@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +67,12 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+    /** Hosted here so HOME MAIN cannot unmount the Compose picker before the result arrives. */
+    private val tileIconPickLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            launcherState?.onTileIconPicked(uri)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = MetroSplash.install(this)
         // Hold the system splash until Compose draws its matching loader (avoids a black gap
@@ -99,6 +106,13 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(state.pendingWidgetConfigureIntent) {
                 val intent = state.pendingWidgetConfigureIntent ?: return@LaunchedEffect
                 widgetConfigureLauncher.launch(intent)
+            }
+
+            LaunchedEffect(state.tileIconPickRequestId) {
+                if (state.tileIconPickRequestId == 0) return@LaunchedEffect
+                tileIconPickLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
             }
 
             DisposableEffect(state) {

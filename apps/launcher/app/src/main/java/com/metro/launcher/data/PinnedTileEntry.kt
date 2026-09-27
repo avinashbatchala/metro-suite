@@ -69,12 +69,21 @@ data class PinnedTileEntry(
     /**
      * Optional package whose launcher icon is drawn on this tile.
      * Null / blank = [packageName] (or suite branding / icon pack for that package).
+     * Ignored when [useCustomIcon] is true.
      */
     val iconPackage: String? = null,
+    /**
+     * When true, draw the user-cropped photo from [TileCustomIcon] instead of the app glyph.
+     */
+    val useCustomIcon: Boolean = false,
     /**
      * Multiplier on the default Start glyph size for this tile. Clamped on read/write.
      */
     val iconScale: Float = DEFAULT_ICON_SCALE,
+    /**
+     * Optional Start-face name override. Null / blank = package / provider label.
+     */
+    val customTitle: String? = null,
     /** When true, medium/wide faces omit the bottom-left app name. */
     val hideTitle: Boolean = false,
 ) {

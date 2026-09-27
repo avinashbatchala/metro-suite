@@ -168,7 +168,10 @@ class LauncherRepository(private val context: Context) {
             null
         }
         val label = resolveAppLabel(packageName)
-        val title = providerData?.title ?: label ?: packageName.substringAfterLast('.')
+        val title = customTitle?.takeIf { it.isNotBlank() }
+            ?: providerData?.title
+            ?: label
+            ?: packageName.substringAfterLast('.')
         val background = resolvePinnedBackgroundColor(
             entry = this,
             providerBackgroundHex = providerData?.backgroundColorHex,

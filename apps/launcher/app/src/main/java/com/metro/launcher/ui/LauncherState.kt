@@ -28,6 +28,7 @@ import com.metro.launcher.data.PinnedTileEntry
 import com.metro.launcher.data.PinnedTileSize
 import com.metro.launcher.data.TileAppWidgetController
 import com.metro.launcher.data.TileBackgroundMode
+import com.metro.launcher.data.TileCustomIcon
 import com.metro.launcher.data.TileNotificationAccess
 import com.metro.launcher.data.TileSizeCycle
 import com.metro.launcher.data.adaptTilesToColumnCount
@@ -150,11 +151,25 @@ class LauncherState(context: Context) {
     var tileCustomizeLaunchTargetPickerOpen by mutableStateOf(false)
         private set
     var tileCustomizeLaunchTargetPickerExiting by mutableStateOf(false)
-    /** Per-tile icon picker stacked on customize (same chrome as launch-target). */
-    var tileCustomizeIconPickerOpen by mutableStateOf(false)
+    /** Custom tile-icon crop subpage (Start-background choose-photo pattern). */
+    var tileCustomizeIconCropOpen by mutableStateOf(false)
         private set
-    var tileCustomizeIconPickerExiting by mutableStateOf(false)
-    /** Cached launchable apps for launch-target / icon pickers (loaded on open). */
+    var tileCustomizeIconCropExiting by mutableStateOf(false)
+    var tileCustomizeIconCropUri by mutableStateOf<android.net.Uri?>(null)
+        private set
+    /** Bumped when a draft crop is written so the thumb reloads. */
+    var tileCustomizeIconReloadEpoch by mutableIntStateOf(0)
+        private set
+    /**
+     * True while the system photo picker is open for a tile icon. Suppresses Home MAIN
+     * dismiss so the pick result can still open the crop page.
+     */
+    var awaitingTileIconPick by mutableStateOf(false)
+        private set
+    /** Bumped to ask [MainActivity] to launch PickVisualMedia. */
+    var tileIconPickRequestId by mutableIntStateOf(0)
+        private set
+    /** Cached launchable apps for the launch-target picker (loaded on open). */
     var launchTargetPickerApps by mutableStateOf<List<MetroAppPickerEntry>>(emptyList())
         private set
     val widgetController = TileAppWidgetController(appContext)
@@ -535,6 +550,14 @@ class LauncherState(context: Context) {
      * @return true when an overlay was active and the shell should finish the home return.
      */
     fun onHomeRequested(): Boolean {
+        // Default-home + system photo picker: returning often re-delivers ACTION_MAIN here.
+        // Closing customize drops the pick / crop session and remounts Start (looks like a restart).
+        if (awaitingTileIconPick ||
+            tileCustomizeIconCropOpen ||
+            tileCustomizeIconCropExiting
+        ) {
+            return false
+        }
         val wasCustomizing = customizingTile != null
         val wasEditing = editingTile != null
         if (!wasCustomizing && !wasEditing) {
@@ -584,8 +607,10 @@ class LauncherState(context: Context) {
                         ?: MetroPreferences.DEFAULT_ACCENT_HEX,
                 ),
             launchTargetPackage = current.resolvedLaunchTargetForPicker(),
-            iconPackage = current.entry.iconPackage,
+            useCustomIcon = current.entry.useCustomIcon,
             iconScale = current.entry.resolvedIconScale(),
+            customTitle = current.entry.customTitle?.takeIf { it.isNotBlank() }
+                ?: current.title,
             hideTitle = current.entry.hideTitle,
             useCustomWidget = current.entry.useCustomWidget,
             widgetProvider = current.entry.widgetProvider,
@@ -596,8 +621,15 @@ class LauncherState(context: Context) {
         tileCustomizeColorPickerExiting = false
         tileCustomizeLaunchTargetPickerOpen = false
         tileCustomizeLaunchTargetPickerExiting = false
-        tileCustomizeIconPickerOpen = false
-        tileCustomizeIconPickerExiting = false
+        tileCustomizeIconCropOpen = false
+        tileCustomizeIconCropExiting = false
+        tileCustomizeIconCropUri = null
+        awaitingTileIconPick = false
+        TileCustomIcon.clearDraft(
+            appContext,
+            current.entry.packageName,
+            current.entry.tileId,
+        )
     }
 
     fun onTileCustomizeEnterComplete() {
@@ -605,14 +637,14 @@ class LauncherState(context: Context) {
         if (customizingTile == null || tileCustomizeExiting) return
         if (tileCustomizeColorPickerOpen || tileCustomizeColorPickerExiting) return
         if (tileCustomizeLaunchTargetPickerOpen || tileCustomizeLaunchTargetPickerExiting) return
-        if (tileCustomizeIconPickerOpen || tileCustomizeIconPickerExiting) return
+        if (tileCustomizeIconCropOpen || tileCustomizeIconCropExiting) return
         tileCustomizeAppBarVisible = true
     }
 
     fun openTileColorPicker() {
         if (customizingTile == null || tileCustomizeExiting) return
         if (tileCustomizeLaunchTargetPickerOpen || tileCustomizeLaunchTargetPickerExiting) return
-        if (tileCustomizeIconPickerOpen || tileCustomizeIconPickerExiting) return
+        if (tileCustomizeIconCropOpen || tileCustomizeIconCropExiting) return
         tileCustomizeAppBarVisible = false
         tileCustomizeColorPickerOpen = true
         tileCustomizeColorPickerExiting = false
@@ -643,7 +675,7 @@ class LauncherState(context: Context) {
     fun openTileLaunchTargetPicker() {
         if (customizingTile == null || tileCustomizeExiting) return
         if (tileCustomizeColorPickerOpen || tileCustomizeColorPickerExiting) return
-        if (tileCustomizeIconPickerOpen || tileCustomizeIconPickerExiting) return
+        if (tileCustomizeIconCropOpen || tileCustomizeIconCropExiting) return
         tileCustomizeAppBarVisible = false
         tileCustomizeLaunchTargetPickerOpen = true
         tileCustomizeLaunchTargetPickerExiting = false
@@ -673,35 +705,51 @@ class LauncherState(context: Context) {
         beginCloseTileLaunchTargetPicker()
     }
 
-    fun openTileIconPicker() {
+    fun requestTileIconPick() {
         if (customizingTile == null || tileCustomizeExiting) return
         if (tileCustomizeColorPickerOpen || tileCustomizeColorPickerExiting) return
         if (tileCustomizeLaunchTargetPickerOpen || tileCustomizeLaunchTargetPickerExiting) return
+        if (tileCustomizeIconCropOpen || tileCustomizeIconCropExiting) return
+        awaitingTileIconPick = true
+        tileIconPickRequestId++
+    }
+
+    fun onTileIconPicked(uri: android.net.Uri?) {
+        awaitingTileIconPick = false
+        if (uri == null) return
+        openTileIconCrop(uri)
+    }
+
+    fun openTileIconCrop(uri: android.net.Uri) {
+        if (customizingTile == null || tileCustomizeExiting) return
+        if (tileCustomizeColorPickerOpen || tileCustomizeColorPickerExiting) return
+        if (tileCustomizeLaunchTargetPickerOpen || tileCustomizeLaunchTargetPickerExiting) return
+        awaitingTileIconPick = false
         tileCustomizeAppBarVisible = false
-        tileCustomizeIconPickerOpen = true
-        tileCustomizeIconPickerExiting = false
-        ensureLaunchTargetPickerApps()
+        tileCustomizeIconCropUri = uri
+        tileCustomizeIconCropOpen = true
+        tileCustomizeIconCropExiting = false
     }
 
-    fun beginCloseTileIconPicker() {
-        if (!tileCustomizeIconPickerOpen || tileCustomizeIconPickerExiting) return
-        tileCustomizeIconPickerExiting = true
+    fun beginCloseTileIconCrop() {
+        if (!tileCustomizeIconCropOpen || tileCustomizeIconCropExiting) return
+        tileCustomizeIconCropExiting = true
     }
 
-    fun finishCloseTileIconPicker() {
-        tileCustomizeIconPickerOpen = false
-        tileCustomizeIconPickerExiting = false
+    fun finishCloseTileIconCrop() {
+        tileCustomizeIconCropOpen = false
+        tileCustomizeIconCropExiting = false
+        tileCustomizeIconCropUri = null
         if (customizingTile != null && !tileCustomizeExiting) {
             tileCustomizeAppBarVisible = true
         }
     }
 
-    fun selectTileIcon(packageName: String?) {
+    fun onTileIconCropSaved() {
         val draft = tileCustomizeDraft ?: return
-        tileCustomizeDraft = draft.copy(
-            iconPackage = packageName?.takeIf { it.isNotBlank() },
-        )
-        beginCloseTileIconPicker()
+        tileCustomizeDraft = draft.copy(useCustomIcon = true)
+        tileCustomizeIconReloadEpoch++
+        beginCloseTileIconCrop()
     }
 
     private fun ensureLaunchTargetPickerApps() {
@@ -726,8 +774,8 @@ class LauncherState(context: Context) {
             beginCloseTileLaunchTargetPicker()
             return
         }
-        if (tileCustomizeIconPickerOpen) {
-            beginCloseTileIconPicker()
+        if (tileCustomizeIconCropOpen) {
+            beginCloseTileIconCrop()
             return
         }
         tileCustomizeAppBarVisible = false
@@ -737,6 +785,14 @@ class LauncherState(context: Context) {
     }
 
     fun finishCloseTileCustomize() {
+        val tile = customizingTile
+        if (tile != null) {
+            TileCustomIcon.clearDraft(
+                appContext,
+                tile.entry.packageName,
+                tile.entry.tileId,
+            )
+        }
         customizingTile = null
         tileCustomizeDraft = null
         tileCustomizeExiting = false
@@ -745,8 +801,10 @@ class LauncherState(context: Context) {
         tileCustomizeColorPickerExiting = false
         tileCustomizeLaunchTargetPickerOpen = false
         tileCustomizeLaunchTargetPickerExiting = false
-        tileCustomizeIconPickerOpen = false
-        tileCustomizeIconPickerExiting = false
+        tileCustomizeIconCropOpen = false
+        tileCustomizeIconCropExiting = false
+        tileCustomizeIconCropUri = null
+        awaitingTileIconPick = false
         launchTargetPickerApps = emptyList()
     }
 
@@ -786,8 +844,9 @@ class LauncherState(context: Context) {
                 backgroundMode = draft.backgroundMode,
                 customBackgroundHex = bgHex,
                 launchTargetPackage = launchTarget,
-                iconPackage = draft.iconPackage,
+                useCustomIcon = draft.useCustomIcon,
                 iconScale = draft.iconScale,
+                customTitle = draft.customTitle,
                 hideTitle = draft.hideTitle,
                 useCustomWidget = false,
                 widgetProvider = null,
@@ -803,8 +862,9 @@ class LauncherState(context: Context) {
                 backgroundMode = draft.backgroundMode,
                 customBackgroundHex = bgHex,
                 launchTargetPackage = launchTarget,
-                iconPackage = draft.iconPackage,
+                useCustomIcon = draft.useCustomIcon,
                 iconScale = draft.iconScale,
+                customTitle = draft.customTitle,
                 hideTitle = draft.hideTitle,
                 useCustomWidget = true,
                 widgetProvider = draft.widgetProvider,
@@ -878,8 +938,9 @@ class LauncherState(context: Context) {
                 tilePackage = key.packageName,
                 selected = draft.launchTargetPackage,
             ),
-            iconPackage = draft.iconPackage,
+            useCustomIcon = draft.useCustomIcon,
             iconScale = draft.iconScale,
+            customTitle = draft.customTitle,
             hideTitle = draft.hideTitle,
             useCustomWidget = true,
             widgetProvider = draft.widgetProvider,
@@ -909,8 +970,9 @@ class LauncherState(context: Context) {
                 tilePackage = key.packageName,
                 selected = draft.launchTargetPackage,
             ),
-            iconPackage = draft.iconPackage,
+            useCustomIcon = draft.useCustomIcon,
             iconScale = draft.iconScale,
+            customTitle = draft.customTitle,
             hideTitle = draft.hideTitle,
             useCustomWidget = true,
             widgetProvider = provider,
@@ -924,13 +986,20 @@ class LauncherState(context: Context) {
         backgroundMode: TileBackgroundMode,
         customBackgroundHex: String?,
         launchTargetPackage: String?,
-        iconPackage: String?,
+        useCustomIcon: Boolean,
         iconScale: Float,
+        customTitle: String,
         hideTitle: Boolean,
         useCustomWidget: Boolean,
         widgetProvider: String?,
         appWidgetId: Int,
     ) {
+        TileCustomIcon.commit(
+            context = appContext,
+            packageName = key.packageName,
+            tileId = key.tileId,
+            enabled = useCustomIcon,
+        )
         layoutEpoch++
         pinnedEntries = pinnedEntries.map { entry ->
             if (entry.packageName == key.packageName && entry.tileId == key.tileId) {
@@ -938,8 +1007,11 @@ class LauncherState(context: Context) {
                     backgroundMode = backgroundMode,
                     customBackgroundHex = customBackgroundHex,
                     launchTargetPackage = launchTargetPackage?.takeIf { it.isNotBlank() },
-                    iconPackage = iconPackage?.takeIf { it.isNotBlank() },
+                    // Custom photo replaces any prior app-icon override.
+                    iconPackage = if (useCustomIcon) null else entry.iconPackage,
+                    useCustomIcon = useCustomIcon,
                     iconScale = PinnedTileEntry.clampIconScale(iconScale),
+                    customTitle = customTitle.takeIf { it.isNotBlank() },
                     hideTitle = hideTitle,
                     useCustomWidget = useCustomWidget,
                     widgetProvider = widgetProvider,
@@ -1054,6 +1126,7 @@ class LauncherState(context: Context) {
 
     fun unpinTile(entry: PinnedTileEntry) {
         deleteWidgetIfNeeded(entry)
+        TileCustomIcon.clear(appContext, entry.packageName, entry.tileId)
         pinnedEntries = pinnedEntries.filterNot {
             it.packageName == entry.packageName && it.tileId == entry.tileId
         }

@@ -672,14 +672,13 @@ private fun TileCustomizeOverlay(
         val launchTargetPickerOpen = state.tileCustomizeLaunchTargetPickerOpen
         val launchTargetPickerExiting = state.tileCustomizeLaunchTargetPickerExiting
         val showingLaunchTargetPicker = launchTargetPickerOpen || launchTargetPickerExiting
-        val iconPickerOpen = state.tileCustomizeIconPickerOpen
-        val iconPickerExiting = state.tileCustomizeIconPickerExiting
-        val showingIconPicker = iconPickerOpen || iconPickerExiting
-        val showingSubpage = showingColorPicker || showingLaunchTargetPicker || showingIconPicker
+        val iconCropOpen = state.tileCustomizeIconCropOpen
+        val iconCropExiting = state.tileCustomizeIconCropExiting
+        val showingIconCrop = iconCropOpen || iconCropExiting
+        val showingSubpage = showingColorPicker || showingLaunchTargetPicker || showingIconCrop
         val epoch = state.tileCustomizeEpoch
         val exiting = state.tileCustomizeExiting
         val noneLaunchLabel = stringResource(R.string.tile_customize_launch_target_none)
-        val defaultIconLabel = stringResource(R.string.tile_customize_icon_default)
         val launchTargetLabel = remember(
             customizeDraft.launchTargetPackage,
             state.launchTargetPickerApps,
@@ -688,18 +687,6 @@ private fun TileCustomizeOverlay(
         ) {
             val pkg = customizeDraft.launchTargetPackage?.takeIf { it.isNotBlank() }
                 ?: return@remember noneLaunchLabel
-            state.launchTargetPickerApps.firstOrNull { it.packageName == pkg }?.label
-                ?: state.apps.firstOrNull { it.packageName == pkg }?.label
-                ?: pkg.substringAfterLast('.')
-        }
-        val iconLabel = remember(
-            customizeDraft.iconPackage,
-            state.launchTargetPickerApps,
-            state.apps,
-            defaultIconLabel,
-        ) {
-            val pkg = customizeDraft.iconPackage?.takeIf { it.isNotBlank() }
-                ?: return@remember defaultIconLabel
             state.launchTargetPickerApps.firstOrNull { it.packageName == pkg }?.label
                 ?: state.apps.firstOrNull { it.packageName == pkg }?.label
                 ?: pkg.substringAfterLast('.')
@@ -714,12 +701,12 @@ private fun TileCustomizeOverlay(
         BackHandler(enabled = launchTargetPickerOpen && !launchTargetPickerExiting) {
             state.beginCloseTileLaunchTargetPicker()
         }
-        BackHandler(enabled = iconPickerOpen && !iconPickerExiting) {
-            state.beginCloseTileIconPicker()
+        BackHandler(enabled = iconCropOpen && !iconCropExiting) {
+            state.beginCloseTileIconCrop()
         }
         BackHandler(
             enabled = exiting || colorPickerExiting || launchTargetPickerExiting ||
-                iconPickerExiting,
+                iconCropExiting,
         ) { }
 
         Box(
@@ -758,9 +745,9 @@ private fun TileCustomizeOverlay(
                             onDraftChange = state::updateTileCustomizeDraft,
                             onOpenColorPicker = state::openTileColorPicker,
                             onOpenLaunchTargetPicker = state::openTileLaunchTargetPicker,
-                            onOpenIconPicker = state::openTileIconPicker,
+                            onRequestIconPick = state::requestTileIconPick,
+                            customIconReloadEpoch = state.tileCustomizeIconReloadEpoch,
                             launchTargetLabel = launchTargetLabel,
-                            iconLabel = iconLabel,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -837,23 +824,27 @@ private fun TileCustomizeOverlay(
                     }
                 }
 
-                if (showingIconPicker) {
-                    MetroPagePivotLoad(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MetroTheme.colors.secondarySurface),
-                        loadKey = "tileIcon:$epoch",
-                        exiting = iconPickerExiting,
-                        onExitComplete = state::finishCloseTileIconPicker,
-                    ) {
-                        MetroAppPickerScreen(
-                            apps = state.launchTargetPickerApps,
-                            selectedPackageName = customizeDraft.iconPackage,
-                            headerTitle = stringResource(R.string.tile_customize_choose_icon),
-                            onSelected = state::selectTileIcon,
-                            onBack = state::beginCloseTileIconPicker,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                if (showingIconCrop) {
+                    val cropUri = state.tileCustomizeIconCropUri
+                    if (cropUri != null) {
+                        MetroPagePivotLoad(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MetroTheme.colors.background),
+                            loadKey = "tileIconCrop:$epoch",
+                            exiting = iconCropExiting,
+                            onExitComplete = state::finishCloseTileIconCrop,
+                        ) {
+                            TileIconCropScreen(
+                                sourceUri = cropUri,
+                                packageName = customizing.entry.packageName,
+                                tileId = customizing.entry.tileId,
+                                tileSize = customizing.entry.size,
+                                onSaved = state::onTileIconCropSaved,
+                                onCancel = state::beginCloseTileIconCrop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }

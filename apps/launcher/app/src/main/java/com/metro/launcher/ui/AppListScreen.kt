@@ -787,6 +787,8 @@ private fun AppListAppRow(
                 }
             }
             .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
                 onClick = onAppClick,
                 onLongClick = { onLongClick(iconBounds.value) },
             ),

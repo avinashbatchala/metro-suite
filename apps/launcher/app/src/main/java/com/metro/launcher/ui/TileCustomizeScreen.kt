@@ -1,9 +1,11 @@
 package com.metro.launcher.ui
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -23,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,28 +34,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.metro.launcher.R
 import com.metro.launcher.data.DisplayTile
 import com.metro.launcher.data.PinnedTileEntry
 import com.metro.launcher.data.PinnedTileSize
 import com.metro.launcher.data.TileBackgroundMode
+import com.metro.launcher.data.TileCustomIcon
 import com.metro.launcher.data.TileWidgetOption
 import com.metro.launcher.data.supportsCustomWidget
 import com.metro.system.MetroAccentPalette
 import com.metro.system.MetroPreferences
+import com.metro.ui.MetroAppTitle
+import com.metro.ui.MetroBorderButton
 import com.metro.ui.MetroDimens
 import com.metro.ui.MetroListPicker
 import com.metro.ui.MetroListPickerOption
+import com.metro.ui.MetroPivot
 import com.metro.ui.MetroSlider
 import com.metro.ui.MetroText
+import com.metro.ui.MetroTextBox
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroToggleSwitch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Preview square matching Settings / lockscreen choose-photo thumbs. */
+private val TileIconThumbSize = 108.dp
+
+private val TileIconPlaceholderGray = Color(0xFF6E6E6E)
 
 /**
  * Draft values for the tile customize page — applied only when Save is tapped.
@@ -60,8 +80,9 @@ data class TileCustomizeDraft(
     val backgroundMode: TileBackgroundMode,
     val customBackgroundHex: String?,
     val launchTargetPackage: String?,
-    val iconPackage: String?,
+    val useCustomIcon: Boolean,
     val iconScale: Float,
+    val customTitle: String,
     val hideTitle: Boolean,
     val useCustomWidget: Boolean,
     val widgetProvider: String?,
@@ -74,9 +95,9 @@ fun TileCustomizeScreen(
     onDraftChange: (TileCustomizeDraft) -> Unit,
     onOpenColorPicker: () -> Unit,
     onOpenLaunchTargetPicker: () -> Unit,
-    onOpenIconPicker: () -> Unit,
+    onRequestIconPick: () -> Unit,
+    customIconReloadEpoch: Int,
     launchTargetLabel: String,
-    iconLabel: String,
     modifier: Modifier = Modifier,
 ) {
     val widgetController = LocalTileAppWidgetController.current
@@ -85,6 +106,14 @@ fun TileCustomizeScreen(
         mutableStateOf<List<TileWidgetOption>>(emptyList())
     }
     var widgetsLoading by remember(tile.entry.packageName) { mutableStateOf(false) }
+    val pagerState = rememberPagerState(pageCount = { 3 })
+    val scope = rememberCoroutineScope()
+    val tabCustomise = stringResource(R.string.tile_customize_tab_customise)
+    val tabWidgets = stringResource(R.string.tile_customize_tab_widgets)
+    val tabTiles = stringResource(R.string.tile_customize_tab_tiles)
+    val pivotTitles = remember(tabCustomise, tabWidgets, tabTiles) {
+        listOf(tabCustomise, tabWidgets, tabTiles)
+    }
 
     // Defer AppWidgetManager + preview decode until the toggle is on — scanning providers
     // on open blocked the customize pivot / app-bar enter.
@@ -145,25 +174,91 @@ fun TileCustomizeScreen(
         else -> 1f
     }
 
-    Column(
+    MetroPivot(
+        titles = pivotTitles,
+        pagerState = pagerState,
         modifier = modifier
             .fillMaxSize()
-            .background(MetroTheme.colors.background)
+            .background(MetroTheme.colors.background),
+        header = {
+            // App-title overline above pivot tabs (Settings / hub pattern).
+            MetroAppTitle(title = tile.title)
+        },
+        onTitleClick = { index ->
+            scope.launch { pagerState.animateScrollToPage(index) }
+        },
+    ) { page ->
+        when (page) {
+            0 -> CustomisePage(
+                tile = tile,
+                draft = draft,
+                onDraftChange = onDraftChange,
+                onOpenColorPicker = onOpenColorPicker,
+                onOpenLaunchTargetPicker = onOpenLaunchTargetPicker,
+                onRequestIconPick = onRequestIconPick,
+                customIconReloadEpoch = customIconReloadEpoch,
+                launchTargetLabel = launchTargetLabel,
+                backgroundOptions = backgroundOptions,
+                customColor = customColor,
+                customName = customName,
+            )
+            1 -> WidgetsCustomizePage(
+                draft = draft,
+                onDraftChange = onDraftChange,
+                showWidgetSection = showWidgetSection,
+                widgetsLoading = widgetsLoading,
+                widgetOptions = widgetOptions,
+                tileAspect = tileAspect,
+                draftRevealsWindow = draftRevealsWindow,
+                draftTileFill = draftTileFill,
+            )
+            else -> TilesCustomizePage()
+        }
+    }
+}
+
+@Composable
+private fun CustomisePage(
+    tile: DisplayTile,
+    draft: TileCustomizeDraft,
+    onDraftChange: (TileCustomizeDraft) -> Unit,
+    onOpenColorPicker: () -> Unit,
+    onOpenLaunchTargetPicker: () -> Unit,
+    onRequestIconPick: () -> Unit,
+    customIconReloadEpoch: Int,
+    launchTargetLabel: String,
+    backgroundOptions: List<MetroListPickerOption<TileBackgroundMode>>,
+    customColor: Color,
+    customName: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 88.dp),
     ) {
-        // Tight page title — avoid MetroPageHeader's 98dp band under the status bar.
+        Spacer(modifier = Modifier.height(12.dp))
         MetroText(
-            text = tile.title,
-            style = MetroTextStyle.PageTitle,
-            color = MetroTheme.colors.primaryText,
+            text = stringResource(R.string.tile_customize_app_name_label),
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText,
             modifier = Modifier.padding(
                 start = MetroDimens.ScreenHorizontalMargin,
-                top = 8.dp,
-                bottom = 16.dp,
+                end = MetroDimens.ScreenHorizontalMargin,
+                bottom = 4.dp,
             ),
         )
+        MetroTextBox(
+            value = draft.customTitle,
+            onValueChange = { text ->
+                onDraftChange(draft.copy(customTitle = text))
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+        )
 
+        Spacer(modifier = Modifier.height(28.dp))
         MetroListPicker(
             selected = draft.backgroundMode,
             options = backgroundOptions,
@@ -194,7 +289,11 @@ fun TileCustomizeScreen(
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
                     .border(2.dp, MetroTheme.colors.primaryText)
-                    .clickable(onClick = onOpenColorPicker)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onOpenColorPicker,
+                    )
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -212,7 +311,6 @@ fun TileCustomizeScreen(
         }
 
         Spacer(modifier = Modifier.height(28.dp))
-        // Drill-in ListPicker — same pattern as Settings icon pack / lockscreen app slots.
         MetroListPicker(
             selected = draft.launchTargetPackage,
             options = emptyList<MetroListPickerOption<String?>>(),
@@ -226,16 +324,16 @@ fun TileCustomizeScreen(
         )
 
         Spacer(modifier = Modifier.height(28.dp))
-        MetroListPicker(
-            selected = draft.iconPackage,
-            options = emptyList<MetroListPickerOption<String?>>(),
-            onSelectedChange = {},
-            label = stringResource(R.string.tile_customize_icon_label),
-            placeholder = iconLabel,
-            onOpen = onOpenIconPicker,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+        TileIconImagePickerRow(
+            packageName = tile.entry.packageName,
+            tileId = tile.entry.tileId,
+            tileSize = tile.entry.size,
+            enabled = draft.useCustomIcon,
+            reloadEpoch = customIconReloadEpoch,
+            onChoosePhoto = onRequestIconPick,
+            onRemove = {
+                onDraftChange(draft.copy(useCustomIcon = false))
+            },
         )
 
         Spacer(modifier = Modifier.height(28.dp))
@@ -276,77 +374,213 @@ fun TileCustomizeScreen(
                     .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
             )
         }
+    }
+}
 
-        if (showWidgetSection) {
-            Spacer(modifier = Modifier.height(28.dp))
-            MetroToggleSwitch(
-                checked = draft.useCustomWidget,
-                onCheckedChange = { enabled ->
-                    onDraftChange(
-                        draft.copy(
-                            useCustomWidget = enabled,
-                            widgetProvider = if (enabled) draft.widgetProvider else null,
+/**
+ * WP8.1 Start-background-style choose photo row for the tile icon.
+ */
+@Composable
+private fun TileIconImagePickerRow(
+    packageName: String,
+    tileId: String,
+    tileSize: PinnedTileSize,
+    enabled: Boolean,
+    reloadEpoch: Int,
+    onChoosePhoto: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var thumbBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val thumbAspect = when (tileSize) {
+        PinnedTileSize.FourByTwo -> 2f
+        else -> 1f
+    }
+
+    LaunchedEffect(enabled, reloadEpoch, packageName, tileId) {
+        thumbBitmap = if (enabled) {
+            withContext(Dispatchers.IO) {
+                TileCustomIcon.decodeForPreview(context, packageName, tileId)
+            }
+        } else {
+            null
+        }
+    }
+
+    Row(
+        modifier = modifier.padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .height(TileIconThumbSize)
+                .aspectRatio(thumbAspect)
+                .background(TileIconPlaceholderGray),
+        ) {
+            thumbBitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = stringResource(R.string.tile_customize_icon_label),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f, fill = false)) {
+            MetroText(
+                text = stringResource(R.string.tile_customize_icon_label),
+                style = MetroTextStyle.Body,
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+            MetroBorderButton(
+                text = stringResource(R.string.tile_customize_choose_photo),
+                onClick = onChoosePhoto,
+            )
+            if (enabled) {
+                Spacer(modifier = Modifier.size(12.dp))
+                val removeLabel = stringResource(R.string.tile_customize_remove_photo)
+                MetroText(
+                    text = remember(removeLabel) {
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
+                                append(removeLabel)
+                            }
+                        }
+                    },
+                    style = MetroTextStyle.Body,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                TileCustomIcon.clearDraft(context, packageName, tileId)
+                                onRemove()
+                            },
+                        )
+                        .padding(vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WidgetsCustomizePage(
+    draft: TileCustomizeDraft,
+    onDraftChange: (TileCustomizeDraft) -> Unit,
+    showWidgetSection: Boolean,
+    widgetsLoading: Boolean,
+    widgetOptions: List<TileWidgetOption>,
+    tileAspect: Float,
+    draftRevealsWindow: Boolean,
+    draftTileFill: Color,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 88.dp),
+    ) {
+        Spacer(modifier = Modifier.height(12.dp))
+        if (!showWidgetSection) {
+            MetroText(
+                text = stringResource(R.string.tile_customize_widget_empty),
+                style = MetroTextStyle.Body,
+                color = MetroTheme.colors.secondaryText,
+                modifier = Modifier.padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+            )
+            return
+        }
+
+        MetroToggleSwitch(
+            checked = draft.useCustomWidget,
+            onCheckedChange = { enabled ->
+                onDraftChange(
+                    draft.copy(
+                        useCustomWidget = enabled,
+                        widgetProvider = if (enabled) draft.widgetProvider else null,
+                    ),
+                )
+            },
+            label = stringResource(R.string.tile_customize_widget_label),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+        )
+
+        if (draft.useCustomWidget) {
+            Spacer(modifier = Modifier.height(12.dp))
+            when {
+                widgetsLoading -> Unit
+                widgetOptions.isEmpty() -> {
+                    MetroText(
+                        text = stringResource(R.string.tile_customize_widget_empty),
+                        style = MetroTextStyle.Body,
+                        color = MetroTheme.colors.secondaryText,
+                        modifier = Modifier.padding(
+                            horizontal = MetroDimens.ScreenHorizontalMargin,
                         ),
                     )
-                },
-                label = stringResource(R.string.tile_customize_widget_label),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
-            )
-
-            if (draft.useCustomWidget) {
-                Spacer(modifier = Modifier.height(12.dp))
-                when {
-                    widgetsLoading -> Unit
-                    widgetOptions.isEmpty() -> {
-                        MetroText(
-                            text = stringResource(R.string.tile_customize_widget_empty),
-                            style = MetroTextStyle.Body,
-                            color = MetroTheme.colors.secondaryText,
-                            modifier = Modifier.padding(
-                                horizontal = MetroDimens.ScreenHorizontalMargin,
-                            ),
-                        )
-                    }
-                    else -> {
-                        MetroText(
-                            text = stringResource(R.string.tile_customize_widget_pick),
-                            style = MetroTextStyle.ListItemSubtitle,
-                            color = MetroTheme.colors.secondaryText,
-                            modifier = Modifier.padding(
-                                start = MetroDimens.ScreenHorizontalMargin,
-                                end = MetroDimens.ScreenHorizontalMargin,
-                                bottom = 8.dp,
-                            ),
-                        )
-                        widgetOptions.forEach { option ->
-                            WidgetProviderPreviewTile(
-                                option = option,
-                                selected = draft.widgetProvider ==
-                                    option.provider.flattenToString(),
-                                aspectRatio = tileAspect,
-                                useWindowFill = draftRevealsWindow,
-                                tileFill = draftTileFill,
-                                onClick = {
-                                    onDraftChange(
-                                        draft.copy(
-                                            widgetProvider = option.provider.flattenToString(),
-                                        ),
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = MetroDimens.ScreenHorizontalMargin,
-                                        vertical = 8.dp,
+                }
+                else -> {
+                    MetroText(
+                        text = stringResource(R.string.tile_customize_widget_pick),
+                        style = MetroTextStyle.ListItemSubtitle,
+                        color = MetroTheme.colors.accent,
+                        modifier = Modifier.padding(
+                            start = MetroDimens.ScreenHorizontalMargin,
+                            end = MetroDimens.ScreenHorizontalMargin,
+                            bottom = 8.dp,
+                        ),
+                    )
+                    widgetOptions.forEach { option ->
+                        WidgetProviderPreviewTile(
+                            option = option,
+                            selected = draft.widgetProvider ==
+                                option.provider.flattenToString(),
+                            aspectRatio = tileAspect,
+                            useWindowFill = draftRevealsWindow,
+                            tileFill = draftTileFill,
+                            onClick = {
+                                onDraftChange(
+                                    draft.copy(
+                                        widgetProvider = option.provider.flattenToString(),
                                     ),
-                            )
-                        }
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = MetroDimens.ScreenHorizontalMargin,
+                                    vertical = 8.dp,
+                                ),
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TilesCustomizePage() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                horizontal = MetroDimens.ScreenHorizontalMargin,
+                vertical = 24.dp,
+            ),
+    ) {
+        MetroText(
+            text = stringResource(R.string.tile_customize_tiles_empty),
+            style = MetroTextStyle.Body,
+            color = MetroTheme.colors.secondaryText,
+        )
     }
 }
 
@@ -378,7 +612,11 @@ private fun WidgetProviderPreviewTile(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(aspectRatio)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .then(
                 if (useWindowFill) {
                     Modifier.drawStartBackgroundWindow(startBackground)

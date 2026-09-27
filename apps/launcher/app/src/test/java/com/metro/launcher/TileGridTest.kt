@@ -209,12 +209,16 @@ class TileGridTest {
             size = PinnedTileSize.TwoByTwo,
             launchTargetPackage = "com.metro.dialer",
             iconPackage = "com.metro.messaging",
+            useCustomIcon = true,
             iconScale = 1.25f,
+            customTitle = "Inbox",
             hideTitle = true,
         )
         assertEquals("com.metro.dialer", entry.launchTargetPackage)
         assertEquals("com.metro.messaging", entry.iconPackage)
+        assertTrue(entry.useCustomIcon)
         assertEquals(1.25f, entry.iconScale, 0.001f)
+        assertEquals("Inbox", entry.customTitle)
         assertTrue(entry.hideTitle)
         assertEquals("com.metro.messaging", entry.resolvedIconPackage())
         assertEquals(1.25f, entry.resolvedIconScale(), 0.001f)

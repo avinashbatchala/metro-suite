@@ -47,11 +47,15 @@ class PinnedTileStore(context: Context) {
                         tile.iconPackage?.takeIf { it.isNotBlank() }?.let {
                             put("iconPackage", it)
                         }
+                        if (tile.useCustomIcon) put("useCustomIcon", true)
                         if (tile.iconScale != PinnedTileEntry.DEFAULT_ICON_SCALE) {
                             put(
                                 "iconScale",
                                 PinnedTileEntry.clampIconScale(tile.iconScale).toDouble(),
                             )
+                        }
+                        tile.customTitle?.takeIf { it.isNotBlank() }?.let {
+                            put("customTitle", it)
                         }
                         if (tile.hideTitle) put("hideTitle", true)
                     },
@@ -101,12 +105,15 @@ class PinnedTileStore(context: Context) {
                                 .takeIf { it.isNotBlank() },
                             iconPackage = obj.optString("iconPackage", "")
                                 .takeIf { it.isNotBlank() },
+                            useCustomIcon = obj.optBoolean("useCustomIcon", false),
                             iconScale = PinnedTileEntry.clampIconScale(
                                 obj.optDouble(
                                     "iconScale",
                                     PinnedTileEntry.DEFAULT_ICON_SCALE.toDouble(),
                                 ).toFloat(),
                             ),
+                            customTitle = obj.optString("customTitle", "")
+                                .takeIf { it.isNotBlank() },
                             hideTitle = obj.optBoolean("hideTitle", false),
                         ),
                     )
