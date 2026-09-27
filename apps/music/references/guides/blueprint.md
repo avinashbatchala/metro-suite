@@ -70,9 +70,9 @@ Collection list pages show **`showing <filter>`** (`MetroShowingLabel`) with fil
 
 ### Page 5 — Album detail
 
-- **Layout:** Square art with play overlay; album title; artist; track list; text action `download` only when source is streaming and offline cache is supported (v1: hide for local; YT Music may show unavailable stub).
-- **Navigation:** Track tap → play album queue from index. Back → previous.
-- **Reference:** `images/album_detail_dark_teal.jpg`
+- **Layout:** Artist caps overline; album title; accent section headers `in collection` (library tracks for this album) then `discover` (YouTube Music album browse or search results not already owned).
+- **Navigation:** Track tap → play that section’s queue from index. Back → previous. Discover albums with a YT browse id load full album tracks under discover when nothing is in collection.
+- **Reference:** `images/album_detail_dark_teal.jpg`. Discover section: see `known-gaps.md`.
 
 ### Page 6 — Settings
 

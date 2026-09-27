@@ -28,11 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.metro.music.data.Album
 import com.metro.music.data.Artist
 import com.metro.music.data.ArtistAboutLogic
@@ -41,7 +37,6 @@ import com.metro.music.data.LibraryLogic
 import com.metro.music.data.Playlist
 import com.metro.music.data.ShowingFilter
 import com.metro.music.data.Song
-import com.metro.music.ytmusic.ArtistAboutClient
 import com.metro.ui.MetroAppTitle
 import com.metro.ui.MetroBorderButton
 import com.metro.ui.MetroLoadingScreen
@@ -253,9 +248,8 @@ private fun AlbumsList(
         onJumpTargetConsumed = onJumpConsumed,
         onLetterMarkerClick = onOpenJumpList,
     ) { album ->
-        MusicListRow(
-            title = album.title,
-            subtitle = album.artist,
+        MusicAlbumRow(
+            album = album,
             onClick = { state.openAlbum(album) },
         )
     }
@@ -407,7 +401,8 @@ private fun isLibraryPageLoading(state: MusicState): Boolean {
 @Composable
 fun AlbumDetailScreen(state: MusicState, album: Album, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val songs = state.songsForAlbumDetail(album)
+    val collection = state.songsForAlbum(album)
+    val discover = state.albumDiscoverSongs
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -420,12 +415,55 @@ fun AlbumDetailScreen(state: MusicState, album: Album, onBack: () -> Unit) {
             style = MetroTextStyle.PageTitle,
             modifier = Modifier.padding(start = 12.dp),
         )
-        Spacer(Modifier.height(12.dp))
-        when {
-            state.albumRemoteLoading && songs.isEmpty() ->
-                MetroLoadingScreen(modifier = Modifier.weight(1f))
-            songs.isEmpty() -> PlaceholderList("No songs.")
-            else -> SongsList(state, songs)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item(key = "album-in-collection-header") {
+                AccentSectionHeader("in collection")
+            }
+            if (collection.isEmpty()) {
+                item(key = "album-in-collection-empty") {
+                    SectionEmpty("No songs in your collection.")
+                }
+            } else {
+                itemsIndexed(collection, key = { index, song -> "ac-${song.id}#$index" }) { index, song ->
+                    MusicListRow(
+                        title = song.title,
+                        subtitle = song.artist.takeIf { it.isNotBlank() },
+                        onClick = { state.playSongs(collection, index) },
+                    )
+                }
+            }
+            item(key = "album-discover-header") {
+                AccentSectionHeader("discover")
+            }
+            when {
+                state.albumDiscoverLoading && discover.isEmpty() -> {
+                    item(key = "album-discover-loading") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MetroLoadingScreen()
+                        }
+                    }
+                }
+                discover.isEmpty() -> {
+                    item(key = "album-discover-empty") {
+                        SectionEmpty("Nothing new to discover right now.")
+                    }
+                }
+                else -> {
+                    itemsIndexed(discover, key = { index, song -> "ad-${song.id}#$index" }) { index, song ->
+                        MusicListRow(
+                            title = song.title,
+                            subtitle = song.artist.takeIf { it.isNotBlank() },
+                            onClick = { state.playSongs(discover, index) },
+                        )
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -556,8 +594,8 @@ private fun ArtistAlbumsPage(state: MusicState, artist: Artist) {
             }
         } else {
             items(collection, key = { it.id }) { album ->
-                MusicListRow(
-                    title = album.title,
+                MusicAlbumRow(
+                    album = album,
                     subtitle = "${album.songCount} songs",
                     onClick = { state.openAlbum(album) },
                 )
@@ -591,9 +629,8 @@ private fun ArtistAlbumsPage(state: MusicState, artist: Artist) {
             }
             else -> {
                 items(discover, key = { it.id }) { album ->
-                    MusicListRow(
-                        title = album.title,
-                        subtitle = album.artist,
+                    MusicAlbumRow(
+                        album = album,
                         onClick = { state.openAlbum(album) },
                     )
                 }
@@ -615,28 +652,20 @@ private fun ArtistAboutPage(state: MusicState) {
                 PlaceholderList(about?.error ?: "No information available.")
                 return
             }
-            val context = LocalContext.current
             val heroUrl = ArtistAboutLogic.heroImageUrl(about)
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp),
             ) {
-                heroUrl?.let { url ->
-                    item(key = "about-image") {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(url)
-                                .addHeader("User-Agent", ArtistAboutClient.USER_AGENT)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = about.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 16.dp),
-                            contentScale = ContentScale.FillWidth,
-                        )
-                    }
+                // Always reserve the hero slot so about has a placeholder while wiki art loads,
+                // and when the page has no image URL at all.
+                item(key = "about-image") {
+                    AboutHeroImage(
+                        url = heroUrl,
+                        contentDescription = about.name,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                    )
                 }
                 about.description?.let { desc ->
                     item(key = "about-desc") {

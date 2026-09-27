@@ -148,6 +148,11 @@ class MusicState(context: Context) {
         private set
     var albumRemoteLoading by mutableStateOf(false)
         private set
+    /** Discover tracks for the open album (YT), excluding songs already in collection. */
+    var albumDiscoverSongs by mutableStateOf<List<Song>>(emptyList())
+        private set
+    var albumDiscoverLoading by mutableStateOf(false)
+        private set
     var artistDiscoverSongs by mutableStateOf<List<Song>>(emptyList())
         private set
     var artistDiscoverAlbums by mutableStateOf<List<Album>>(emptyList())
@@ -607,24 +612,9 @@ class MusicState(context: Context) {
     fun openAlbum(album: Album) {
         selectedAlbum = album
         albumRemoteSongs = emptyList()
+        albumDiscoverSongs = emptyList()
         route = MusicRoute.AlbumDetail
-        val browseId = album.youtubeBrowseId
-        if (browseId != null && songsForAlbum(album).isEmpty()) {
-            albumJob?.cancel()
-            albumJob = scope.launch {
-                albumRemoteLoading = true
-                try {
-                    albumRemoteSongs = withContext(Dispatchers.IO) {
-                        ytClient.albumSongs(browseId)
-                    }
-                } finally {
-                    albumRemoteLoading = false
-                }
-            }
-        } else {
-            albumJob?.cancel()
-            albumRemoteLoading = false
-        }
+        loadAlbumExtras(album)
     }
 
     fun openArtist(artist: Artist) {
@@ -642,6 +632,52 @@ class MusicState(context: Context) {
     fun songsForAlbumDetail(album: Album): List<Song> {
         val local = songsForAlbum(album)
         return local.ifEmpty { albumRemoteSongs }
+    }
+
+    private fun loadAlbumExtras(album: Album) {
+        albumJob?.cancel()
+        albumJob = scope.launch {
+            albumDiscoverLoading = true
+            albumRemoteLoading = true
+            val collection = songsForAlbum(album)
+            try {
+                val remote = withContext(Dispatchers.IO) { resolveAlbumRemoteSongs(album) }
+                albumRemoteSongs = remote
+                albumDiscoverSongs = ArtistDiscoverLogic.songsNotInCollection(remote, collection)
+            } finally {
+                albumDiscoverLoading = false
+                albumRemoteLoading = false
+            }
+        }
+    }
+
+    private fun resolveAlbumRemoteSongs(album: Album): List<Song> {
+        val browseId = album.youtubeBrowseId
+        if (!browseId.isNullOrBlank()) {
+            return ytClient.albumSongs(browseId)
+        }
+        val query = listOf(album.title, album.artist)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+        if (query.isBlank()) return emptyList()
+        val results = ytClient.searchSongs(query, limit = 40)
+        return results.filter { song ->
+            matchesAlbumDiscover(song, album)
+        }.ifEmpty { results }
+    }
+
+    private fun matchesAlbumDiscover(song: Song, album: Album): Boolean {
+        val title = album.title.trim()
+        val artist = album.artist.trim()
+        val albumOk = title.isEmpty() ||
+            song.album.contains(title, ignoreCase = true) ||
+            title.contains(song.album, ignoreCase = true) ||
+            song.album.isBlank()
+        val artistOk = artist.isEmpty() ||
+            song.artist.contains(artist, ignoreCase = true) ||
+            artist.contains(song.artist, ignoreCase = true)
+        return albumOk && artistOk
     }
 
     private fun loadArtistExtras(artist: Artist) {

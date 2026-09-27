@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.metro.music.data.Album
 import com.metro.music.data.LibraryLogic
 import com.metro.ui.MetroDimens
 import com.metro.ui.MetroJumpListLogic
@@ -34,15 +35,37 @@ fun MusicListRow(
     title: String,
     subtitle: String? = null,
     onClick: () -> Unit,
+    leading: @Composable (() -> Unit)? = null,
 ) {
     MetroListItem(
         title = title,
         subtitle = subtitle,
+        leading = leading,
         verticalPadding = RowVerticalPadding,
-        oneLineMinHeight = RowOneLineMinHeight,
-        twoLineMinHeight = RowTwoLineMinHeight,
+        oneLineMinHeight = if (leading != null) AlbumArtThumbnailSize + 8.dp else RowOneLineMinHeight,
+        twoLineMinHeight = if (leading != null) AlbumArtThumbnailSize + 8.dp else RowTwoLineMinHeight,
         singleLine = true,
         onClick = onClick,
+    )
+}
+
+/** Album row with square cover art (placeholder + music glyph while loading). */
+@Composable
+fun MusicAlbumRow(
+    album: Album,
+    onClick: () -> Unit,
+    subtitle: String? = album.artist,
+) {
+    MusicListRow(
+        title = album.title,
+        subtitle = subtitle,
+        onClick = onClick,
+        leading = {
+            AlbumArtThumbnail(
+                model = album.artworkUri,
+                contentDescription = album.title,
+            )
+        },
     )
 }
 
