@@ -4,8 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +44,7 @@ import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroTransitions
+import com.metro.ui.metroClickable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -146,11 +145,7 @@ private fun ShowingFilterPicker(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { onSelect(filter) },
-                        )
+                        .metroClickable(onClick = { onSelect(filter) })
                         .defaultMinSize(minHeight = 44.dp)
                         .padding(vertical = 2.dp),
                     contentAlignment = Alignment.CenterStart,

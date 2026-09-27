@@ -49,7 +49,7 @@ Constants from `scope.md` §9 — export as `Duration` and easing objects:
 
 - `PageEnter` / `PageExit`: 300ms ease-out
 - `PivotSwitch`: 250ms ease-in-out
-- `ListTilt`: 150ms, 3° Z-rotation
+- `ListTilt`: superseded by content **press nudge** (`MetroPressNudge` 6dp — snap on press, ~90ms ease-back on release via `metroClickable`; onClick immediate; text rows only, not tiles)
 - `AppBarSlide`: 200ms from bottom
 - `TileFlip`: 600ms turnstile
 - `JumpListFlip`: 300ms `rotationX` with 40ms diagonal stagger
@@ -79,7 +79,7 @@ Mapped via `metroFontFamilyFor(MetroTypeface)` / `LocalMetroFontFamily` (Setting
 
 - **No Material** in this module's public API surface.
 - Every composable must have `@Preview` in dark + light theme.
-- Export `Modifier.metroTiltOnPress()` for list items.
+- Export `Modifier.metroClickable()` / `Modifier.metroPressNudge()` for content taps (press nudge; never Material ripple).
 - Document each public composable in `README.md` and the matching section of `METRO-UX-LANGUAGE.md` §13.
 - **Shared icons:** chrome glyphs live in `MetroSystemIconType`; media in `MetroMediaGlyph`; suite/tile identity drawables in `res/drawable/metro_*` + `MetroAppGlyphs`. Apps must not reimplement these.
 

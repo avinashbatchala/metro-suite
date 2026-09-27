@@ -31,7 +31,7 @@ Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
 - Swipe art up = next, down = previous
 - `showing …` filter via `MetroShowingLabel`
 - Local via MediaStore; streaming via YouTube Music connect
-- List items use `MetroListItem` tilt
+- List items use `MetroListItem` press nudge (`metroClickable`)
 
 ## Primary flows
 

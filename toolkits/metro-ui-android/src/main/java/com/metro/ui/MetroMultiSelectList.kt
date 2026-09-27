@@ -1,7 +1,6 @@
 package com.metro.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -119,7 +118,7 @@ fun MetroMultiSelectRow(
             .fillMaxWidth()
             .heightIn(min = MetroMultiSelectDefaults.RowMinHeight)
             .clipToBounds()
-            .clickable(enabled = enabled, onClick = onClick)
+            .metroClickable(enabled = enabled, onClick = onClick)
             .padding(
                 start = MetroDimens.ScreenHorizontalMargin,
                 end = MetroDimens.ScreenHorizontalMargin,

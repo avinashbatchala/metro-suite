@@ -49,7 +49,8 @@ Use before marking any UI task complete. Every item must pass or be documented a
 - [ ] All controls from `metro-ui-android` toolkit (not reimplemented)
 - [ ] Border text buttons: 3dp stroke, square corners, transparent rest (see `METRO-UX-LANGUAGE.md` §6.3)
 - [ ] App bar: use `MetroAppBar` — icon row (max 4) **or** Store-style text buttons (`MetroAppBarTextButton`, max 3), `…` reveals labels (icon mode) + text menu list below the primary row (max 5), bottom only
-- [ ] List items use tilt-on-press (3°, 150ms)
+- [ ] Text-only rows use press-nudge (`metroClickable`); tiles use `indication = null` with **no** nudge — never Material ripple or a square darkened wash
+- [ ] Bare `Modifier.clickable` / `combinedClickable` without `indication = null` is banned (harness lint)
 - [ ] ToggleSwitch sharp rectangle with accent fill when on, rectangular thumb
 - [ ] TextBox is a light square field with black text and a 3dp accent border when focused — not a dark filled chip or Material TextField
 - [ ] No Material buttons, chips, cards, bottom sheets, snackbars

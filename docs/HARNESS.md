@@ -200,9 +200,9 @@ When CI is added, `verify-all.sh` becomes the required check. Until then, local 
 
 ## Metro UX language
 
-Per-control WP8.1 shape and interaction rules live in [`toolkits/metro-ui-android/METRO-UX-LANGUAGE.md`](../toolkits/metro-ui-android/METRO-UX-LANGUAGE.md). Agents must read it before any UI work (after `scope.md`). It defines square vs round geometry, border text buttons, circular app bar icon press, tiles, pivots, and anti-patterns.
+Per-control WP8.1 shape and interaction rules live in [`toolkits/metro-ui-android/METRO-UX-LANGUAGE.md`](../toolkits/metro-ui-android/METRO-UX-LANGUAGE.md). Agents must read it before any UI work (after `scope.md`). It defines square vs round geometry, border text buttons, circular app bar icon press, tiles, pivots, **content press-nudge** (§5.4 — never Material ripple / square wash), and anti-patterns.
 
-`check-ux-language.sh` runs in `verify-app.sh` and `verify-toolkit.sh` to ensure the spec file exists and stays linked from agent docs.
+`check-ux-language.sh` runs in `verify-app.sh` and `verify-toolkit.sh` to ensure the spec file exists and stays linked from agent docs. `lint-metro.sh` fails bare `clickable`/`combinedClickable` without `indication = null`.
 
 ## Agent session checklist
 

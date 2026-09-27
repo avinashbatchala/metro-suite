@@ -1,6 +1,5 @@
 package com.metro.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +26,9 @@ import androidx.compose.ui.unit.dp
  *
  * With [singleLine], title and subtitle never wrap: long text runs past the row's end margin and
  * clips mid-glyph at the screen edge, matching WP8.1 dense lists (e.g. Xbox Music collection).
+ *
+ * Press uses [Modifier.metroClickable] (down-left nudge) for **text-only rows** —
+ * never Material ripple or a square wash. Tiles must not use this (no nudge).
  */
 @Composable
 fun MetroListItem(
@@ -62,8 +64,8 @@ fun MetroListItem(
             .fillMaxWidth()
             .heightIn(min = if (subtitle == null) oneLineMinHeight else twoLineMinHeight)
             .then(
-                if (onClick != null && enabled) {
-                    Modifier.clickable(onClick = onClick)
+                if (onClick != null) {
+                    Modifier.metroClickable(enabled = enabled, onClick = onClick)
                 } else {
                     Modifier
                 },

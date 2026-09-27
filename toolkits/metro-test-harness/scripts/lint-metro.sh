@@ -132,6 +132,22 @@ for path in kt_files(roots):
                         "(METRO-UX-LANGUAGE.md §6.3)"
                     )
 
+    # Bare clickable / combinedClickable must pass indication = null (or use metroClickable).
+    # Default Compose indication is a Material square wash — banned (METRO-UX-LANGUAGE §5.4).
+    clickable_re = re.compile(r"\.(?:clickable|combinedClickable)\s*\(")
+    for m in clickable_re.finditer(text):
+        call = extract_call(text, m.start())
+        if call is None:
+            continue
+        if "indication" not in call:
+            failures.append(
+                f"{rel}:{line_no(text, m.start())}: "
+                "bare clickable/combinedClickable must set indication = null "
+                "(or use Modifier.metroClickable for press-nudge). "
+                "Default Compose indication is a Material square wash — banned "
+                "(METRO-UX-LANGUAGE.md §5.4)"
+            )
+
     # MetroAppTitle must not sit in a Column that applies horizontal padding on the Column itself.
     if "MetroAppTitle" not in text:
         continue

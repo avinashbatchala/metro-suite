@@ -30,6 +30,7 @@ private val LetterTileMinFontSize = 24.sp
  *
  * When [enabled] is false (no items for that letter), the tile uses a dark inactive
  * fill matching WP8.1 jump list gray tiles and ignores clicks.
+ * Press: no nudge (tiles are not text rows) — `indication = null` only.
  */
 @Composable
 fun MetroLetterTile(

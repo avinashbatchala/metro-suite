@@ -279,7 +279,7 @@ Official **Windows Phone 8 / 8.1** 20-color set (Settings → start+theme → Ac
 | `ToggleSwitch` | Custom switch | Sharp rectangle 52×20dp, accent fill when on, rectangular thumb |
 | `Slider` | Custom slider | Accent track, 24dp thumb |
 | `ProgressBar` | Indeterminate: accent bar sweep; Determinate: accent fill | |
-| `ListBox` / `LongListSelector` | `MetroListView` | Tilt-on-press animation (3° Z-rotate, 150ms) |
+| `ListBox` / `LongListSelector` | `MetroListItem` | Press-nudge on tap (~4dp down-left; never Material ripple) |
 | `TextBox` | Underline style when focused | Accent underline, no Material TextInputLayout |
 | `ApplicationBar` | `MetroAppBar` | See App bar section |
 | `MessageDialog` | Centered modal | Title 24sp, body 16sp, accent buttons |
@@ -348,7 +348,7 @@ Live tiles are **not** drawn inside the launcher from hard-coded per-app logic. 
 | Page transition | 300ms | Ease-out cubic |
 | Pivot header switch | 250ms | Ease-in-out |
 | Panorama scroll | Physics-based deceleration | Friction coefficient matching WP scroll viewer |
-| List item tilt (press) | 150ms | Ease-out, 3° rotation |
+| Content press nudge | snap on press / ~90ms out | Ease-out; ~6dp down-left (`metroClickable`; onClick immediate) |
 | App bar show/hide | 200ms | Slide from bottom |
 | Status tray expand | 200ms/icon staggered R→L drop | Hold 5000ms then staggered exit up |
 | Live tile flip | 600ms | WP8.1 turnstile animation |

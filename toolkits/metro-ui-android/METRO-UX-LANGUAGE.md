@@ -157,6 +157,25 @@ App bar, status tray, and system overlays use theme background at **80% opacity*
 
 **Toolkit:** `MetroColors`, `MetroTheme`.
 
+### 5.4 Press feedback (content taps)
+
+WP8.1 content taps **never** use Material ripple, a darkened square selection wash, or text that dims under a button-like overlay.
+
+| Surface | Press language |
+|---------|----------------|
+| **Text-only rows** (list items, showing labels, hub pane links, filter options, multi-select / list-picker labels) | **Press nudge** — snap ~6dp down-left on press, ease back in ~90ms on release; [onClick] fires immediately (`Modifier.metroClickable`) |
+| **Tiles** (live tiles, hub accent tiles, letter tiles, app-slot squares) | **No press nudge** — `indication = null` only. Start live tiles use position tilt on the launcher (`tilePressTiltAt`) |
+| **App bar / icon buttons** | Circular fill behind the glyph (§6.2 / §6.4) |
+| **Border text buttons** | 20% foreground fill inside the square border (§6.3) |
+| **Media transport** | Press nudge (same as text rows) |
+
+**Rules:**
+
+- Always pass `indication = null` (or use `metroClickable`) — bare `Modifier.clickable { }` / `combinedClickable` pulls Compose's default indication and **fails harness lint**.
+- Do **not** darken label text on press for content taps.
+
+**Toolkit:** `Modifier.metroClickable`, `Modifier.metroPressNudge`, `MetroPressNudge` (6dp), `MetroPressNudgeInMs` / `HoldMs` / `OutMs`.
+
 ---
 
 ## 6. Control specifications
@@ -283,7 +302,7 @@ parent `Column` that also hosts `MetroAppTitle` — the app title already owns t
 | Title | 24sp Regular |
 | Subtitle | 16sp @ 60% opacity |
 | Chevron | Optional 12dp accent or secondary glyph for drill-in |
-| Press | **Tilt** 3° Z-rotation, 150ms ease-out |
+| Press | **Press nudge** (~6dp down-left via `metroClickable`) — snap on press, ease back ~90ms on release; [onClick] immediate — never Material ripple or a square wash |
 | Separator | None between items — whitespace bands only |
 | Margins | 12dp horizontal |
 | Overflow | Default wraps to 2 lines with ellipsis. Dense media lists (Xbox Music collection) pass `singleLine = true`: one line, no wrap, clipping mid-glyph at the **screen** edge (start inset only, no end margin). |
@@ -600,7 +619,7 @@ WP8.1 Messaging conversation chrome — square body + right-triangle tail. Used 
 |-----------|----------|--------|
 | Page forward / back | 300ms | Ease-out |
 | Pivot switch | 250ms | Ease-in-out |
-| List tilt press | 150ms | Ease-out, 3° |
+| List / content press nudge | snap in / ~90ms out | Ease-out; ~6dp down-left; `metroClickable` fires onClick immediately |
 | App bar show/hide | 200ms | Slide from bottom |
 | Live tile flip | 600ms | Turnstile |
 | Status tray | 200ms/icon staggered R→L | Hold 5000ms then staggered exit up |
@@ -612,7 +631,7 @@ WP8.1 Messaging conversation chrome — square body + right-triangle tail. Used 
 
 Show progress for operations **> 500ms**. No Material shared-element transitions.
 
-**Toolkit:** `MetroTransitions`, `MetroPagePivotLoad`, `MetroPagePivotSwing`, `MetroStaggeredPivotEnter`, `MetroAppLaunchPivot`, `MetroAppOpenSplash`, `MetroAppPivotShell`, `MetroSubpageHost`, `MetroPanoramaBrandEnter`, `MetroPanoramaBodyEnter`, `Modifier.metroTiltOnPress()`.
+**Toolkit:** `MetroTransitions`, `MetroPagePivotLoad`, `MetroPagePivotSwing`, `MetroStaggeredPivotEnter`, `MetroAppLaunchPivot`, `MetroAppOpenSplash`, `MetroAppPivotShell`, `MetroSubpageHost`, `MetroPanoramaBrandEnter`, `MetroPanoramaBodyEnter`, `Modifier.metroClickable()`, `Modifier.metroPressNudge()`.
 
 **Animation suite** (decorative / feedback, not page chrome): `MetroAnimationSuite` + named composables such as `MetroBiometricAnimation` (`biometric` — Windows Hello–style face success).
 
@@ -697,6 +716,8 @@ Need a container shape?
 | Pure black/white tile | Tinted tile color from palette |
 | `MetroBorderButton(…, modifier = Modifier.fillMaxWidth())` | Hug-label + flush left (`padding(horizontal = 12.dp)` on setup screens) |
 | `Column(Modifier.padding(horizontal)) { MetroAppTitle(…) }` | Unpadded Column; `MetroAppTitle` owns 12dp start; pad siblings per-child |
+| Bare `Modifier.clickable { }` / `combinedClickable` (default indication) | `Modifier.metroClickable` (press nudge) or chrome-specific press with `indication = null` (§5.4) |
+| Square darkened wash / text dim on content tap | Press nudge only — never Material ripple |
 
 ---
 
@@ -730,6 +751,7 @@ Need a container shape?
 | Theme / color | `MetroTheme`, `MetroColors` | Implemented |
 | Typography | `MetroText`, `MetroTextStyle` | Implemented |
 | Motion | `MetroTransitions` | Implemented |
+| Press feedback | `Modifier.metroClickable`, `Modifier.metroPressNudge` | Implemented |
 | Animation suite | `MetroAnimationSuite`, `MetroBiometricAnimation` | Implemented |
 
 **Rule:** Apps must not reimplement these primitives locally. Import from `metro-ui-android`.

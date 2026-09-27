@@ -11,7 +11,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
@@ -240,7 +239,7 @@ private fun MetroListPickerChrome(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(enabled = enabled) {
+                                .metroClickable(enabled = enabled) {
                                     onSelectIndex(index)
                                     setExpanded(false)
                                 }
@@ -266,7 +265,7 @@ private fun MetroListPickerChrome(
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = CollapsedMinHeight)
                         .border(BorderWidth, borderColor, RectangleShape)
-                        .clickable(enabled = enabled) {
+                        .metroClickable(enabled = enabled) {
                             when {
                                 onOpen != null -> onOpen()
                                 canExpand -> setExpanded(true)

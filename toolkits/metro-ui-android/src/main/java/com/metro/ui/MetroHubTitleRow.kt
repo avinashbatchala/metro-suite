@@ -1,7 +1,6 @@
 package com.metro.ui
 
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -128,7 +127,7 @@ private fun HubTitle(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val clickModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    val clickModifier = if (onClick != null) Modifier.metroClickable(onClick = onClick) else Modifier
 
     MetroText(
         text = title,

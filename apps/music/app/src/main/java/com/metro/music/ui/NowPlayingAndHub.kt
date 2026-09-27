@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -174,7 +175,6 @@ fun MusicHub(
                 pageContent = { page ->
                     when (page) {
                         MusicState.HUB_COLLECTION -> CollectionHubPane(
-                            state = state,
                             onOpenPivot = onOpenCollection,
                         )
                         MusicState.HUB_GET_MUSIC -> GetMusicPane(
@@ -199,7 +199,6 @@ fun MusicHub(
 
 @Composable
 fun CollectionHubPane(
-    state: MusicState,
     onOpenPivot: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.padding(top = 12.dp)) {
@@ -221,15 +220,6 @@ fun CollectionHubPane(
                     if (pivot >= 0) onOpenPivot(pivot)
                     else onOpenPivot(0) // radio → collection for v1
                 },
-            )
-        }
-        if (state.ytSyncMessage != null && !state.ytSyncing) {
-            Spacer(modifier = Modifier.height(12.dp))
-            MetroText(
-                text = state.ytSyncMessage.orEmpty(),
-                style = MetroTextStyle.Body,
-                color = MetroTheme.colors.secondaryText,
-                modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
     }
@@ -380,7 +370,11 @@ private fun MusicHubAccentTile(
     BoxWithConstraints(
         modifier = modifier
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .semantics { contentDescription = title }
             .padding(HubAccentTileInset),
     ) {

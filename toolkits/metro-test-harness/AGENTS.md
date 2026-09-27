@@ -29,6 +29,7 @@ See [`metro-ui-android/METRO-UX-LANGUAGE.md`](../metro-ui-android/METRO-UX-LANGU
 4. Fail on touch targets < 44dp where detectable via lint API
 5. Fail when `MetroBorderButton` uses `fillMaxWidth()` — buttons are flush-left and hug the label
 6. Fail when a `Column` with `padding(horizontal=…)` hosts `MetroAppTitle` — the app title owns the 12dp start inset; pad siblings per-child
+7. Fail on bare `Modifier.clickable` / `combinedClickable` without `indication = null` — default Compose indication is a Material square wash; use `Modifier.metroClickable` (press nudge) or chrome-specific press with `indication = null` (METRO-UX-LANGUAGE §5.4)
 
 ## screenshot-diff
 
