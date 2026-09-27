@@ -7,6 +7,7 @@ import com.metro.hub.data.HubAppCategory
 import com.metro.hub.data.HubLogoDecoder
 import com.metro.hub.data.ReleaseApkAsset
 import com.metro.hub.data.toReleaseApkAsset
+import com.metro.hub.ui.DetailPrimaryAction
 import com.metro.hub.ui.HubState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -291,6 +292,103 @@ class HubCatalogTest {
             ),
         )
         assertFalse(HubState.isExternalInstallerUrl(""))
+    }
+
+    @Test
+    fun detailPrimaryActionUsesGetAppForPlayStore() {
+        assertEquals(
+            DetailPrimaryAction.GetApp,
+            HubState.detailPrimaryAction(
+                downloadUrl = "https://play.google.com/store/apps/details?id=com.tileshell",
+                isFirstParty = false,
+                isInstalled = false,
+            ),
+        )
+        // Play Store wins even if a first-party package were somehow installed.
+        assertEquals(
+            DetailPrimaryAction.GetApp,
+            HubState.detailPrimaryAction(
+                downloadUrl = "market://details?id=com.example",
+                isFirstParty = true,
+                isInstalled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun detailPrimaryActionUsesUpdateWhenFirstPartyInstalled() {
+        assertEquals(
+            DetailPrimaryAction.Update,
+            HubState.detailPrimaryAction(
+                downloadUrl = "https://example.com/music-debug.apk",
+                isFirstParty = true,
+                isInstalled = true,
+            ),
+        )
+        assertEquals(
+            DetailPrimaryAction.Download,
+            HubState.detailPrimaryAction(
+                downloadUrl = "https://example.com/music-debug.apk",
+                isFirstParty = true,
+                isInstalled = false,
+            ),
+        )
+        // Second/third party: never "update" from install detection.
+        assertEquals(
+            DetailPrimaryAction.Download,
+            HubState.detailPrimaryAction(
+                downloadUrl = "https://example.com/other.apk",
+                isFirstParty = false,
+                isInstalled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun detailPrimaryEnabledGreysUpdateWhenCurrent() {
+        assertFalse(
+            HubState.detailPrimaryEnabled(
+                action = DetailPrimaryAction.Update,
+                downloadUrl = "https://example.com/music-debug.apk",
+                hasUpdateAvailable = false,
+            ),
+        )
+        assertTrue(
+            HubState.detailPrimaryEnabled(
+                action = DetailPrimaryAction.Update,
+                downloadUrl = "https://example.com/music-debug.apk",
+                hasUpdateAvailable = true,
+            ),
+        )
+        assertTrue(
+            HubState.detailPrimaryEnabled(
+                action = DetailPrimaryAction.Download,
+                downloadUrl = "https://example.com/music-debug.apk",
+                hasUpdateAvailable = false,
+            ),
+        )
+        assertTrue(
+            HubState.detailPrimaryEnabled(
+                action = DetailPrimaryAction.GetApp,
+                downloadUrl = "https://play.google.com/store/apps/details?id=com.tileshell",
+                hasUpdateAvailable = false,
+            ),
+        )
+        assertFalse(
+            HubState.detailPrimaryEnabled(
+                action = DetailPrimaryAction.Download,
+                downloadUrl = "",
+                hasUpdateAvailable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun firstPartyCategoryDetection() {
+        assertTrue(HubAppCatalog.isFirstParty(HubAppCategory.Core))
+        assertTrue(HubAppCatalog.isFirstParty(HubAppCategory.Shell))
+        assertFalse(HubAppCatalog.isFirstParty(HubAppCategory.SecondParty))
+        assertFalse(HubAppCatalog.isFirstParty(HubAppCategory.ThirdParty))
     }
 
     @Test

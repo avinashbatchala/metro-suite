@@ -15,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.metro.hub.R
 import com.metro.hub.data.ApkInstaller
 import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarIcon
@@ -129,6 +131,12 @@ private fun HubSubpageContent(
             HubRoute.AppDetail -> {
                 val asset = state.selectedAsset
                 val downloading = asset != null && state.downloadingAssetName == asset.name
+                val primaryAction = state.selectedDetailPrimaryAction
+                val primaryLabel = when (primaryAction) {
+                    DetailPrimaryAction.GetApp -> stringResource(R.string.apps_action_get_app)
+                    DetailPrimaryAction.Update -> stringResource(R.string.apps_action_update)
+                    DetailPrimaryAction.Download -> stringResource(R.string.apps_action_download)
+                }
                 AppDetailScreen(
                     state = state,
                     modifier = Modifier.fillMaxSize(),
@@ -137,8 +145,8 @@ private fun HubSubpageContent(
                     minimized = false,
                     textButtons = listOf(
                         MetroAppBarTextButton(
-                            text = "download",
-                            enabled = asset != null && !downloading && asset.downloadUrl.isNotBlank(),
+                            text = primaryLabel,
+                            enabled = !downloading && state.selectedDetailPrimaryEnabled,
                             onClick = {
                                 val selected = state.selectedAsset ?: return@MetroAppBarTextButton
                                 if (state.downloadingAssetName == null) {
@@ -147,7 +155,7 @@ private fun HubSubpageContent(
                             },
                         ),
                         MetroAppBarTextButton(
-                            text = "share",
+                            text = stringResource(R.string.apps_action_share),
                             enabled = asset != null,
                             onClick = {
                                 val selected = state.selectedAsset ?: return@MetroAppBarTextButton

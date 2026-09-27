@@ -211,6 +211,69 @@ class HubState(
                 ?: combinedCatalogAssets.find { it.name == name }
         }
 
+    /**
+     * Installed versionName for the open detail app — only for first-party (Core/Shell).
+     * Null when not first-party or the package is not installed.
+     */
+    val selectedInstalledVersionName: String?
+        get() {
+            val asset = selectedAsset ?: return null
+            if (!HubAppCatalog.isFirstParty(asset)) return null
+            return installedVersion(appContext.packageManager, asset.packageName)?.first
+                ?.takeIf { it.isNotBlank() }
+        }
+
+    /** True when the open detail app is a first-party package present on device. */
+    val selectedIsInstalledFirstParty: Boolean
+        get() {
+            val asset = selectedAsset ?: return false
+            if (!HubAppCatalog.isFirstParty(asset)) return false
+            return installedVersion(appContext.packageManager, asset.packageName) != null
+        }
+
+    /**
+     * True when catalog build is newer than the installed first-party package.
+     * False when not installed, not first-party, or already on the latest catalog build.
+     */
+    val selectedHasUpdateAvailable: Boolean
+        get() {
+            val asset = selectedAsset ?: return false
+            if (!HubAppCatalog.isFirstParty(asset)) return false
+            val installed = installedVersion(appContext.packageManager, asset.packageName)
+                ?: return false
+            return HubAppCatalog.isNewerThanInstalled(
+                catalogVersionCode = asset.versionCode,
+                catalogVersionName = asset.versionName,
+                installedVersionCode = installed.second,
+                installedVersionName = installed.first,
+            )
+        }
+
+    /**
+     * App-bar primary action on detail: Play Store → get app; installed first-party →
+     * update; otherwise download.
+     */
+    val selectedDetailPrimaryAction: DetailPrimaryAction
+        get() {
+            val asset = selectedAsset ?: return DetailPrimaryAction.Download
+            return detailPrimaryAction(
+                downloadUrl = asset.downloadUrl,
+                isFirstParty = HubAppCatalog.isFirstParty(asset),
+                isInstalled = selectedIsInstalledFirstParty,
+            )
+        }
+
+    /** Whether the detail primary text button should be enabled (ignores in-flight download). */
+    val selectedDetailPrimaryEnabled: Boolean
+        get() {
+            val asset = selectedAsset ?: return false
+            return detailPrimaryEnabled(
+                action = selectedDetailPrimaryAction,
+                downloadUrl = asset.downloadUrl,
+                hasUpdateAvailable = selectedHasUpdateAvailable,
+            )
+        }
+
     /** Full catalog used to detect per-app updates on the device page. */
     private val updateCatalogPool: List<ReleaseApkAsset>
         get() = when {
@@ -1003,5 +1066,42 @@ class HubState(
             if ("play.app.goo.gl" in u) return true
             return false
         }
+
+        /**
+         * Detail app-bar primary label:
+         * - Play Store / market / non-APK installer → [DetailPrimaryAction.GetApp]
+         * - First-party already on device → [DetailPrimaryAction.Update]
+         * - Else → [DetailPrimaryAction.Download]
+         */
+        fun detailPrimaryAction(
+            downloadUrl: String,
+            isFirstParty: Boolean,
+            isInstalled: Boolean,
+        ): DetailPrimaryAction {
+            if (isExternalInstallerUrl(downloadUrl)) return DetailPrimaryAction.GetApp
+            if (isFirstParty && isInstalled) return DetailPrimaryAction.Update
+            return DetailPrimaryAction.Download
+        }
+
+        /**
+         * Whether the detail primary button should be enabled (aside from in-flight download).
+         * `update` requires a catalog build newer than the installed package.
+         */
+        fun detailPrimaryEnabled(
+            action: DetailPrimaryAction,
+            downloadUrl: String,
+            hasUpdateAvailable: Boolean,
+        ): Boolean {
+            if (downloadUrl.isBlank()) return false
+            if (action == DetailPrimaryAction.Update) return hasUpdateAvailable
+            return true
+        }
     }
+}
+
+/** Primary text action on the app detail app bar. */
+enum class DetailPrimaryAction {
+    Download,
+    Update,
+    GetApp,
 }

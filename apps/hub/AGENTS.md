@@ -21,7 +21,7 @@ Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
 |--------|---------|-----------|
 | Hub | `MetroPanorama` + panoramic `hub` brand | `references/images/panorama_dark_teal.png` |
 | Suite apps list | Full page list (title / description / By) | Blueprint § Page 4 / `known-gaps.md` |
-| App detail | Full page + download/share text app-bar buttons | Blueprint § Page 5 |
+| App detail | Full page + download|update|get app + share | Blueprint § Page 5 |
 | Search | Full page + `MetroTextBox` catalog filter | Blueprint § Page 7 / Music explore |
 | extras+info | Full page (Lumia extras+info language) | Blueprint § Page 6 / `extras_info_dark_cyan.png` |
 | Updater | Full page (WP8.1 phone update) | Blueprint § Page 9 / `phone_update_dark_red.png` |
@@ -39,7 +39,7 @@ Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
 
 1. Launch → panorama brand `hub`, swipe `home` ↔ `apps` ↔ `featured` ↔ `local`
 2. Tap `metro os apps` → first-party catalog only (`first-party` / GitHub suite fallback)
-3. Tap list row → app detail → download / share text buttons → install or share GitHub link
+3. Tap list row → app detail → download|update|get app + share → install, open store, or share GitHub link
 4. Tap `related apps` or second-party tile → `second-party` Firestore catalog
 5. Tap `unofficial metro apps` or third-party tile → `third-party` Firestore catalog (may be empty)
 6. Swipe to featured → 4 random apps from combined catalogs → tap opens detail

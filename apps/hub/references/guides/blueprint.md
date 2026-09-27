@@ -60,8 +60,12 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 ### Page 5 — App detail (drill-in)
 
 - **Pattern:** Full page with `MetroAppTitle` + page title = app display name.
-- **Content:** Icon + title + publisher; full description; version; download size; category.
-- **App bar:** Store-style centered text buttons `download` + `share` (`MetroAppBarTextButton`). Download installs the APK (`REQUEST_INSTALL_PACKAGES` + `FileProvider`); share sends the app GitHub URL (Firestore `githubRepo`, else the suite repo). Download disabled while a download is in progress.
+- **Content:** Icon + title + publisher; full description; catalog version; **installed version** (first-party Core/Shell only, when the package is on device); download size; category.
+- **App bar:** Store-style centered text buttons primary + `share` (`MetroAppBarTextButton`). Primary label:
+  - `get app` when the installer URL is Play Store / market (not a direct APK)
+  - `update` when the app is first-party and already installed (disabled / greyed when installed build is already the latest catalog version)
+  - `download` otherwise
+  Primary action installs the APK (`REQUEST_INSTALL_PACKAGES` + `FileProvider`) or opens the store listing; share sends the app GitHub URL (Firestore `githubRepo`, else the suite repo). Primary disabled while a download is in progress, or when `update` has nothing newer to install.
 - **Loading:** Inline `MetroLoadingDots` + “Downloading…” on the detail body while the APK downloads.
 - **Back:** Returns to the previous surface (suite list, search, or panorama hub).
 

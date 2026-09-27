@@ -40,8 +40,13 @@
     <string name="apps_install_ready">Ready to install</string>
     <string name="apps_detail_missing">App details unavailable.</string>
     <string name="apps_detail_version">Version</string>
+    <string name="apps_detail_installed_version">Installed version</string>
     <string name="apps_detail_download_size">Download size</string>
     <string name="apps_detail_category">Category</string>
+    <string name="apps_action_download">download</string>
+    <string name="apps_action_update">update</string>
+    <string name="apps_action_get_app">get app</string>
+    <string name="apps_action_share">share</string>
     <string name="search_title">search</string>
     <string name="search_placeholder">search</string>
     <string name="search_hint">Type to find suite apps by name or description.</string>

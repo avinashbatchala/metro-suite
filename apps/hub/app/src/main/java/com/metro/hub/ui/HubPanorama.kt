@@ -3,6 +3,7 @@ package com.metro.hub.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,6 +55,7 @@ import com.metro.ui.MetroPanoramaBrandEnter
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
+import com.metro.ui.metroClickable
 import kotlin.math.roundToInt
 
 private const val HubBrandText = "hub"
@@ -216,7 +218,7 @@ private fun HubLinkRow(
             .height(52.dp)
             .then(
                 if (onClick != null && enabled) {
-                    Modifier.clickable(onClick = onClick)
+                    Modifier.metroClickable(onClick = onClick)
                 } else {
                     Modifier
                 },
@@ -345,7 +347,11 @@ private fun QuickLinkTile(
     Box(
         modifier = modifier
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .semantics { contentDescription = title }
             .padding(QuickLinkTileInset),
     ) {
@@ -472,7 +478,11 @@ private fun LocalHubTile(
     BoxWithConstraints(
         modifier = modifier
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .semantics { contentDescription = title }
             .padding(QuickLinkTileInset),
     ) {

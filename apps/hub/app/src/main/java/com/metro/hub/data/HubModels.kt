@@ -115,6 +115,12 @@ object HubAppCatalog {
         }
     }
 
+    /** Core / Shell suite packages — Hub install detection applies only here. */
+    fun isFirstParty(category: HubAppCategory): Boolean =
+        category == HubAppCategory.Core || category == HubAppCategory.Shell
+
+    fun isFirstParty(asset: ReleaseApkAsset): Boolean = isFirstParty(asset.category)
+
     fun displayNameForAsset(assetName: String): String {
         return assetId(assetName)
             .split('-', ' ')

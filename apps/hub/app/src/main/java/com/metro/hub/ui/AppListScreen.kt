@@ -2,7 +2,6 @@ package com.metro.hub.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +54,7 @@ import com.metro.ui.MetroLoadingScreen
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
+import com.metro.ui.metroClickable
 import java.io.File
 
 internal val StoreIconSize = 72.dp
@@ -193,7 +193,7 @@ internal fun StoreAppRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .metroClickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StoreAppIcon(

@@ -1,5 +1,6 @@
 package com.metro.hub.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -191,7 +194,7 @@ internal fun DeviceAppRowItem(
         if (app.hasUpdate) {
             if (downloading) {
                 Box(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(DeviceUpdateButtonSize),
                     contentAlignment = Alignment.Center,
                 ) {
                     MetroLoadingDots()
@@ -200,7 +203,7 @@ internal fun DeviceAppRowItem(
                 val interaction = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(DeviceUpdateButtonSize)
                         .semantics {
                             contentDescription = updateLabel
                             role = Role.Button
@@ -212,14 +215,30 @@ internal fun DeviceAppRowItem(
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // Larger ring than the glyph (WP Store download affordance).
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeWidth = size.minDimension * 0.04f
+                        val circleRadius = size.minDimension * 0.42f - strokeWidth
+                        drawCircle(
+                            color = primary,
+                            radius = circleRadius,
+                            style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
+                        )
+                    }
                     MetroSystemIcon(
                         type = MetroSystemIconType.Save,
-                        iconSize = 28.dp,
+                        iconSize = DeviceUpdateIconSize,
                         color = primary,
-                        showCircle = true,
+                        showCircle = false,
                     )
                 }
             }
         }
     }
 }
+
+/** Hit / ring size for the device-row update control. */
+private val DeviceUpdateButtonSize = 52.dp
+
+/** Glyph size — keep download icon unchanged when the ring grows. */
+private val DeviceUpdateIconSize = 28.dp

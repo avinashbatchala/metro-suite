@@ -15,7 +15,7 @@ About / suite catalog for metro-os: panoramic overview, category quick links, an
 
 1. **Hub panorama** — brand `hub`; panes `home` (HubLinks), `apps` (quick-link tiles), `featured` (4 random Store rows), and `local` (icon tiles for updater / device); app-bar search opens catalog search
 2. **Suite apps list** — Firestore / release assets as Store-style rows (title, description, By); tap opens detail
-3. **App detail** — version, size, category, full description; bottom app bar download text button installs the APK
+3. **App detail** — version (plus installed version for first-party when on device), size, category, full description; bottom app bar primary action is `download` / `update` / `get app`
 4. **extras+info** — project about page (Metro Ruby alphas, latest release, support tiles)
 5. **Search** — Music explore–style `MetroTextBox` filtering the suite catalog; tap opens detail
 6. **Updater** — WP8.1 phone-update language: latest metro-os release, Learn more → GitHub release, update now

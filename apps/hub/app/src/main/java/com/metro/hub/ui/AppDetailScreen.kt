@@ -121,6 +121,12 @@ fun AppDetailScreen(
                 label = stringResource(R.string.apps_detail_version),
                 value = versionLabel,
             )
+            state.selectedInstalledVersionName?.let { installed ->
+                DetailMetaRow(
+                    label = stringResource(R.string.apps_detail_installed_version),
+                    value = installed,
+                )
+            }
             DetailMetaRow(
                 label = stringResource(R.string.apps_detail_download_size),
                 value = sizeLabel,
