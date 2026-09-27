@@ -6,12 +6,12 @@
 ## Status
 
 **Prototype** — panorama home with 2-up Start-style app tiles; lists + RemoteInput reply.
-Excludes SMS / suite Messaging notifications.
+SMS / Messages off by default; add via Settings → connected apps.
 
 ## App role
 
 Reply inbox over shade notifications with free-form reply, grouped by app. Not Action Center.
-Not SMS (use Messaging for that).
+SMS stays in Messaging unless the user connects those packages.
 
 ## Screen inventory
 

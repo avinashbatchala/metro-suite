@@ -67,19 +67,6 @@ class ConversationsRepository(
         return ConversationsLogic.groupByApp(conversations)
     }
 
-    /**
-     * Installed packages from Settings → connected apps → Conversation apps.
-     * Shown as home tiles even when they currently have no shade conversations.
-     */
-    fun loadConnectedInstalledApps(): List<ConnectedAppRef> {
-        val connected = prefs.conversationAppPackages
-        return connected.mapNotNull { pkg ->
-            if (ConversationsLogic.isExcludedMessagingPackage(pkg)) return@mapNotNull null
-            val label = installedAppLabel(pkg) ?: return@mapNotNull null
-            ConnectedAppRef(packageName = pkg, appLabel = label)
-        }.sortedBy { it.appLabel.lowercase() }
-    }
-
     fun sendReply(key: String, text: String): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
@@ -477,30 +464,6 @@ class ConversationsRepository(
         )
         labelCache[packageName] = resolved
         return resolved
-    }
-
-    /** Null when [packageName] is not installed on this device. */
-    private fun installedAppLabel(packageName: String): String? {
-        val pm = appContext.packageManager
-        return try {
-            val info = if (Build.VERSION.SDK_INT >= 33) {
-                pm.getApplicationInfo(
-                    packageName,
-                    PackageManager.ApplicationInfoFlags.of(0),
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getApplicationInfo(packageName, 0)
-            }
-            val pmLabel = pm.getApplicationLabel(info)?.toString() ?: return null
-            ConversationsLogic.resolveAppLabel(
-                packageName = packageName,
-                packageManagerLabel = pmLabel,
-                substituteAppName = null,
-            )
-        } catch (_: PackageManager.NameNotFoundException) {
-            null
-        }
     }
 
     private fun packageManagerLabel(packageName: String): String? {

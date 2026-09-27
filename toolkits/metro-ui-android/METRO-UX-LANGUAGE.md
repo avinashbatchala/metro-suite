@@ -163,7 +163,8 @@ WP8.1 content taps **never** use Material ripple, a darkened square selection wa
 
 | Surface | Press language |
 |---------|----------------|
-| **Text-only rows** (list items, showing labels, hub pane links, filter options, multi-select / list-picker labels) | **Press nudge** — snap ~6dp down-left on press, ease back in ~90ms on release; [onClick] fires immediately (`Modifier.metroClickable`) |
+| **Text-only list rows** (list items, showing labels, filter options, multi-select / list-picker labels) | **Press nudge** — snap ~6dp down-left on press, ease back in ~90ms on release; [onClick] fires immediately (`Modifier.metroClickable`) |
+| **Pivot / panorama tab titles** | **No press nudge** — `indication = null` only |
 | **Tiles** (live tiles, hub accent tiles, letter tiles, app-slot squares) | **No press nudge** — `indication = null` only. Start live tiles use position tilt on the launcher (`tilePressTiltAt`) |
 | **App bar / icon buttons** | Circular fill behind the glyph (§6.2 / §6.4) |
 | **Border text buttons** | 20% foreground fill inside the square border (§6.3) |

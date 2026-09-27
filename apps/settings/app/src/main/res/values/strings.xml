@@ -92,7 +92,7 @@
     <string name="settings_conversation_apps">Conversation apps</string>
     <string name="settings_conversation_apps_subtitle">replyable chats</string>
     <string name="settings_conversation_apps_title">conversation apps</string>
-    <string name="settings_conversation_apps_intro">Apps on this list appear in Conversations when they post replyable shade notifications. SMS stays in Messaging.</string>
+    <string name="settings_conversation_apps_intro">Apps on this list appear in Conversations when they post replyable shade notifications. Messages is off by default — add it here if you want SMS in Conversations.</string>
     <string name="settings_connected_apps_section">Apps</string>
     <string name="settings_connected_apps_tap_select">tap to select apps</string>
     <string name="settings_connected_apps_empty">No apps selected.</string>

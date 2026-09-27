@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.metro.conversations.ConversationsListenerService
 import com.metro.conversations.data.AppConversationGroup
-import com.metro.conversations.data.ConnectedAppRef
 import com.metro.conversations.data.ConversationsLogic
 import com.metro.conversations.data.ConversationsRepository
 import com.metro.conversations.data.FavoriteChat
@@ -55,9 +54,6 @@ class ConversationsState(
     var groups by mutableStateOf<List<AppConversationGroup>>(emptyList())
         private set
 
-    var connectedInstalled by mutableStateOf<List<ConnectedAppRef>>(emptyList())
-        private set
-
     var favorites by mutableStateOf<Set<FavoriteChat>>(emptySet())
         private set
 
@@ -71,7 +67,7 @@ class ConversationsState(
         private set
 
     val homeTiles: List<HomeTile>
-        get() = ConversationsLogic.homeTiles(groups, connectedInstalled)
+        get() = ConversationsLogic.homeTiles(groups)
 
     val selectedConversation: ReplyableConversation?
         get() {
@@ -106,7 +102,6 @@ class ConversationsState(
 
     fun refresh() {
         hasAccess = repository.hasNotificationAccess()
-        connectedInstalled = repository.loadConnectedInstalledApps()
         groups = if (hasAccess) repository.loadGroups() else emptyList()
         favorites = favoriteStore.load()
         pruneStaleRoutes()

@@ -18,13 +18,13 @@ Prototype UI — panorama home with Start-style tiles; richer presentation may f
   body (`MetroPanoramaBodyEnter`) with a **2-column** vertical tile grid
 - Tile 1: **all chats** (system accent + people-group glyph)
 - Tile 2: **favorites** (pink + heart glyph)
-- Following tiles: one per **connected installed app** (Settings → connected apps →
-  Conversation apps), even with zero active chats; notifying apps sort first by recency,
-  then remaining connected apps A–Z (Start tile fill from `MetroAppBranding`, app icon,
-  app label) — SMS / suite Messaging excluded; **Gmail included** even without RemoteInput
+- Following tiles: one per **notifying connected app** (Settings → connected apps →
+  Conversation apps + active shade conversation); quiet connected apps stay hidden
+  (Start tile fill from `MetroAppBranding`, app icon, app label). Defaults omit SMS /
+  Messages; users may add Messaging packages. **Gmail included** even without RemoteInput
   when on that list
-- Last tile when active shade chats exist: **clear** (red + trash glyph) — dismisses all
-  Conversations-tracked shade posts; omitted when there is nothing to dismiss; always
+- Last tile when apps exist: **clear** (red + trash glyph) — dismisses all
+  Conversations-tracked shade posts; omitted when the home grid has no app tiles; always
   occupies the last 2-up slot when present (slides in with the first app tile; later apps
   push it to the new last slot)
 - Tile size: ~88% of half-width square; enter: Hub extras+info right-slide stagger
@@ -60,6 +60,6 @@ No WP8.1 Conversations product — see [`known-gaps.md`](../known-gaps.md).
 
 ## Out of scope (v1)
 
-- SMS / `com.metro.messaging` (and stock Messages packages)
+- SMS / Messages on by default (opt-in via Settings → connected apps → Conversation apps)
 - Action Center chrome
 - Multi-pane panorama sections (home is one page with panorama *intro* motion only)

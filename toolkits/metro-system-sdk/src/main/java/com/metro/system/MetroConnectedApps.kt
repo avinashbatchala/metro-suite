@@ -39,8 +39,8 @@ object MetroConnectedApps {
     )
 
     /**
-     * Default chat + mail packages Conversations may show (SMS / suite Messaging stay
-     * excluded in Conversations itself). Users can add more via Settings → connected apps.
+     * Default chat + mail packages Conversations may show. SMS / suite Messaging are
+     * omitted by default; users can add them via Settings → connected apps.
      */
     val DEFAULT_CONVERSATION_PACKAGES: Set<String> = setOf(
         "com.metro.mail",
