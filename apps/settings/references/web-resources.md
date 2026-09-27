@@ -59,7 +59,7 @@ Add one `##` section per screen or feature. Keep URLs stable; use archive.org mi
 
 | Resource | URL | Notes |
 |----------|-----|-------|
-| WP8.1 email+accounts layout | User capture `images/email_account_dark.png` | Icon + title + subtitle rows for Gallery / Music hub |
+| WP8.1 email+accounts layout | User capture `images/email_account_dark.png` | Icon + title + subtitle rows for Gallery / Music / Conversation hub |
 | WP8.1 Apps Corner | User capture `images/apps_corner_dark.png` | Selected apps list + Apps / tap to select apps |
 
 ## brightness / storage sense
@@ -77,5 +77,5 @@ Add one `##` section per screen or feature. Keep URLs stable; use archive.org mi
 | `images/accent_palette_wp8_dark.png` | Generated from official WP8 HEX list | Palette aid for the 20 official accents |
 | `images/start_theme_dark_cobalt.png` | WP start+theme capture | Intro + Background + Accent colour combo |
 | `images/email_account_dark.png` | User-provided WP8.1 email+account capture | Connected apps hub layout |
-| `images/apps_corner_dark.png` | User-provided WP8.1 Apps Corner capture | Gallery / Music apps selection pages |
+| `images/apps_corner_dark.png` | User-provided WP8.1 Apps Corner capture | Gallery / Music / Conversation apps selection pages |
 | `images/apps_multiselect_dark.png` | User-provided WP multi-select apps list | Connected apps picker (`MetroMultiSelectList`) |

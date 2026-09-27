@@ -77,6 +77,14 @@ fun ConnectedAppsScreen(
                     onClick = { state.open(SettingsRoute.MusicApps) },
                 )
             }
+            item {
+                ConnectedHubRow(
+                    glyphRes = MetroAppGlyphs.Conversations,
+                    title = stringResource(R.string.settings_conversation_apps),
+                    subtitle = stringResource(R.string.settings_conversation_apps_subtitle),
+                    onClick = { state.open(SettingsRoute.ConversationApps) },
+                )
+            }
         }
     }
 }
@@ -106,7 +114,7 @@ private fun ConnectedHubRow(
 }
 
 /**
- * Gallery / Music apps page — WP8.1 apps corner: selected apps + "tap to select apps".
+ * Gallery / Music / Conversation apps page — WP8.1 apps corner: selected apps + "tap to select apps".
  */
 @Composable
 fun ConnectedAppListScreen(
@@ -117,6 +125,7 @@ fun ConnectedAppListScreen(
     val packages = when (kind) {
         ConnectedAppKind.Gallery -> state.galleryAppPackages
         ConnectedAppKind.Music -> state.musicAppPackages
+        ConnectedAppKind.Conversation -> state.conversationAppPackages
     }
     val selected = remember(packages, state.applicationEntries) {
         packages.mapNotNull { pkg ->
@@ -127,14 +136,17 @@ fun ConnectedAppListScreen(
     val pageTitle = when (kind) {
         ConnectedAppKind.Gallery -> stringResource(R.string.settings_gallery_apps_title)
         ConnectedAppKind.Music -> stringResource(R.string.settings_music_apps_title)
+        ConnectedAppKind.Conversation -> stringResource(R.string.settings_conversation_apps_title)
     }
     val intro = when (kind) {
         ConnectedAppKind.Gallery -> stringResource(R.string.settings_gallery_apps_intro)
         ConnectedAppKind.Music -> stringResource(R.string.settings_music_apps_intro)
+        ConnectedAppKind.Conversation -> stringResource(R.string.settings_conversation_apps_intro)
     }
     val pickerRoute = when (kind) {
         ConnectedAppKind.Gallery -> SettingsRoute.GalleryAppPicker
         ConnectedAppKind.Music -> SettingsRoute.MusicAppPicker
+        ConnectedAppKind.Conversation -> SettingsRoute.ConversationAppPicker
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -202,6 +214,7 @@ fun ConnectedAppPickerScreen(
     val committed = when (kind) {
         ConnectedAppKind.Gallery -> state.galleryAppPackages
         ConnectedAppKind.Music -> state.musicAppPackages
+        ConnectedAppKind.Conversation -> state.conversationAppPackages
     }
     var draft by remember { mutableStateOf(committed) }
     LaunchedEffect(committed) {
@@ -222,6 +235,7 @@ fun ConnectedAppPickerScreen(
             when (kind) {
                 ConnectedAppKind.Gallery -> state.applyGalleryAppPackages(draft)
                 ConnectedAppKind.Music -> state.applyMusicAppPackages(draft)
+                ConnectedAppKind.Conversation -> state.applyConversationAppPackages(draft)
             }
             state.goBack()
         },
@@ -310,4 +324,5 @@ private fun ConnectedAppIcon(
 enum class ConnectedAppKind {
     Gallery,
     Music,
+    Conversation,
 }

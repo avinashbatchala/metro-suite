@@ -176,6 +176,7 @@ class MetroSystemPreferencesProvider : ContentProvider() {
             if (prefs.getBoolean(key, false)) 1 else 0
         MetroPreferenceKeys.CONNECTED_GALLERY_APPS,
         MetroPreferenceKeys.CONNECTED_MUSIC_APPS,
+        MetroPreferenceKeys.CONNECTED_CONVERSATION_APPS,
         MetroPreferenceKeys.ICON_PACK_PACKAGE,
         -> prefs.getString(key, null)
         else -> prefs.all[key]
@@ -201,6 +202,7 @@ class MetroSystemPreferencesProvider : ContentProvider() {
             MetroPreferenceKeys.START_BACKGROUND_ENABLED,
             MetroPreferenceKeys.CONNECTED_GALLERY_APPS,
             MetroPreferenceKeys.CONNECTED_MUSIC_APPS,
+            MetroPreferenceKeys.CONNECTED_CONVERSATION_APPS,
             MetroPreferenceKeys.ICON_PACK_PACKAGE,
         )
 

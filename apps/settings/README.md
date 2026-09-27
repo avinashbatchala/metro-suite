@@ -5,7 +5,7 @@
 
 ## Status
 
-Implemented — Settings root with `system` | `applications` pivot (all launchable user + system apps; in-Settings app detail with toggles/open/uninstall), start+theme (accent colour + font + icon pack + Start background choose photo + show more columns), accent picker (20 WP8 colours), ease of access (10-step text size), brightness, storage sense, connected apps (gallery / music live-tile package lists), navigation bar / status bar / notifications / volume / lock screen (launch shell setup apps), keyboard (launches `com.metro.keyboard`), and about (WP8.1 more info device details; Software = metro-os alpha-3). Hosts `content://com.metro.system` preferences provider.
+Implemented — Settings root with `system` | `applications` pivot (all launchable user + system apps; in-Settings app detail with toggles/open/uninstall), start+theme (accent colour + font + icon pack + Start background choose photo + show more columns), accent picker (20 WP8 colours), ease of access (10-step text size), brightness, storage sense, connected apps (gallery / music live-tile package lists + conversation apps), navigation bar / status bar / notifications / volume / lock screen (launch shell setup apps), keyboard (launches `com.metro.keyboard`), and about (WP8.1 more info device details; Software = metro-os alpha-3). Hosts `content://com.metro.system` preferences provider.
 
 ## App role
 
@@ -37,7 +37,7 @@ See [`references/guides/blueprint.md`](references/guides/blueprint.md).
 | volume | Done (launches `com.metro.volume` setup) |
 | lock screen | Done (launches `com.metro.lockscreen` setup) |
 | keyboard | Done (launches `com.metro.keyboard` settings) |
-| connected apps | Done (gallery / music live-tile package lists) |
+| connected apps | Done (gallery / music live tiles + conversation apps) |
 | gallery apps / music apps | Done (apps corner list + multi-select picker) |
 | about / more info | Done (device information; Software = metro-os alpha-3) |
 

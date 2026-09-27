@@ -49,4 +49,17 @@ class MetroConnectedAppsTest {
         )
         assertTrue(MetroConnectedApps.musicPackagesOrDefault("").isEmpty())
     }
+
+    @Test
+    fun conversationPackagesOrDefault_nullUsesDefaults() {
+        assertEquals(
+            MetroConnectedApps.DEFAULT_CONVERSATION_PACKAGES,
+            MetroConnectedApps.conversationPackagesOrDefault(null),
+        )
+        assertTrue(MetroConnectedApps.conversationPackagesOrDefault("").isEmpty())
+        assertEquals(
+            setOf("com.whatsapp"),
+            MetroConnectedApps.conversationPackagesOrDefault("com.whatsapp"),
+        )
+    }
 }

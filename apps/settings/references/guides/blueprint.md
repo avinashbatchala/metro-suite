@@ -15,7 +15,7 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
   - `storage sense`
   - `brightness`
   - `ease of access`
-  - `connected apps` — gallery / music live-tile package lists
+  - `connected apps` — gallery / music live-tile package lists + conversation apps
   - `navigation bar` — launches `com.metro.navbar` MainActivity (soft-key overlay setup / permissions). Does **not** open Android Settings.
   - `status bar` — launches `com.metro.statusbar` MainActivity (system tray overlay setup / permissions). Does **not** open Android Settings.
   - `notifications` — launches `com.metro.notifications` MainActivity (toast banner setup / permissions). Does **not** open Android Settings.
@@ -115,25 +115,26 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 
 ### Page 8 — connected apps
 
-- **Layout:** `SETTINGS` overline + title `connected apps`. Intro body, then two email+account–style rows (leading suite glyph + title + secondary subtitle):
+- **Layout:** `SETTINGS` overline + title `connected apps`. Intro body, then three email+account–style rows (leading suite glyph + title + secondary subtitle):
   - **Gallery apps** — subtitle `photos live tiles` → Page 8a
-  - **Music apps** — subtitle `now playing live tiles` → Page 8b
+  - **Music apps** — subtitle `now playing live tiles` → Page 8b (glyph: `MetroAppGlyphs.Music`)
+  - **Conversation apps** — subtitle `replyable chats` → Page 8c (glyph: `MetroAppGlyphs.Conversations`)
 - **Navigation:** Back → Settings root.
 - **Interactions:** Hub only; lists live on child pages.
 - **Background:** Theme background.
 - **Reference:** `images/email_account_dark.png` (layout pattern — icon + title + subtitle)
 
-### Page 8a — gallery apps / Page 8b — music apps
+### Page 8a — gallery apps / Page 8b — music apps / Page 8c — conversation apps
 
 - **Layout:** Apps Corner pattern (`images/apps_corner_dark.png`):
-  1. `SETTINGS` overline + lowercase page title (`gallery apps` / `music apps`)
-  2. Intro body explaining Photos-style vs Xbox Music now-playing Start tiles
+  1. `SETTINGS` overline + lowercase page title (`gallery apps` / `music apps` / `conversation apps`)
+  2. Intro body explaining Photos-style vs Xbox Music now-playing Start tiles vs Conversations shade membership
   3. Vertical list of selected apps (square icon + display name)
   4. Trailing **Apps** / **tap to select apps** row → multi-select picker
-- **Picker:** `MetroMultiSelectList` (`APPS` overline; checkbox + icon + name rows; app bar check / close). Saves to `MetroPreferences` (`connected_gallery_apps` / `connected_music_apps` comma-separated packages). Back / close discards draft.
-- **Defaults:** When a key has never been written, suite defaults from `MetroConnectedApps` apply (Photos / Music + common third-party packages). Saving an empty list clears live-tile membership.
-- **Navigation:** Back → connected apps. Picker back → gallery/music page.
-- **Consumers:** Launcher reads lists for music now-playing faces and Photos-style cycle tiles (MediaStore synthesis for any connected gallery package on a medium/wide pin).
+- **Picker:** `MetroMultiSelectList` (`APPS` overline; checkbox + icon + name rows; app bar check / close). Saves to `MetroPreferences` (`connected_gallery_apps` / `connected_music_apps` / `connected_conversation_apps` comma-separated packages). Back / close discards draft.
+- **Defaults:** When a key has never been written, suite defaults from `MetroConnectedApps` apply (Photos / Music / common chat+mail packages). Saving an empty list clears membership.
+- **Navigation:** Back → connected apps. Picker back → gallery/music/conversation page.
+- **Consumers:** Launcher reads gallery/music lists for live tiles; Conversations reads the conversation list to decide which shade packages appear.
 
 ## Images
 
@@ -144,7 +145,7 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 | `accents_picker_dark.png` | Page 3 | Eight Forums WP8 accent grid — `ACCENTS` title, 4×5 tiles |
 | `accent_palette_wp8_dark.png` | Page 3 | Generated strip of the 20 official WP8 accent hex values (palette aid) |
 | `email_account_dark.png` | Page 8 | WP email+account — icon + title + subtitle hub rows |
-| `apps_corner_dark.png` | Page 8a/8b | WP apps corner — selected apps + tap to select |
+| `apps_corner_dark.png` | Page 8a/8b/8c | WP apps corner — selected apps + tap to select |
 
 Missing device captures for root / brightness / storage / extras+info → see [`known-gaps.md`](../known-gaps.md).
 

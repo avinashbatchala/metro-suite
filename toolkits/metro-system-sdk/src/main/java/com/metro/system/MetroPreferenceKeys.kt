@@ -31,6 +31,12 @@ object MetroPreferenceKeys {
     const val CONNECTED_MUSIC_APPS = "connected_music_apps"
 
     /**
+     * Comma-separated packages Conversations may surface from the notification shade.
+     * Null (never written) → [MetroConnectedApps.DEFAULT_CONVERSATION_PACKAGES]; blank → none.
+     */
+    const val CONNECTED_CONVERSATION_APPS = "connected_conversation_apps"
+
+    /**
      * Active Android icon-pack package for Start / app list glyphs.
      * Null or blank → system / suite icons ([MetroIconPacks]).
      */

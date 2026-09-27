@@ -18,11 +18,15 @@ Prototype UI — panorama home with Start-style tiles; richer presentation may f
   body (`MetroPanoramaBodyEnter`) with a **2-column** vertical tile grid
 - Tile 1: **all chats** (system accent + people-group glyph)
 - Tile 2: **favorites** (pink + heart glyph)
-- Following tiles: one per notifying app (Start tile fill from `MetroAppBranding`, app icon,
+- Following tiles: one per **connected installed app** (Settings → connected apps →
+  Conversation apps), even with zero active chats; notifying apps sort first by recency,
+  then remaining connected apps A–Z (Start tile fill from `MetroAppBranding`, app icon,
   app label) — SMS / suite Messaging excluded; **Gmail included** even without RemoteInput
-- Last tile when apps exist: **clear** (red + trash glyph) — dismisses all Conversations-tracked
-  shade posts; omitted when the home grid has no app tiles; always occupies the last 2-up slot
-  (slides in with the first app tile; later apps push it to the new last slot)
+  when on that list
+- Last tile when active shade chats exist: **clear** (red + trash glyph) — dismisses all
+  Conversations-tracked shade posts; omitted when there is nothing to dismiss; always
+  occupies the last 2-up slot when present (slides in with the first app tile; later apps
+  push it to the new last slot)
 - Tile size: ~88% of half-width square; enter: Hub extras+info right-slide stagger
 - Interactions: tap app tile → Page 3; tap clear → staggered slide-out of app tiles + clear, then refresh
 

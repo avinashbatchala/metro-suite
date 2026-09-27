@@ -36,6 +36,12 @@ data class AppConversationGroup(
     val conversations: List<ReplyableConversation>,
 )
 
+/** Installed package on the Settings → connected apps → Conversation apps list. */
+data class ConnectedAppRef(
+    val packageName: String,
+    val appLabel: String,
+)
+
 /**
  * Snapshot parsed from a [android.service.notification.StatusBarNotification] before
  * app-label resolution — kept free of Android types for unit tests.
@@ -117,6 +123,10 @@ object ConversationsLogic {
     fun isMailPackage(packageName: String): Boolean =
         packageName in MAIL_PACKAGES
 
+    /** True when [packageName] is on the Settings → connected apps → Conversation apps list. */
+    fun isConnectedPackage(packageName: String, connectedPackages: Set<String>): Boolean =
+        packageName in connectedPackages
+
     fun isReplyableCandidate(snapshot: ReplyableNotificationSnapshot): Boolean {
         if (isExcludedMessagingPackage(snapshot.packageName)) return false
         if (snapshot.isGroupSummary) return false
@@ -149,17 +159,32 @@ object ConversationsLogic {
             )
     }
 
-    /** Tile 1 = all chats, tile 2 = favorites, then each app group; clear only when apps exist. */
-    fun homeTiles(groups: List<AppConversationGroup>): List<HomeTile> {
-        val apps = groups.map { group ->
+    /**
+     * Tile 1 = all chats, tile 2 = favorites, then each connected installed app
+     * (notifying apps first by recency, then remaining connected apps A–Z), then
+     * clear when there is at least one dismissible shade conversation.
+     */
+    fun homeTiles(
+        groups: List<AppConversationGroup>,
+        connectedInstalled: List<ConnectedAppRef> = emptyList(),
+    ): List<HomeTile> {
+        val counts = groups.associate { it.packageName to it.conversations.size }
+        val labelsFromGroups = groups.associate { it.packageName to it.appLabel }
+        val connectedLabels = connectedInstalled.associate { it.packageName to it.appLabel }
+        val ordered = LinkedHashSet<String>()
+        groups.forEach { ordered.add(it.packageName) }
+        connectedInstalled
+            .sortedBy { it.appLabel.lowercase() }
+            .forEach { ordered.add(it.packageName) }
+        val apps = ordered.map { pkg ->
             HomeTile.App(
-                packageName = group.packageName,
-                appLabel = group.appLabel,
-                conversationCount = group.conversations.size,
+                packageName = pkg,
+                appLabel = labelsFromGroups[pkg] ?: connectedLabels[pkg] ?: pkg,
+                conversationCount = counts[pkg] ?: 0,
             )
         }
         return listOf(HomeTile.AllApps, HomeTile.Favorites) + apps +
-            if (apps.isNotEmpty()) listOf(HomeTile.Clear) else emptyList()
+            if (groups.isNotEmpty()) listOf(HomeTile.Clear) else emptyList()
     }
 
     fun conversationsFor(

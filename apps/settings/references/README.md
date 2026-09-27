@@ -29,8 +29,8 @@ references/
 | Accent palette aid | `images/accent_palette_wp8_dark.png` | Generated 20-colour HEX strip |
 | ease of access | `images/ease_of_access_dark_cyan.png` | Text size Sample + 7-step slider |
 | connected apps hub | `images/email_account_dark.png` | email+account icon + title + subtitle pattern |
-| gallery / music apps | `images/apps_corner_dark.png` | apps corner selected list + tap to select |
-| gallery / music app picker | `images/apps_multiselect_dark.png` | `MetroMultiSelectList` checkbox + icon + name |
+| gallery / music / conversation apps | `images/apps_corner_dark.png` | apps corner selected list + tap to select |
+| gallery / music / conversation app picker | `images/apps_multiselect_dark.png` | `MetroMultiSelectList` checkbox + icon + name |
 | brightness / storage sense / about | _gap_ | See blueprint Pages 5–7b |
 
 ## Image naming

@@ -19,15 +19,20 @@ import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
 import com.metro.conversations.ConversationsListenerService
 import com.metro.system.MetroAppBranding
+import com.metro.system.MetroPreferences
 
 /**
  * Reads active shade notifications that expose free-form reply (plus Gmail) and maps
  * them into [ReplyableConversation] groups for the hub UI.
+ *
+ * Membership is gated by Settings → connected apps → Conversation apps
+ * ([MetroPreferences.conversationAppPackages]).
  */
 class ConversationsRepository(
     private val appContext: Context,
 ) {
     private val labelCache = mutableMapOf<String, String>()
+    private val prefs = MetroPreferences(appContext)
 
     fun hasNotificationAccess(): Boolean =
         ConversationsListenerService.isNotificationAccessEnabled(appContext)
@@ -36,10 +41,14 @@ class ConversationsRepository(
         ConversationsListenerService.notificationAccessSettingsIntent()
 
     fun loadGroups(): List<AppConversationGroup> {
+        val connected = prefs.conversationAppPackages
         val active = ConversationsListenerService.activeNotificationsOrEmpty()
         val conversations = active.mapNotNull { sbn ->
             val snapshot = snapshotFrom(sbn) ?: return@mapNotNull null
             if (!ConversationsLogic.isReplyableCandidate(snapshot)) return@mapNotNull null
+            if (!ConversationsLogic.isConnectedPackage(snapshot.packageName, connected)) {
+                return@mapNotNull null
+            }
             val substitute = sbn.notification.extras
                 .getCharSequence("android.substName")
                 ?.toString()
@@ -56,6 +65,19 @@ class ConversationsRepository(
             )
         }
         return ConversationsLogic.groupByApp(conversations)
+    }
+
+    /**
+     * Installed packages from Settings → connected apps → Conversation apps.
+     * Shown as home tiles even when they currently have no shade conversations.
+     */
+    fun loadConnectedInstalledApps(): List<ConnectedAppRef> {
+        val connected = prefs.conversationAppPackages
+        return connected.mapNotNull { pkg ->
+            if (ConversationsLogic.isExcludedMessagingPackage(pkg)) return@mapNotNull null
+            val label = installedAppLabel(pkg) ?: return@mapNotNull null
+            ConnectedAppRef(packageName = pkg, appLabel = label)
+        }.sortedBy { it.appLabel.lowercase() }
     }
 
     fun sendReply(key: String, text: String): Boolean {
@@ -455,6 +477,30 @@ class ConversationsRepository(
         )
         labelCache[packageName] = resolved
         return resolved
+    }
+
+    /** Null when [packageName] is not installed on this device. */
+    private fun installedAppLabel(packageName: String): String? {
+        val pm = appContext.packageManager
+        return try {
+            val info = if (Build.VERSION.SDK_INT >= 33) {
+                pm.getApplicationInfo(
+                    packageName,
+                    PackageManager.ApplicationInfoFlags.of(0),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getApplicationInfo(packageName, 0)
+            }
+            val pmLabel = pm.getApplicationLabel(info)?.toString() ?: return null
+            ConversationsLogic.resolveAppLabel(
+                packageName = packageName,
+                packageManagerLabel = pmLabel,
+                substituteAppName = null,
+            )
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
     }
 
     private fun packageManagerLabel(packageName: String): String? {

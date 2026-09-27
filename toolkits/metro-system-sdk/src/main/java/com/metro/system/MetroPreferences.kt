@@ -165,6 +165,19 @@ class MetroPreferences(context: Context) {
         )
 
     /**
+     * Packages Conversations may show from the shade. Null preference → suite defaults;
+     * empty set when the user cleared the list in Settings → connected apps.
+     */
+    var conversationAppPackages: Set<String>
+        get() = MetroConnectedApps.conversationPackagesOrDefault(
+            readStringNullable(MetroPreferenceKeys.CONNECTED_CONVERSATION_APPS),
+        )
+        set(value) = writeString(
+            MetroPreferenceKeys.CONNECTED_CONVERSATION_APPS,
+            MetroConnectedApps.encode(value),
+        )
+
+    /**
      * Active Android icon-pack package for Start / app-list glyphs (Settings → start+theme).
      * Null or blank → system icons. See [MetroIconPacks].
      *
@@ -337,8 +350,9 @@ class MetroPreferences(context: Context) {
 
     private fun writeString(key: String, value: String) {
         val editor = localPrefs.edit().putString(key, value)
-        // Theme keys must hit disk before Settings can be killed; apply() races with process death.
-        if (isThemeKey(key)) editor.commit() else editor.apply()
+        // Theme + connected-app lists must hit memory/disk before another process queries the
+        // Settings provider (apply() can race with cross-app ContentResolver reads).
+        if (isThemeKey(key) || isConnectedAppsKey(key)) editor.commit() else editor.apply()
         propagateWrite { updateProvider(key, value) }
     }
 
@@ -371,6 +385,11 @@ class MetroPreferences(context: Context) {
             key == MetroPreferenceKeys.ACCENT_COLOR ||
             key == MetroPreferenceKeys.FONT_SCALE ||
             key == MetroPreferenceKeys.FONT_FAMILY
+
+    private fun isConnectedAppsKey(key: String): Boolean =
+        key == MetroPreferenceKeys.CONNECTED_GALLERY_APPS ||
+            key == MetroPreferenceKeys.CONNECTED_MUSIC_APPS ||
+            key == MetroPreferenceKeys.CONNECTED_CONVERSATION_APPS
 
     private fun rawAsFloat(raw: Any?): Float? = when (raw) {
         is Float -> raw

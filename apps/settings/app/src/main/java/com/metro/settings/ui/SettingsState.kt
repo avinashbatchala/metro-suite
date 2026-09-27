@@ -33,8 +33,10 @@ enum class SettingsRoute {
     ConnectedApps,
     GalleryApps,
     MusicApps,
+    ConversationApps,
     GalleryAppPicker,
     MusicAppPicker,
+    ConversationAppPicker,
 }
 
 class SettingsState(
@@ -129,6 +131,9 @@ class SettingsState(
     var musicAppPackages by mutableStateOf(prefs.musicAppPackages)
         private set
 
+    var conversationAppPackages by mutableStateOf(prefs.conversationAppPackages)
+        private set
+
     val accentColor: Color
         get() = MetroPreferences.parseAccentHex(accentHex)
 
@@ -167,9 +172,11 @@ class SettingsState(
             SettingsRoute.ConnectedApps -> route = SettingsRoute.Root
             SettingsRoute.GalleryApps,
             SettingsRoute.MusicApps,
+            SettingsRoute.ConversationApps,
             -> route = SettingsRoute.ConnectedApps
             SettingsRoute.GalleryAppPicker -> route = SettingsRoute.GalleryApps
             SettingsRoute.MusicAppPicker -> route = SettingsRoute.MusicApps
+            SettingsRoute.ConversationAppPicker -> route = SettingsRoute.ConversationApps
             SettingsRoute.EaseOfAccess,
             SettingsRoute.Brightness,
             SettingsRoute.StorageSense,
@@ -319,6 +326,11 @@ class SettingsState(
         prefs.musicAppPackages = packages
     }
 
+    fun applyConversationAppPackages(packages: Set<String>) {
+        conversationAppPackages = packages
+        prefs.conversationAppPackages = packages
+    }
+
     fun refreshSystemReads() {
         brightness = system.brightnessFraction()
         accentHex = prefs.accentColorHex
@@ -329,6 +341,7 @@ class SettingsState(
         iconPackPackage = prefs.iconPackPackage
         galleryAppPackages = prefs.galleryAppPackages
         musicAppPackages = prefs.musicAppPackages
+        conversationAppPackages = prefs.conversationAppPackages
         applicationEntries = applications.listInstalledApps()
         selectedApp?.packageName?.let { pkg ->
             selectedApp = applications.loadApp(pkg)

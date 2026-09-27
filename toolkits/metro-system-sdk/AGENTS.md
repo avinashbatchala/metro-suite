@@ -26,6 +26,7 @@ Cross-app system contracts: shared preferences, intents, broadcasts, content pro
 | `icon_pack_package` | `String?` | null | Active Android icon-pack package for Start / app-list glyphs; null = system icons ([MetroIconPacks]) |
 | `connected_gallery_apps` | `String` (CSV packages) | suite defaults when unset | Photos-style live-tile packages |
 | `connected_music_apps` | `String` (CSV packages) | suite defaults when unset | Xbox Music now-playing live-tile packages |
+| `connected_conversation_apps` | `String` (CSV packages) | suite defaults when unset | Packages Conversations may show from the shade |
 
 Storage: Settings-hosted ContentProvider (`content://com.metro.system`) backed by
 `SharedPreferences` file `metro_system`. Client apps always attempt ContentResolver first,

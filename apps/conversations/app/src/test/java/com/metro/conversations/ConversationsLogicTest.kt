@@ -1,6 +1,7 @@
 package com.metro.conversations
 
 import com.metro.conversations.data.ConversationsLogic
+import com.metro.conversations.data.ConnectedAppRef
 import com.metro.conversations.data.ConversationMessage
 import com.metro.conversations.data.FavoriteChat
 import com.metro.conversations.data.HomeTile
@@ -62,6 +63,15 @@ class ConversationsLogicTest {
     }
 
     @Test
+    fun isConnectedPackage_respectsAllowlist() {
+        val connected = setOf("com.whatsapp", "com.google.android.gm")
+        assertTrue(ConversationsLogic.isConnectedPackage("com.whatsapp", connected))
+        assertTrue(ConversationsLogic.isConnectedPackage("com.google.android.gm", connected))
+        assertFalse(ConversationsLogic.isConnectedPackage("org.telegram.messenger", connected))
+        assertFalse(ConversationsLogic.isConnectedPackage("com.whatsapp", emptySet()))
+    }
+
+    @Test
     fun groupByApp_sortsAppsByNewestThenLabel() {
         val conversations = listOf(
             conversation("wa:1", "com.whatsapp", "WhatsApp", postTimeMs = 100L),
@@ -86,6 +96,41 @@ class ConversationsLogicTest {
             tiles[2],
         )
         assertEquals(HomeTile.Clear, tiles.last())
+    }
+
+    @Test
+    fun homeTiles_includesConnectedAppsWithoutActiveChats() {
+        val groups = ConversationsLogic.groupByApp(
+            listOf(conversation("wa:1", "com.whatsapp", "WhatsApp", 1L)),
+        )
+        val connected = listOf(
+            ConnectedAppRef("org.telegram.messenger", "Telegram"),
+            ConnectedAppRef("com.whatsapp", "WhatsApp"),
+        )
+        val tiles = ConversationsLogic.homeTiles(groups, connected)
+        assertEquals(
+            listOf(
+                HomeTile.AllApps,
+                HomeTile.Favorites,
+                HomeTile.App("com.whatsapp", "WhatsApp", 1),
+                HomeTile.App("org.telegram.messenger", "Telegram", 0),
+                HomeTile.Clear,
+            ),
+            tiles,
+        )
+    }
+
+    @Test
+    fun homeTiles_omitsClearWhenNoActiveChats() {
+        val connected = listOf(ConnectedAppRef("com.whatsapp", "WhatsApp"))
+        assertEquals(
+            listOf(
+                HomeTile.AllApps,
+                HomeTile.Favorites,
+                HomeTile.App("com.whatsapp", "WhatsApp", 0),
+            ),
+            ConversationsLogic.homeTiles(emptyList(), connected),
+        )
     }
 
     @Test

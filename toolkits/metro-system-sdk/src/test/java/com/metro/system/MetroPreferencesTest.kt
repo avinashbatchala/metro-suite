@@ -123,16 +123,21 @@ class MetroPreferencesTest {
     fun connectedApps_defaultUntilWrittenThenRoundTrip() {
         assertEquals(MetroConnectedApps.DEFAULT_GALLERY_PACKAGES, prefs.galleryAppPackages)
         assertEquals(MetroConnectedApps.DEFAULT_MUSIC_PACKAGES, prefs.musicAppPackages)
+        assertEquals(MetroConnectedApps.DEFAULT_CONVERSATION_PACKAGES, prefs.conversationAppPackages)
 
         prefs.galleryAppPackages = setOf("com.metro.photos")
         prefs.musicAppPackages = setOf("com.metro.music", "com.spotify.music")
+        prefs.conversationAppPackages = setOf("com.whatsapp", "com.google.android.gm")
         assertEquals(setOf("com.metro.photos"), prefs.galleryAppPackages)
         assertEquals(setOf("com.metro.music", "com.spotify.music"), prefs.musicAppPackages)
+        assertEquals(setOf("com.whatsapp", "com.google.android.gm"), prefs.conversationAppPackages)
 
         prefs.galleryAppPackages = emptySet()
         prefs.musicAppPackages = emptySet()
+        prefs.conversationAppPackages = emptySet()
         assertTrue(prefs.galleryAppPackages.isEmpty())
         assertTrue(prefs.musicAppPackages.isEmpty())
+        assertTrue(prefs.conversationAppPackages.isEmpty())
     }
 
     @Test

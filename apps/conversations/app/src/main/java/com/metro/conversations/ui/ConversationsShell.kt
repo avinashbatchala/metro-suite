@@ -529,7 +529,11 @@ private fun HomeAppTile(
                 this.alpha = alpha.value
             }
             .background(faceColor)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .semantics { contentDescription = title },
     ) {
         val iconSize = minOf(maxWidth, maxHeight) * 0.42f
