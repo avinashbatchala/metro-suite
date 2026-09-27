@@ -8,7 +8,24 @@ import android.provider.MediaStore
 
 class LocalLibraryRepository(private val context: Context) {
 
-    fun loadSongs(): List<Song> {
+    fun loadSongs(excludedDirectoryIds: Set<String> = emptySet()): List<Song> {
+        return scanLocalTracks()
+            .filter { MusicDirectoryLogic.filterExcluded(it.directoryId, excludedDirectoryIds) }
+            .map { it.song }
+    }
+
+    fun loadMusicDirectories(): List<MusicDirectory> {
+        return MusicDirectoryLogic.aggregate(
+            scanLocalTracks().mapNotNull { it.directoryId },
+        )
+    }
+
+    private data class LocalTrack(
+        val song: Song,
+        val directoryId: String?,
+    )
+
+    private fun scanLocalTracks(): List<LocalTrack> {
         val collection: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         } else {
@@ -16,6 +33,7 @@ class LocalLibraryRepository(private val context: Context) {
         }
 
         val useInlineGenre = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+        val useRelativePath = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
         val projection = buildList {
             add(MediaStore.Audio.Media._ID)
             add(MediaStore.Audio.Media.TITLE)
@@ -27,12 +45,17 @@ class LocalLibraryRepository(private val context: Context) {
             if (useInlineGenre) {
                 add(MediaStore.Audio.Media.GENRE)
             }
+            if (useRelativePath) {
+                add(MediaStore.Audio.Media.RELATIVE_PATH)
+            }
+            @Suppress("DEPRECATION")
+            add(MediaStore.Audio.Media.DATA)
         }.toTypedArray()
 
         // Pre-R: GENRE is not on the media table — map audio id → name via Genres.Members.
         val genreByAudioId = if (useInlineGenre) emptyMap() else loadGenreByAudioId()
 
-        val songs = mutableListOf<Song>()
+        val tracks = mutableListOf<LocalTrack>()
         context.contentResolver.query(
             collection,
             projection,
@@ -51,6 +74,13 @@ class LocalLibraryRepository(private val context: Context) {
             } else {
                 -1
             }
+            val relativePathCol = if (useRelativePath) {
+                cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+            } else {
+                -1
+            }
+            @Suppress("DEPRECATION")
+            val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -67,22 +97,28 @@ class LocalLibraryRepository(private val context: Context) {
                     genreCol >= 0 -> cursor.getString(genreCol)?.trim()?.takeIf { it.isNotEmpty() }
                     else -> genreByAudioId[id]
                 }
-                songs += Song(
-                    id = "local:$id",
-                    title = cursor.getString(titleCol).orEmpty().ifBlank { "Unknown title" },
-                    artist = cursor.getString(artistCol).orEmpty().ifBlank { "Unknown artist" },
-                    album = cursor.getString(albumCol).orEmpty().ifBlank { "Unknown album" },
-                    durationMs = cursor.getLong(durationCol).coerceAtLeast(0L),
-                    uri = contentUri,
-                    artworkUri = artUri,
-                    source = LibrarySource.Local,
-                    albumId = "local-album:$albumId",
-                    artistId = null,
-                    genre = genre,
+                val relativePath = if (relativePathCol >= 0) cursor.getString(relativePathCol) else null
+                val absolutePath = if (dataCol >= 0) cursor.getString(dataCol) else null
+                val directoryId = MusicDirectoryLogic.directoryId(relativePath, absolutePath)
+                tracks += LocalTrack(
+                    song = Song(
+                        id = "local:$id",
+                        title = cursor.getString(titleCol).orEmpty().ifBlank { "Unknown title" },
+                        artist = cursor.getString(artistCol).orEmpty().ifBlank { "Unknown artist" },
+                        album = cursor.getString(albumCol).orEmpty().ifBlank { "Unknown album" },
+                        durationMs = cursor.getLong(durationCol).coerceAtLeast(0L),
+                        uri = contentUri,
+                        artworkUri = artUri,
+                        source = LibrarySource.Local,
+                        albumId = "local-album:$albumId",
+                        artistId = null,
+                        genre = genre,
+                    ),
+                    directoryId = directoryId,
                 )
             }
         }
-        return songs
+        return tracks
     }
 
     /**

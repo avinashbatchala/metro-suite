@@ -76,6 +76,19 @@ object PlayHistoryLogic {
         val byId = library.associateBy { it.id }
         return entries.map { entry -> byId[entry.songId] ?: entry.toSong() }
     }
+
+    /**
+     * Cold-start now-playing: last played track plus history as the logical queue
+     * (newest first — same order as the recent list).
+     */
+    fun restoreSession(
+        entries: List<PlayHistoryEntry>,
+        library: List<Song>,
+    ): Pair<Song, List<Song>>? {
+        val songs = resolveSongs(entries, library)
+        if (songs.isEmpty()) return null
+        return songs.first() to songs
+    }
 }
 
 /** SharedPreferences-backed store for play history on this device. */

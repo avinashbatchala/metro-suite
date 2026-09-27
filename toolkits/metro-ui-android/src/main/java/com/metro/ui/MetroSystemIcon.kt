@@ -67,6 +67,8 @@ enum class MetroSystemIconType {
     More,
     SwitchView,
     Refresh,
+    /** Filled folder — music directories / file pickers. */
+    Folder,
 
     // Common app-bar actions
     Phone,
@@ -202,6 +204,7 @@ fun DrawScope.drawMetroSystemIconGlyph(
         MetroSystemIconType.More -> drawMoreGlyph(color, glyphStroke)
         MetroSystemIconType.SwitchView -> drawRefreshGlyph(color)
         MetroSystemIconType.Refresh -> drawRefreshGlyph(color)
+        MetroSystemIconType.Folder -> drawFolderGlyph(color)
         MetroSystemIconType.Phone -> drawViewportPath(phoneHandsetPath, color, 0.72f)
         MetroSystemIconType.Message -> drawViewportPath(messagingBubblePath, color, 0.66f)
         MetroSystemIconType.Heart -> drawHeartGlyph(color)
@@ -220,7 +223,7 @@ fun DrawScope.drawMetroSystemIconGlyph(
         MetroSystemIconType.Emoji -> drawEmojiGlyph(color)
         MetroSystemIconType.Undo -> drawUndoRedoGlyph(color, glyphStroke, redo = false)
         MetroSystemIconType.Redo -> drawUndoRedoGlyph(color, glyphStroke, redo = true)
-        MetroSystemIconType.Settings -> drawSettingsGlyph(color, glyphStroke)
+        MetroSystemIconType.Settings -> drawSettingsGlyph(color)
         MetroSystemIconType.Clipboard -> drawClipboardGlyph(color, glyphStroke)
         MetroSystemIconType.Copy -> drawCopyGlyph(color, glyphStroke)
         MetroSystemIconType.Cut -> drawCutGlyph(color, glyphStroke)
@@ -999,24 +1002,30 @@ private fun DrawScope.drawUndoRedoGlyph(color: Color, stroke: Stroke, redo: Bool
     }
 }
 
-private fun DrawScope.drawSettingsGlyph(color: Color, stroke: Stroke) {
-    val s = size.minDimension
-    val cx = size.width / 2f
-    val cy = size.height / 2f
-    drawCircle(color, s * 0.10f, Offset(cx, cy), style = stroke)
-    drawCircle(color, s * 0.26f, Offset(cx, cy), style = stroke)
-    for (i in 0 until 6) {
-        val a = Math.toRadians((i * 60).toDouble()).toFloat()
-        val inner = s * 0.26f
-        val outer = s * 0.34f
-        drawLine(
-            color,
-            Offset(cx + kotlin.math.cos(a) * inner, cy + kotlin.math.sin(a) * inner),
-            Offset(cx + kotlin.math.cos(a) * outer, cy + kotlin.math.sin(a) * outer),
-            stroke.width,
-            StrokeCap.Butt,
-        )
-    }
+/** Filled settings gear — 512 viewBox path from the WP8.1 settings reference SVG. */
+private const val SETTINGS_GLYPH_PATH =
+    "m447.1 259.8l64.9-27.1l-19.8-83.2l-72.7 7.8c-7.3-12.4-15.9-23.7-25.4-33.8L421 58.1l-72.8-44.9l-45.4 56.5c-15.7-4.1-32-6.2-48.3-6.3L225.9 0l-82.7 22.2l9.7 70.2c-11.4 7.1-21.9 15.1-31.2 24L59 90.5l-44.9 72.8l54 43.7c-3.9 14.9-6.3 30.3-6.6 45.8L0 278.4l19.8 83.3l68.7-7.4c7.9 13.8 17.2 26.3 28 37.3L91.2 453l72.8 44.9l43.6-54.2c14.8 3.7 29.9 5.7 45.3 5.9l25.8 62.4l83.2-19.8l-7.5-70.8c12.9-7.8 24.7-16.8 34.9-27l63.8 26.3l44.9-72.9l-56.4-45.6c3.4-13.8 5.3-28.1 5.5-42.4M256 374.4c-65.2 0-118-53-118-118.5c0-65.4 52.8-118.5 118-118.5s118 53 118 118.5s-52.9 118.5-118 118.5m0-158c-21.9 0-39.6 17.7-39.6 39.6s17.7 39.6 39.6 39.6s39.6-17.7 39.6-39.6s-17.8-39.6-39.6-39.6"
+
+private val settingsGlyphPath: Path by lazy {
+    PathParser().parsePathString(SETTINGS_GLYPH_PATH).toPath()
+}
+
+/** Filled settings gear — scales the 512 reference into the ring inset. */
+internal fun DrawScope.drawSettingsGlyph(color: Color) {
+    drawFilledViewportGlyph(settingsGlyphPath, color, viewBox = 512f, glyphScale = 0.42f)
+}
+
+/** Filled folder — 512 viewBox path from the WP8.1 folder reference SVG. */
+private const val FOLDER_GLYPH_PATH =
+    "m0 192l36.6 237.7c0 8 10.3 18.3 18.3 18.3h402.3c8 0 18.3-10.3 18.3-18.3L512 192zm475.4-54.9c0-8-10.3-18.3-18.3-18.3H274.3l-9.1-36.6c-1.3-7.8-10.3-18.3-18.3-18.3h-128c-7.9 0-17 10.4-18.3 18.3l-9.1 36.6H54.9c-7.9 0-18.3 10.3-18.3 18.3v18.3h438.9v-18.3z"
+
+private val folderGlyphPath: Path by lazy {
+    PathParser().parsePathString(FOLDER_GLYPH_PATH).toPath()
+}
+
+/** Filled folder — scales the 512 reference into the ring inset. */
+internal fun DrawScope.drawFolderGlyph(color: Color) {
+    drawFilledViewportGlyph(folderGlyphPath, color, viewBox = 512f, glyphScale = 0.42f)
 }
 
 private fun DrawScope.drawClipboardGlyph(color: Color, stroke: Stroke) {

@@ -25,6 +25,8 @@ import com.metro.music.data.Genre
 import com.metro.music.data.LibraryLogic
 import com.metro.music.data.LibrarySource
 import com.metro.music.data.LocalLibraryRepository
+import com.metro.music.data.MusicDirectory
+import com.metro.music.data.MusicDirectoryStore
 import com.metro.music.data.PlayHistoryEntry
 import com.metro.music.data.PlayHistoryLogic
 import com.metro.music.data.PlayHistoryStore
@@ -50,6 +52,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
@@ -61,6 +64,7 @@ enum class MusicRoute {
     PlaylistDetail,
     GenreDetail,
     Settings,
+    MusicDirectories,
     Explore,
     Recent,
     Queue,
@@ -70,6 +74,7 @@ class MusicState(context: Context) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val localRepo = LocalLibraryRepository(appContext)
+    private val musicDirectoryStore = MusicDirectoryStore(appContext)
     private val playHistoryStore = PlayHistoryStore(appContext)
     private val authStore = YtMusicAuthStore(appContext)
     private val ytHttp = OkHttpClient.Builder()
@@ -87,7 +92,16 @@ class MusicState(context: Context) {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private var positionJob: Job? = null
-    private var queueJob: Job? = null
+    /** Resolves and starts the current track — must not be cancelled by window fill. */
+    private var playbackJob: Job? = null
+    /** Prefetch local look-ahead / look-behind around the current track. */
+    private var windowJob: Job? = null
+    /** Background Innertube resolves for upcoming YouTube tracks (URL cache only). */
+    private var prefetchJob: Job? = null
+    /** Bumped on every [playSongs] so a stale resolve cannot replace a newer skip. */
+    private var playbackGeneration: Int = 0
+    /** Fresh googlevideo URLs keyed by video id — skips re-resolve when still valid. */
+    private val streamUrlCache = ConcurrentHashMap<String, CachedStreamUrl>()
     private var playlistJob: Job? = null
     private var albumJob: Job? = null
     private var artistJob: Job? = null
@@ -112,6 +126,10 @@ class MusicState(context: Context) {
         private set
     var localPlaylists by mutableStateOf<List<Playlist>>(emptyList())
         private set
+    var musicDirectories by mutableStateOf<List<MusicDirectory>>(emptyList())
+        private set
+    var excludedMusicDirectoryIds by mutableStateOf<Set<String>>(emptySet())
+        private set
     var ytSongs by mutableStateOf<List<Song>>(emptyList())
         private set
     var ytPlaylists by mutableStateOf<List<Playlist>>(emptyList())
@@ -129,7 +147,7 @@ class MusicState(context: Context) {
     var ytSyncMessage by mutableStateOf<String?>(null)
         private set
     var route by mutableStateOf(MusicRoute.Hub)
-    /** Hub panes: 0 collection | 1 get music | 2 now playing */
+    /** Hub panes: 0 collection | 1 get music | 2 now playing | 3 local */
     var hubPage by mutableIntStateOf(0)
     var collectionPage by mutableIntStateOf(0)
     /** Find-by-letter grid over the collection pivots. */
@@ -234,6 +252,7 @@ class MusicState(context: Context) {
 
     init {
         loadPlayHistory()
+        excludedMusicDirectoryIds = musicDirectoryStore.loadExcludedIds()
     }
 
     fun connectPlayer() {
@@ -263,13 +282,26 @@ class MusicState(context: Context) {
 
     fun releasePlayer() {
         positionJob?.cancel()
-        queueJob?.cancel()
+        playbackJob?.cancel()
+        windowJob?.cancel()
+        prefetchJob?.cancel()
         playlistJob?.cancel()
         albumJob?.cancel()
         artistJob?.cancel()
         libraryJob?.cancel()
         exploreJob?.cancel()
-        controller?.removeListener(playerListener)
+        val ctrl = controller
+        if (ctrl != null) {
+            ctrl.removeListener(playerListener)
+            // If playback is not active, drop the session so the next cold open shows
+            // "Nothing playing" instead of restoring a paused queue.
+            runCatching {
+                if (!ctrl.isPlaying) {
+                    ctrl.stop()
+                    ctrl.clearMediaItems()
+                }
+            }
+        }
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controller = null
         controllerFuture = null
@@ -281,7 +313,9 @@ class MusicState(context: Context) {
             libraryLoading = true
             libraryJob = scope.launch {
                 try {
-                    localSongs = withContext(Dispatchers.IO) { localRepo.loadSongs() }
+                    val excluded = excludedMusicDirectoryIds
+                    musicDirectories = withContext(Dispatchers.IO) { localRepo.loadMusicDirectories() }
+                    localSongs = withContext(Dispatchers.IO) { localRepo.loadSongs(excluded) }
                     localPlaylists = withContext(Dispatchers.IO) { localRepo.loadPlaylists() }
                 } finally {
                     if (isActive) {
@@ -296,9 +330,17 @@ class MusicState(context: Context) {
             libraryJob?.cancel()
             localSongs = emptyList()
             localPlaylists = emptyList()
+            musicDirectories = emptyList()
             libraryLoading = false
         }
         refreshYtLibrary()
+    }
+
+    fun applyMusicDirectorySelection(selectedIds: Set<String>) {
+        val excluded = musicDirectories.map { it.id }.toSet() - selectedIds
+        excludedMusicDirectoryIds = excluded
+        musicDirectoryStore.saveExcludedIds(excluded)
+        reloadLibrary()
     }
 
     fun refreshYtAuth() {
@@ -383,6 +425,10 @@ class MusicState(context: Context) {
     /**
      * Opens now playing immediately with the tapped song, resolves the stream in the background,
      * then starts playback. The seek bar stays as loading dots until duration is known.
+     *
+     * Always replaces the Media3 window with a freshly resolved URI for the start track.
+     * YouTube googlevideo URLs expire within minutes — seeking a prefetched next item is what
+     * caused "first song keeps playing / next infinite buffers" on skip.
      */
     fun playSongs(songs: List<Song>, startIndex: Int) {
         if (songs.isEmpty()) return
@@ -398,35 +444,50 @@ class MusicState(context: Context) {
         positionMs = 0L
         durationMs = 0L
         isPlaying = false
-        orderedPlaybackQueue = songs
-        playbackQueue = if (shuffle) {
-            QueueLogic.shuffleKeepingCurrent(songs, start.id)
-        } else {
+        // Same list instance = jump within the active queue (skip). A new list = fresh play.
+        val queue = if (songs === playbackQueue) {
             songs
+        } else {
+            orderedPlaybackQueue = songs
+            if (shuffle) QueueLogic.shuffleKeepingCurrent(songs, start.id) else songs
         }
-        val queue = playbackQueue
+        playbackQueue = queue
         val queueIndex = QueueLogic.indexOfSong(queue, start.id).coerceIn(0, queue.lastIndex)
+        // Arm UI before pausing so chrome does not flash empty.
+        loadingPlayback = true
         updateCurrentSong(start)
         hubPage = HUB_NOW_PLAYING
         route = MusicRoute.Hub
-        loadingPlayback = true
-        queueJob?.cancel()
-        queueJob = scope.launch {
+        val generation = ++playbackGeneration
+        playbackJob?.cancel()
+        windowJob?.cancel()
+        prefetchJob?.cancel()
+        // Stop the previous track immediately; setMediaItems below replaces the window.
+        runCatching { ctrl.pause() }
+        playbackJob = scope.launch {
             try {
                 val startItem = withContext(Dispatchers.IO) { resolvePlayable(start) }
+                if (generation != playbackGeneration || !isActive) return@launch
                 if (startItem == null) {
                     statusMessage = playbackError ?: "Unable to play"
                     return@launch
                 }
+                if (generation != playbackGeneration || !isActive) return@launch
                 ctrl.shuffleModeEnabled = false
                 ctrl.setMediaItems(listOf(startItem.second), 0, 0L)
                 ctrl.prepare()
                 ctrl.play()
                 updateCurrentSong(startItem.first)
             } finally {
-                loadingPlayback = false
+                if (generation == playbackGeneration) loadingPlayback = false
             }
-            fillQueue(ctrl, queue, queueIndex)
+            if (generation == playbackGeneration && isActive) {
+                windowJob?.cancel()
+                windowJob = scope.launch {
+                    fillQueueWindow(ctrl, queue, queueIndex)
+                }
+                prefetchUpcomingStreams(queue, queueIndex)
+            }
         }
     }
 
@@ -437,42 +498,27 @@ class MusicState(context: Context) {
         route = MusicRoute.Queue
     }
 
-    /**
-     * Jump to [index] in [playbackQueue]. Prefers seeking an already-materialised Media3 item;
-     * otherwise reloads the queue from that song.
-     */
+    /** Jump to [index] in [playbackQueue] with a fresh stream resolve. */
     fun playQueueIndex(index: Int) {
         val songs = playbackQueue
         if (index !in songs.indices) return
-        val target = songs[index]
-        val ctrl = controller
-        if (ctrl != null) {
-            for (i in 0 until ctrl.mediaItemCount) {
-                if (ctrl.getMediaItemAt(i).mediaId == target.id) {
-                    ctrl.seekToDefaultPosition(i)
-                    ctrl.play()
-                    hubPage = HUB_NOW_PLAYING
-                    route = MusicRoute.Hub
-                    return
-                }
-            }
-        }
         playSongs(songs, index)
     }
 
     /**
-     * Every YouTube track costs an Innertube round trip and its stream URL expires, so only a
-     * short window either side of the tapped song is materialised. [ensureQueueWindow] tops it
-     * up as playback advances through the full logical [playbackQueue].
+     * Only local files are prefetched into Media3. YouTube stream URLs expire quickly; prefetching
+     * them made skip land on a dead URL (infinite buffer) while the first cached item kept playing.
      */
-    private suspend fun fillQueue(ctrl: MediaController, songs: List<Song>, startIndex: Int) {
+    private suspend fun fillQueueWindow(ctrl: MediaController, songs: List<Song>, startIndex: Int) {
         val following = songs.drop(startIndex + 1).take(QUEUE_LOOKAHEAD)
+            .filter { it.source == LibrarySource.Local }
         for (song in following) {
             coroutineContext.ensureActive()
             val item = withContext(Dispatchers.IO) { resolvePlayable(song) } ?: continue
             ctrl.addMediaItem(item.second)
         }
         val preceding = songs.take(startIndex).takeLast(QUEUE_LOOKBEHIND)
+            .filter { it.source == LibrarySource.Local }
         for ((offset, song) in preceding.withIndex()) {
             coroutineContext.ensureActive()
             val item = withContext(Dispatchers.IO) { resolvePlayable(song) } ?: continue
@@ -481,28 +527,30 @@ class MusicState(context: Context) {
     }
 
     /**
-     * Append / prepend unresolved songs so Media3 always holds ~[QUEUE_LOOKAHEAD] ahead of the
-     * current logical index. Skip and natural advance both rely on this sliding window.
+     * Append / prepend unresolved **local** songs so Media3 holds a short window. YouTube tracks
+     * are resolved on demand in [playSongs] / skip.
      */
     private fun ensureQueueWindow() {
         val ctrl = controller ?: return
+        if (ctrl.mediaItemCount == 0) return
         val songs = playbackQueue
         if (songs.isEmpty()) return
         val logicalIndex = QueueLogic.indexOfSong(songs, currentSong?.id)
         if (logicalIndex < 0) return
         val materialised = materialisedMediaIds(ctrl)
         val ahead = QueueLogic.missingAhead(songs, logicalIndex, QUEUE_LOOKAHEAD, materialised)
+            .filter { it.source == LibrarySource.Local }
         val behind = QueueLogic.missingBehind(songs, logicalIndex, QUEUE_LOOKBEHIND, materialised)
+            .filter { it.source == LibrarySource.Local }
         if (ahead.isEmpty() && behind.isEmpty()) return
-        queueJob?.cancel()
-        queueJob = scope.launch {
+        windowJob?.cancel()
+        windowJob = scope.launch {
             for (song in ahead) {
                 if (!isActive) return@launch
                 if (materialisedMediaIds(ctrl).contains(song.id)) continue
                 val item = withContext(Dispatchers.IO) { resolvePlayable(song) } ?: continue
                 ctrl.addMediaItem(item.second)
             }
-            // Prepend in reverse so the earliest missing song ends up first.
             for (song in behind.asReversed()) {
                 if (!isActive) return@launch
                 if (materialisedMediaIds(ctrl).contains(song.id)) continue
@@ -519,8 +567,7 @@ class MusicState(context: Context) {
     }
 
     /**
-     * Drop every Media3 item except the current track, then refill the look-ahead / look-behind
-     * window from [playbackQueue]. Used after shuffle reorder so the player order matches.
+     * Drop every Media3 item except the current track, then refill local look-ahead / look-behind.
      */
     private fun rematerializeWindowAroundCurrent() {
         val ctrl = controller ?: return
@@ -535,43 +582,69 @@ class MusicState(context: Context) {
             ctrl.removeMediaItem(0)
         }
         ctrl.shuffleModeEnabled = false
-        queueJob?.cancel()
-        queueJob = scope.launch {
-            fillQueue(ctrl, songs, logicalIndex)
+        windowJob?.cancel()
+        windowJob = scope.launch {
+            fillQueueWindow(ctrl, songs, logicalIndex)
         }
     }
 
     fun togglePlayPause() {
         val ctrl = controller ?: return
-        if (ctrl.isPlaying) ctrl.pause() else ctrl.play()
+        if (ctrl.isPlaying) {
+            ctrl.pause()
+            return
+        }
+        // If UI shows a different song than Media3 (stale window), rematerialise instead of
+        // resuming the old cached item.
+        val uiId = currentSong?.id
+        val playerId = ctrl.currentMediaItem?.mediaId
+        if (uiId != null && playerId != null && uiId != playerId) {
+            val index = QueueLogic.indexOfSong(playbackQueue, uiId)
+            if (index >= 0) {
+                playSongs(playbackQueue, index)
+                return
+            }
+        }
+        ctrl.play()
     }
 
     fun skipNext() {
-        val ctrl = controller ?: return
-        if (ctrl.hasNextMediaItem()) {
-            ctrl.seekToNextMediaItem()
-            return
-        }
-        // Media3 window exhausted but logical queue may still have tracks — jump / refill.
         val next = QueueLogic.upNext(playbackQueue, currentSong?.id) ?: return
         val index = QueueLogic.indexOfSong(playbackQueue, next.id)
-        if (index >= 0) playQueueIndex(index)
+        if (index < 0) return
+        // Local tracks already in the Media3 window can skip instantly.
+        if (next.source == LibrarySource.Local && seekMaterialised(next.id)) return
+        // Always fresh-materialise YouTube (or unmaterialised local). Prefetched YT Media3
+        // items expire; seekToNext left song A playing while the UI showed B buffering forever.
+        playSongs(playbackQueue, index)
     }
 
     fun skipPrevious() {
         val ctrl = controller ?: return
-        // Near the start of a track, WP / most players restart; otherwise go previous.
         if (ctrl.currentPosition > PREVIOUS_RESTART_MS && ctrl.isCurrentMediaItemSeekable) {
             ctrl.seekTo(0L)
             return
         }
-        if (ctrl.hasPreviousMediaItem()) {
-            ctrl.seekToPreviousMediaItem()
-            return
-        }
         val queue = playbackQueue
         val index = QueueLogic.indexOfSong(queue, currentSong?.id)
-        if (index > 0) playQueueIndex(index - 1)
+        if (index <= 0) return
+        val previous = queue[index - 1]
+        if (previous.source == LibrarySource.Local && seekMaterialised(previous.id)) return
+        playSongs(queue, index - 1)
+    }
+
+    /** Seek to a Media3 item already in the short window. Returns false if missing. */
+    private fun seekMaterialised(songId: String): Boolean {
+        val ctrl = controller ?: return false
+        for (i in 0 until ctrl.mediaItemCount) {
+            if (ctrl.getMediaItemAt(i).mediaId == songId) {
+                updateCurrentSong(songById(songId) ?: return false)
+                ctrl.seekTo(i, 0L)
+                ctrl.play()
+                return true
+            }
+        }
+        return false
     }
 
     fun seekTo(ms: Long) {
@@ -787,13 +860,49 @@ class MusicState(context: Context) {
             }
             LibrarySource.YouTubeMusic -> {
                 val videoId = song.youtubeVideoId ?: return null
+                val cached = streamUrlCache[videoId]
+                val now = System.currentTimeMillis()
+                if (cached != null && cached.expiresAtMs > now) {
+                    return song to MusicPlaybackService.mediaItemFor(song, cached.url)
+                }
                 val result = ytClient.resolveStream(videoId)
                 val url = result.url
                 if (url == null) {
                     playbackError = result.error
+                    streamUrlCache.remove(videoId)
                     return null
                 }
+                streamUrlCache[videoId] = CachedStreamUrl(
+                    url = url,
+                    expiresAtMs = now + STREAM_CACHE_TTL_MS,
+                )
                 song to MusicPlaybackService.mediaItemFor(song, url)
+            }
+        }
+    }
+
+    /**
+     * Warm the URL cache for the next few YouTube tracks so skip does not wait on Innertube.
+     * Does **not** push items into Media3 — those URLs expire and broke seekToNext.
+     */
+    private fun prefetchUpcomingStreams(songs: List<Song>, startIndex: Int) {
+        prefetchJob?.cancel()
+        val upcoming = songs.drop(startIndex + 1).take(YT_PREFETCH_COUNT)
+            .filter { it.source == LibrarySource.YouTubeMusic && !it.youtubeVideoId.isNullOrBlank() }
+        if (upcoming.isEmpty()) return
+        prefetchJob = scope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            for (song in upcoming) {
+                ensureActive()
+                val videoId = song.youtubeVideoId ?: continue
+                val cached = streamUrlCache[videoId]
+                if (cached != null && cached.expiresAtMs > now) continue
+                val result = runCatching { ytClient.resolveStream(videoId) }.getOrNull() ?: continue
+                val url = result.url ?: continue
+                streamUrlCache[videoId] = CachedStreamUrl(
+                    url = url,
+                    expiresAtMs = System.currentTimeMillis() + STREAM_CACHE_TTL_MS,
+                )
             }
         }
     }
@@ -816,6 +925,24 @@ class MusicState(context: Context) {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
+            // No YouTube look-ahead in Media3 — advance the logical queue ourselves.
+            if (playbackState == Player.STATE_ENDED) {
+                when (repeatMode) {
+                    Player.REPEAT_MODE_ONE -> {
+                        val id = currentSong?.id
+                        val index = QueueLogic.indexOfSong(playbackQueue, id)
+                        if (index >= 0) playSongs(playbackQueue, index)
+                    }
+                    else -> {
+                        val next = QueueLogic.upNext(playbackQueue, currentSong?.id)
+                        if (next != null) {
+                            skipNext()
+                        } else if (repeatMode == Player.REPEAT_MODE_ALL && playbackQueue.isNotEmpty()) {
+                            playSongs(playbackQueue, 0)
+                        }
+                    }
+                }
+            }
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
@@ -828,6 +955,7 @@ class MusicState(context: Context) {
             isPlaying = false
             loadingPlayback = false
             statusMessage = "Playback failed: ${error.errorCodeName}"
+            currentSong?.youtubeVideoId?.let { streamUrlCache.remove(it) }
             // Stop cleanly — an abrupt Source error previously aborted MediaCodec (SIGABRT).
             runCatching {
                 controller?.pause()
@@ -876,6 +1004,7 @@ class MusicState(context: Context) {
             ?: exploreResults.firstOrNull { it.id == id }
             ?: playlistSongs.firstOrNull { it.id == id }
             ?: playbackQueue.firstOrNull { it.id == id }
+            ?: recentSongs.firstOrNull { it.id == id }
             ?: currentSong?.takeIf { it.id == id }
     }
 
@@ -922,11 +1051,17 @@ class MusicState(context: Context) {
     companion object {
         private const val QUEUE_LOOKAHEAD = 6
         private const val QUEUE_LOOKBEHIND = 3
+        /** How many upcoming YT tracks to resolve into [streamUrlCache] while one plays. */
+        private const val YT_PREFETCH_COUNT = 2
+        /** googlevideo signed URLs typically live ~6h; keep a short TTL to stay safe. */
+        private const val STREAM_CACHE_TTL_MS = 4L * 60L * 1000L
         /** Restart current track instead of skipping previous when earlier than this. */
         private const val PREVIOUS_RESTART_MS = 3_000L
         const val HUB_COLLECTION = 0
         const val HUB_GET_MUSIC = 1
         const val HUB_NOW_PLAYING = 2
+        const val HUB_LOCAL = 3
+        const val HUB_PAGE_COUNT = 4
         const val COLLECTION_ARTISTS = 0
         const val COLLECTION_ALBUMS = 1
         const val COLLECTION_SONGS = 2
@@ -951,3 +1086,8 @@ class MusicState(context: Context) {
             }
     }
 }
+
+private data class CachedStreamUrl(
+    val url: String,
+    val expiresAtMs: Long,
+)

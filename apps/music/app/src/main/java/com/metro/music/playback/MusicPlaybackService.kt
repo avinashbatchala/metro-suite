@@ -16,6 +16,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.metro.music.MainActivity
 import com.metro.music.data.Song
+import com.metro.music.ytmusic.YtMusicClient
 
 class MusicPlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
@@ -24,18 +25,19 @@ class MusicPlaybackService : MediaSessionService() {
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Default matches IOS player mints; per-URL UA from [YtStreamPlayback] overrides via
+        // [RequestHeaderDataSource] so googlevideo Ranges past ~1 MiB are not 403'd.
+        val defaultUa = YtMusicClient.IOS_UA
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(
-                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
-                    "Chrome/130.0.0.0 Mobile Safari/537.36",
-            )
+            .setUserAgent(defaultUa)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(20_000)
             .setReadTimeoutMs(30_000)
+        val headerFactory = RequestHeaderDataSource.Factory(httpFactory, defaultUa)
         val exo = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(
-                    DefaultDataSource.Factory(this, ChunkedDataSource.Factory(httpFactory)),
+                    DefaultDataSource.Factory(this, ChunkedDataSource.Factory(headerFactory)),
                 ),
             )
             .setAudioAttributes(

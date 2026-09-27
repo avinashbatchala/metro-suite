@@ -142,7 +142,7 @@ fun MusicShell(
                 rootContent = {
                     val pagerState = rememberPagerState(
                         initialPage = state.hubPage,
-                        pageCount = { 3 },
+                        pageCount = { MusicState.HUB_PAGE_COUNT },
                     )
                     LaunchedEffect(pagerState.currentPage) {
                         state.hubPage = pagerState.currentPage
@@ -166,6 +166,12 @@ fun MusicShell(
                         },
                         onOpenRecent = {
                             state.route = MusicRoute.Recent
+                        },
+                        onSyncNow = {
+                            state.reloadLibrary()
+                        },
+                        onOpenMusicDirectories = {
+                            state.route = MusicRoute.MusicDirectories
                         },
                         skipIntro = panoramaIntroPlayed,
                         onIntroPlayed = { panoramaIntroPlayed = true },
@@ -236,6 +242,10 @@ fun MusicShell(
                                 )
                             },
                         )
+                        MusicRoute.MusicDirectories -> MusicDirectoriesScreen(
+                            state = state,
+                            onBack = { onBack() },
+                        )
                         MusicRoute.Explore -> ExploreScreen(
                             state = state,
                             onBack = { onBack() },
@@ -283,6 +293,10 @@ fun MusicShell(
                         state.hubPage = MusicState.HUB_GET_MUSIC
                         state.route = MusicRoute.Hub
                     },
+                    MetroAppBarMenuItem("local") {
+                        state.hubPage = MusicState.HUB_LOCAL
+                        state.route = MusicRoute.Hub
+                    },
                 ),
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -315,6 +329,7 @@ private fun MusicRoute.parentRoute(): MusicRoute = when (this) {
     -> MusicRoute.Collection
     MusicRoute.Collection,
     MusicRoute.Settings,
+    MusicRoute.MusicDirectories,
     MusicRoute.Explore,
     MusicRoute.Recent,
     MusicRoute.Queue,
@@ -329,6 +344,7 @@ private fun subpageLoadKey(route: MusicRoute, state: MusicState): Any = when (ro
     MusicRoute.PlaylistDetail -> "Playlist:${state.selectedPlaylist?.id.orEmpty()}"
     MusicRoute.GenreDetail -> "Genre:${state.selectedGenre?.id.orEmpty()}"
     MusicRoute.Settings -> "Settings"
+    MusicRoute.MusicDirectories -> "MusicDirectories"
     MusicRoute.Explore -> "Explore"
     MusicRoute.Recent -> "Recent"
     MusicRoute.Queue -> "Queue"

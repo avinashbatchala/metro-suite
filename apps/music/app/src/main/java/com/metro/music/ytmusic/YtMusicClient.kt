@@ -4,6 +4,7 @@ import android.util.Log
 import com.metro.music.data.Playlist
 import com.metro.music.data.Album
 import com.metro.music.data.Song
+import com.metro.music.playback.YtStreamPlayback
 import com.metro.music.ytmusic.potoken.YtPoTokenSession
 import com.metro.music.ytmusic.potoken.appendStreamPoToken
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,6 +29,8 @@ data class YtPlaylistSyncResult(
 
 data class YtStreamResult(
     val url: String? = null,
+    /** User-Agent that minted [url] — ExoPlayer must reuse it for googlevideo Ranges. */
+    val userAgent: String? = null,
     val error: String? = null,
 )
 
@@ -132,23 +135,28 @@ class YtMusicClient(
     suspend fun resolveStreamUrl(videoId: String): String? = resolveStream(videoId).url
 
     /**
-     * Resolve a playable URL. Mints a GVS streaming PO token (BotGuard) when possible and appends
-     * `pot=` so adaptive googlevideo Ranges succeed past ~1 MiB. Innertube clients are tried in
-     * order; streams must pass a mid-file Range probe when content length is known.
+     * Resolve a playable URL. Mints a GVS PO token (BotGuard) when possible and appends `pot=`
+     * so adaptive googlevideo Ranges succeed past ~1 MiB. Prefers a video-id-bound pot on the
+     * URL (trusted — no mid-file probe on the critical path), then the visitor-bound session pot
+     * with a Range probe. HLS returns immediately when present. Registers the minting User-Agent
+     * so ExoPlayer can replay with the same identity.
      */
     suspend fun resolveStream(videoId: String): YtStreamResult {
         if (videoId.isBlank()) return YtStreamResult(error = "Missing video id")
 
         var visitor = visitorData()
         val streamingPot = mintStreamingPot(visitor)
-        val playerPot = if (streamingPot != null) {
+        val videoPot = if (streamingPot != null) {
             runCatching { poTokenSession?.mintPlayerPot(videoId) }.getOrNull()
         } else {
             null
         }
+        // Player integrity pot (video-bound) when available; URL pot tried separately below.
+        val playerPot = videoPot
 
         var lastError: String? = null
         var fallbackUrl: String? = null
+        var fallbackUa: String? = null
         for (client in PLAYER_CLIENTS) {
             visitor = visitorData()
             var json = requestPlayer(videoId, client, visitor, playerPot)
@@ -179,7 +187,7 @@ class YtMusicClient(
                 ?.ifBlank { null }
             if (hls != null) {
                 Log.i(TAG, "${client.name} resolved HLS stream")
-                return YtStreamResult(url = hls)
+                return acceptedStream(hls, client.userAgent)
             }
             val selected = extractStream(json)
             if (selected == null) {
@@ -187,44 +195,69 @@ class YtMusicClient(
                 Log.w(TAG, "${client.name} had OK playability but no usable audio URL")
                 continue
             }
-            val stamped = if (streamingPot != null) {
-                appendStreamPoToken(selected.url, streamingPot)
-            } else {
-                selected.url
-            }
-            val playable = ensureClenOnUrl(stamped)
-            if (rangeReachable(playable, client.userAgent, selected.contentLength)) {
+            // Video-bound pot unlocks mid-file Ranges — start play without a blocking probe.
+            if (videoPot != null) {
+                val playable = ensureClenOnUrl(appendStreamPoToken(selected.url, videoPot))
                 Log.i(
                     TAG,
-                    "${client.name} resolved progressive stream itag-br=${selected.bitrate}" +
-                        if (streamingPot != null) " (with pot)" else "",
+                    "${client.name} resolved progressive itag-br=${selected.bitrate} (video pot)",
                 )
-                return YtStreamResult(url = playable)
+                return acceptedStream(playable, client.userAgent)
             }
-            Log.w(
-                TAG,
-                "${client.name} stream fails mid-file Range probe (PO/preview gate) — keeping fallback",
-            )
-            if (fallbackUrl == null) fallbackUrl = playable
+            if (streamingPot != null) {
+                val playable = ensureClenOnUrl(appendStreamPoToken(selected.url, streamingPot))
+                if (fallbackUrl == null) {
+                    fallbackUrl = playable
+                    fallbackUa = client.userAgent
+                }
+                if (rangeReachable(playable, client.userAgent, selected.contentLength)) {
+                    Log.i(
+                        TAG,
+                        "${client.name} resolved progressive itag-br=${selected.bitrate} (session pot)",
+                    )
+                    return acceptedStream(playable, client.userAgent)
+                }
+                Log.w(TAG, "${client.name} session pot failed mid-file Range probe")
+                lastError = "Stream blocked past preview window"
+                continue
+            }
+            val bare = ensureClenOnUrl(selected.url)
+            if (fallbackUrl == null) {
+                fallbackUrl = bare
+                fallbackUa = client.userAgent
+            }
+            if (rangeReachable(bare, client.userAgent, selected.contentLength)) {
+                Log.i(TAG, "${client.name} resolved progressive stream without pot")
+                return acceptedStream(bare, client.userAgent)
+            }
             lastError = "Stream blocked past preview window"
         }
         if (fallbackUrl != null) {
             Log.w(TAG, "falling back to PO-preview progressive stream")
-            return YtStreamResult(url = fallbackUrl)
+            return acceptedStream(fallbackUrl, fallbackUa ?: IOS_UA)
         }
         return YtStreamResult(error = lastError ?: "Unable to play this track")
+    }
+
+    private fun acceptedStream(url: String, userAgent: String): YtStreamResult {
+        YtStreamPlayback.register(url, userAgent)
+        return YtStreamResult(url = url, userAgent = userAgent)
     }
 
     private suspend fun mintStreamingPot(visitor: String?): String? {
         val session = poTokenSession ?: return null
         if (visitor.isNullOrBlank()) return null
-        return runCatching {
-            session.ensureStreamingPot(visitor).also {
-                Log.i(TAG, "streaming pot ready")
+        return kotlinx.coroutines.withTimeoutOrNull(PO_WARM_TIMEOUT_MS) {
+            runCatching {
+                session.ensureStreamingPot(visitor).also {
+                    Log.i(TAG, "streaming pot ready")
+                }
+            }.getOrElse {
+                Log.w(TAG, "streaming pot mint failed", it)
+                null
             }
-        }.getOrElse {
-            Log.w(TAG, "streaming pot mint failed", it)
-            null
+        }.also {
+            if (it == null) Log.w(TAG, "streaming pot mint timed out or failed")
         }
     }
 
@@ -559,6 +592,8 @@ class YtMusicClient(
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/130.0.0.0 Safari/537.36"
+        /** Cap BotGuard warm so a stuck WebView cannot block play forever. */
+        private const val PO_WARM_TIMEOUT_MS = 8_000L
 
         /** ytmusicapi search filter — songs (ignore_spelling=false). */
         private const val SEARCH_FILTER_SONGS = "EgWKAQIIAWoMEA4QChADEAQQCRAF"

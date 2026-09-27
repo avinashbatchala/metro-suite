@@ -6,7 +6,7 @@ Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
 
 ## App role
 
-**Xbox Music** — panorama hub (now playing / collection / radio / explore), artists/albums/songs pivots, now playing, playlists. Streaming = **YouTube Music**.
+**Xbox Music** — panorama hub (collection / get music / now playing / local), artists/albums/songs pivots, now playing, playlists. Streaming = **YouTube Music**.
 
 ## Build phase gate
 

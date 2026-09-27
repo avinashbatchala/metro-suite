@@ -66,6 +66,19 @@ class PlayHistoryLogicTest {
     }
 
     @Test
+    fun restoreSession_usesNewestAsCurrentAndHistoryAsQueue() {
+        val entries = PlayHistoryLogic.record(other, 2_000L, PlayHistoryLogic.record(local, 1_000L, emptyList()))
+        val session = PlayHistoryLogic.restoreSession(entries, emptyList())
+        assertEquals(other.id, session!!.first.id)
+        assertEquals(listOf(other.id, local.id), session.second.map { it.id })
+    }
+
+    @Test
+    fun restoreSession_emptyHistoryReturnsNull() {
+        assertEquals(null, PlayHistoryLogic.restoreSession(emptyList(), emptyList()))
+    }
+
+    @Test
     fun encodeDecode_roundTrips() {
         val entries = PlayHistoryLogic.record(local, 42L, emptyList())
         val raw = PlayHistoryStore.encode(entries)

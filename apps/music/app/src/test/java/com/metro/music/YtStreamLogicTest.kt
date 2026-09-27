@@ -114,4 +114,11 @@ class YtStreamLogicTest {
             ),
         )
     }
+
+    @Test
+    fun probeOffset_targetsPastPreviewWindow() {
+        assertEquals(1_500_000L, YtStreamLogic.probeOffset(5_000_000L))
+        assertEquals(1_500_000L, YtStreamLogic.probeOffset(null))
+        assertNull(YtStreamLogic.probeOffset(1_000_000L))
+    }
 }

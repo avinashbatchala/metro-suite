@@ -1,6 +1,7 @@
 package com.metro.music.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,27 +9,36 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.metro.ui.MetroAppTitle
 import com.metro.ui.MetroBorderButton
 import com.metro.ui.MetroLoadingScreen
+import com.metro.ui.MetroMultiSelectDefaults
+import com.metro.ui.MetroMultiSelectItem
+import com.metro.ui.MetroMultiSelectList
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextBox
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroToggleSwitch
-
+import com.metro.ui.MetroSystemIconType
+import com.metro.ui.drawMetroSystemIconGlyph
 @Composable
 fun SettingsScreen(
     state: MusicState,
@@ -209,4 +219,99 @@ fun PermissionScreen(onGrant: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         MetroBorderButton(text = "allow access", onClick = onGrant)
     }
+}
+
+/**
+ * Checkbox list of MediaStore folders that contribute local tracks — same pattern as
+ * Settings → connected apps picker ([MetroMultiSelectList]).
+ */
+@Composable
+fun MusicDirectoriesScreen(
+    state: MusicState,
+    onBack: () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    val directories = state.musicDirectories
+    val committedSelected = remember(directories, state.excludedMusicDirectoryIds) {
+        directories.map { it.id }.toSet() - state.excludedMusicDirectoryIds
+    }
+    var draft by remember { mutableStateOf(committedSelected) }
+    LaunchedEffect(committedSelected) {
+        draft = committedSelected
+    }
+    val items = remember(directories) {
+        directories.map { dir ->
+            val countLabel = if (dir.songCount == 1) "1 song" else "${dir.songCount} songs"
+            MetroMultiSelectItem(
+                id = dir.id,
+                title = "${dir.title} · $countLabel",
+            )
+        }
+    }
+
+    if (directories.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MetroTheme.colors.background)
+                .padding(bottom = 24.dp),
+        ) {
+            MetroAppTitle("FOLDERS")
+            MetroText(
+                text = "music directories",
+                style = MetroTextStyle.PageTitle,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            when {
+                state.libraryLoading -> {
+                    MetroLoadingScreen(modifier = Modifier.weight(1f))
+                }
+                !state.hasAudioPermission -> {
+                    MetroText(
+                        text = "Allow music access to see folders on this device.",
+                        style = MetroTextStyle.Body,
+                        color = MetroTheme.colors.secondaryText,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+                else -> {
+                    MetroText(
+                        text = "No music folders found on this device.",
+                        style = MetroTextStyle.Body,
+                        color = MetroTheme.colors.secondaryText,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    MetroMultiSelectList(
+        title = "folders",
+        items = items,
+        selectedIds = draft,
+        onSelectionChange = { draft = it },
+        onConfirm = {
+            state.applyMusicDirectorySelection(draft)
+            onBack()
+        },
+        onCancel = onBack,
+        itemLeading = {
+            // Folder chrome glyph is sized for app-bar rings (~0.42); boost to fill the
+            // 40dp leading slot like connected-app tiles.
+            val color = MetroTheme.colors.primaryText
+            Canvas(modifier = Modifier.size(MetroMultiSelectDefaults.LeadingSize)) {
+                val boost = 0.85f / 0.42f
+                withTransform({
+                    scale(scaleX = boost, scaleY = boost, pivot = center)
+                }) {
+                    drawMetroSystemIconGlyph(MetroSystemIconType.Folder, color)
+                }
+            }
+        },
+        confirmLabel = "done",
+        cancelLabel = "cancel",
+    )
 }

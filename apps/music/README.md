@@ -114,7 +114,7 @@ cd apps/music
 | SD Card as distinct Showing filter | Scoped storage | Fold into “on this device” |
 | System media volume HUD | Owned by `com.metro.volume` | Do not draw a second volume chrome |
 | Perfect Live Tile flips | Launcher owns tiles | Optional now-playing metadata broadcast later |
-| Direct stream URLs for a streamed track | GVS PO token: catalog art-track URLs 403 past ~1 MiB without `pot=` | BotGuard streaming pot (`YtPoTokenSession`) appended as `pot=`; Innertube IOS/VR/WEB with Range probe; progressive fallback. See `references/known-gaps.md` |
+| Direct stream URLs for a streamed track | GVS PO token: catalog art-track URLs 403 past ~1 MiB without `pot=` / matching UA | BotGuard pot on URL (video-bound preferred); minting UA replayed via `YtStreamPlayback`; Range probe for session/bare only; URL cache + YT prefetch. See `references/known-gaps.md` |
 
 ## Agent postmortem
 
