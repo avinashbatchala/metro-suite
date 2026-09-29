@@ -16,7 +16,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Display
 import android.view.Gravity
-import android.view.RoundedCorner
 import android.view.Surface
 import android.view.View
 import android.view.WindowInsets
@@ -89,6 +88,14 @@ class StatusBarOverlayService :
             handler.postDelayed(this, 500L)
         }
     }
+    private val notificationCycleRunnable = object : Runnable {
+        override fun run() {
+            trayState.advanceNotificationCycle()
+            trayState.refreshHotspot()
+            trayState.refreshBluetoothAudio()
+            handler.postDelayed(this, NOTIFICATION_CYCLE_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -106,6 +113,7 @@ class StatusBarOverlayService :
         trayState.refreshDataConnectionLabel()
         scheduleNextClockTick()
         handler.post(autoCollapseRunnable)
+        handler.post(notificationCycleRunnable)
         trayState.ensureExpandedIfNeverHides()
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
     }
@@ -163,6 +171,7 @@ class StatusBarOverlayService :
         if (instance === this) instance = null
         handler.removeCallbacks(clockRunnable)
         handler.removeCallbacks(autoCollapseRunnable)
+        handler.removeCallbacks(notificationCycleRunnable)
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         removeOverlay()
         trayState.unregisterReceivers(this)
@@ -308,79 +317,15 @@ class StatusBarOverlayService :
     }
 
     /**
-     * Physical left/right padding so tray glyphs clear the configured notch side, cutouts,
-     * waterfall edges, and top rounded corners. Uses absolute edges (not RTL start/end)
-     * because WP tray chrome stays clock-on-right regardless of locale.
+     * Physical left/right padding for the live tray — same formula as configure / TrayPreview:
+     * base WP insets plus optional notch-side clearance from setup. System cutout / rounded-
+     * corner insets are not added here; they made the overlay sit farther in than the
+     * configure strip. Punch-hole clearance is the user's Notch position ListPicker.
      */
-    private fun statusBarHorizontalPaddingDp(
-        wm: WindowManager,
-        barHeightDp: Int,
-    ): HorizontalPaddingDp {
-        val density = resources.displayMetrics.density
-        var systemLeftPx = 0f
-        var systemRightPx = 0f
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val metrics = wm.currentWindowMetrics
-            val bounds = metrics.bounds
-            val insets = metrics.windowInsets
-            val cutoutInsets = insets.getInsets(WindowInsets.Type.displayCutout())
-            systemLeftPx = maxOf(systemLeftPx, cutoutInsets.left.toFloat())
-            systemRightPx = maxOf(systemRightPx, cutoutInsets.right.toFloat())
-
-            val waterfall = insets.displayCutout?.waterfallInsets
-            if (waterfall != null) {
-                systemLeftPx = maxOf(systemLeftPx, waterfall.left.toFloat())
-                systemRightPx = maxOf(systemRightPx, waterfall.right.toFloat())
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val barHeightPx = barHeightDp * density
-                // Glyphs sit in the vertical middle of the tray; sample that band so corner
-                // chords clear clock/battery without padding the full corner radius.
-                val contentTopY = barHeightPx * 0.18f
-                val contentBottomY = barHeightPx * 0.82f
-                val topLeft = insets.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)
-                val topRight = insets.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT)
-                if (topLeft != null) {
-                    systemLeftPx = maxOf(
-                        systemLeftPx,
-                        StatusBarSafeInsets.topRoundedCornerInsetPx(
-                            radius = topLeft.radius,
-                            centerX = topLeft.center.x,
-                            centerY = topLeft.center.y,
-                            contentTopY = contentTopY,
-                            contentBottomY = contentBottomY,
-                            windowLeft = bounds.left,
-                            windowRight = bounds.right,
-                            isLeftCorner = true,
-                        ),
-                    )
-                }
-                if (topRight != null) {
-                    systemRightPx = maxOf(
-                        systemRightPx,
-                        StatusBarSafeInsets.topRoundedCornerInsetPx(
-                            radius = topRight.radius,
-                            centerX = topRight.center.x,
-                            centerY = topRight.center.y,
-                            contentTopY = contentTopY,
-                            contentBottomY = contentBottomY,
-                            windowLeft = bounds.left,
-                            windowRight = bounds.right,
-                            isLeftCorner = false,
-                        ),
-                    )
-                }
-            }
-        }
-
-        return TraySpec.horizontalPaddingDp(
+    private fun statusBarHorizontalPaddingDp(): HorizontalPaddingDp =
+        TraySpec.horizontalPaddingDp(
             notchPosition = StatusTrayPreferences(this).notchPosition,
-            systemLeftDp = StatusBarSafeInsets.pxToDpCeil(systemLeftPx, density),
-            systemRightDp = StatusBarSafeInsets.pxToDpCeil(systemRightPx, density),
         )
-    }
 
     /** True when privacy dots are showing on the clock side of the tray (API 31+). */
     private fun readPrivacyDotsNearClock(wm: WindowManager): Boolean {
@@ -396,8 +341,8 @@ class StatusBarOverlayService :
         )
     }
 
-    private fun applyHorizontalInsets(wm: WindowManager, barHeightDp: Int) {
-        val padding = statusBarHorizontalPaddingDp(wm, barHeightDp)
+    private fun applyHorizontalInsets(wm: WindowManager) {
+        val padding = statusBarHorizontalPaddingDp()
         leftPaddingDp = padding.left
         rightPaddingDp = padding.right
         privacyDotsNearClock = readPrivacyDotsNearClock(wm)
@@ -408,7 +353,7 @@ class StatusBarOverlayService :
         val wm = manager ?: return
         val height = statusBarInsetDp(wm)
         barHeightDp = height
-        applyHorizontalInsets(wm, height)
+        applyHorizontalInsets(wm)
     }
 
     /** Re-reads cutout / privacy insets without rebuilding the overlay window. */
@@ -476,6 +421,8 @@ class StatusBarOverlayService :
 
     companion object {
         private const val NOTIFICATION_ID = 1002
+        /** Interval between notification-app glyph advances when multiple packages are active. */
+        private const val NOTIFICATION_CYCLE_MS = 2_500L
 
         /** Running service instance, used by the accessibility service to trigger a rehost. */
         @Volatile
@@ -540,6 +487,27 @@ class StatusBarOverlayService :
             instance?.let { svc ->
                 svc.handler.post {
                     svc.trayState.ensureExpandedIfNeverHides()
+                }
+            }
+        }
+
+        /** Re-reads icons-tab toggles on the running overlay. */
+        fun requestIconFlagsRefresh() {
+            instance?.let { svc ->
+                svc.handler.post {
+                    svc.trayState.refreshIconFlags()
+                    svc.trayState.refreshHotspot()
+                    svc.trayState.refreshBluetoothAudio()
+                    svc.trayState.refreshNotificationPackages()
+                }
+            }
+        }
+
+        /** Re-reads configure-page layout (order + spacers) on the running overlay. */
+        fun requestLayoutRefresh() {
+            instance?.let { svc ->
+                svc.handler.post {
+                    svc.trayState.refreshLayout()
                 }
             }
         }

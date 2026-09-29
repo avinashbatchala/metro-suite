@@ -67,6 +67,38 @@ class StatusTrayPreferences(context: Context) {
             .remove(KEY_MATCH_APP_BACKGROUND)
             .apply()
 
+    /**
+     * Per-glyph visibility from the setup **icons** tab. Defaults all on so new installs
+     * match the full preview row until the user turns individual icons off.
+     */
+    var iconFlags: TrayIconFlags
+        get() = TrayIconFlags(
+            network = prefs.getBoolean(KEY_ICON_NETWORK, true),
+            wifi = prefs.getBoolean(KEY_ICON_WIFI, true),
+            mute = prefs.getBoolean(KEY_ICON_MUTE, true),
+            notifications = prefs.getBoolean(KEY_ICON_NOTIFICATIONS, true),
+            hotspot = prefs.getBoolean(KEY_ICON_HOTSPOT, true),
+            bluetoothAudio = prefs.getBoolean(KEY_ICON_BLUETOOTH_AUDIO, true),
+            battery = prefs.getBoolean(KEY_ICON_BATTERY, true),
+        )
+        set(value) = prefs.edit()
+            .putBoolean(KEY_ICON_NETWORK, value.network)
+            .putBoolean(KEY_ICON_WIFI, value.wifi)
+            .putBoolean(KEY_ICON_MUTE, value.mute)
+            .putBoolean(KEY_ICON_NOTIFICATIONS, value.notifications)
+            .putBoolean(KEY_ICON_HOTSPOT, value.hotspot)
+            .putBoolean(KEY_ICON_BLUETOOTH_AUDIO, value.bluetoothAudio)
+            .putBoolean(KEY_ICON_BATTERY, value.battery)
+            .apply()
+
+    /**
+     * Ordered tray slots from the **configure** page (icons + optional spacers).
+     * Defaults to WP L→R icon order with no spacers.
+     */
+    var layout: List<TrayLayoutSlot>
+        get() = TrayLayout.parse(prefs.getString(KEY_LAYOUT, null))
+        set(value) = prefs.edit().putString(KEY_LAYOUT, TrayLayout.serialize(value)).apply()
+
     companion object {
         private const val PREFS_NAME = "metro_statusbar"
         private const val KEY_ENABLED = "status_tray_enabled"
@@ -75,6 +107,14 @@ class StatusTrayPreferences(context: Context) {
         private const val KEY_BACKGROUND_MODE = "statusbar_background_mode"
         /** Legacy boolean key — read for migration, removed on write. */
         private const val KEY_MATCH_APP_BACKGROUND = "match_app_background"
+        private const val KEY_ICON_NETWORK = "icon_network"
+        private const val KEY_ICON_WIFI = "icon_wifi"
+        private const val KEY_ICON_MUTE = "icon_mute"
+        private const val KEY_ICON_NOTIFICATIONS = "icon_notifications"
+        private const val KEY_ICON_HOTSPOT = "icon_hotspot"
+        private const val KEY_ICON_BLUETOOTH_AUDIO = "icon_bluetooth_audio"
+        private const val KEY_ICON_BATTERY = "icon_battery"
+        private const val KEY_LAYOUT = "tray_layout"
 
         const val TIMEOUT_3S_MS = 3_000L
         const val TIMEOUT_5S_MS = MetroStatusBar.AUTO_COLLAPSE_MS

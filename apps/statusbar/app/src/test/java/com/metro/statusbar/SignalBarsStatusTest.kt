@@ -94,4 +94,47 @@ class SignalBarsStatusTest {
             ),
         )
     }
+
+    @Test
+    fun visibleLeft_respectsIconFlagsAndNewIndicators() {
+        assertEquals(
+            listOf(
+                TrayIndicator.NotificationApp,
+                TrayIndicator.WifiHotspot,
+                TrayIndicator.BluetoothAudio,
+            ),
+            TrayIndicatorOrder.visibleLeft(
+                dataConnectionLabel = "4G",
+                wifiConnected = true,
+                ringerMuted = true,
+                hotspotActive = true,
+                bluetoothAudio = BluetoothAudioKind.Headset,
+                notificationPackage = "com.example.mail",
+                iconFlags = TrayIconFlags(
+                    network = false,
+                    wifi = false,
+                    mute = false,
+                    notifications = true,
+                    hotspot = true,
+                    bluetoothAudio = true,
+                    battery = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun visibleLeft_hidesNewIconsWhenInactive() {
+        assertEquals(
+            listOf(TrayIndicator.Cellular, TrayIndicator.DataConnection, TrayIndicator.Wifi),
+            TrayIndicatorOrder.visibleLeft(
+                dataConnectionLabel = "4G",
+                wifiConnected = true,
+                ringerMuted = false,
+                hotspotActive = false,
+                bluetoothAudio = null,
+                notificationPackage = null,
+            ),
+        )
+    }
 }

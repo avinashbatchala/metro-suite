@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Status Bar</string>
-    <string name="setup_title">customisation</string>
+    <string name="tab_edit">customise</string>
+    <string name="tab_icons">icons</string>
     <string name="accessibility_service_description">Enables the Metro status tray to cover the system status bar so the WP8.1 clock and indicators appear on top.</string>
     <string name="overlay_notification_title">Metro status tray</string>
     <string name="overlay_notification_body">WP8.1 system tray is active</string>
     <string name="permission_overlay_title">Display over other apps</string>
-    <string name="setup_body">Grant overlay permission and enable the accessibility service so the Metro tray draws over the system status bar. Allow phone state for the mobile network label.</string>
+    <string name="setup_body">Grant overlay permission and enable the accessibility service so the Metro tray draws over the system status bar. Allow phone state for the mobile network label, notification access for cycling notification icons, and Bluetooth for headset vs speaker glyphs.</string>
     <string name="permission_accessibility_title">Accessibility service</string>
     <string name="permission_accessibility_body">Required to draw above the system status bar.</string>
     <string name="show_status_tray">Show status bar</string>
@@ -16,10 +17,12 @@
     <string name="icon_hide_timeout_5s">5 seconds</string>
     <string name="icon_hide_timeout_10s">10 seconds</string>
     <string name="icon_hide_timeout_never">Never</string>
-    <string name="notch_position_label">Notch position</string>
-    <string name="notch_position_center">Center</string>
-    <string name="notch_position_left">Left</string>
-    <string name="notch_position_right">Right</string>
+    <string name="configure_statusbar">configure statusbar</string>
+    <string name="configure_statusbar_subtitle">Add spacers, move icons around.</string>
+    <string name="configure_page_title">configure</string>
+    <string name="configure_add_spacer">add spacer</string>
+    <string name="configure_add_spacer_hint">You can use spacers to cover the notch and active mic areas. Tap the delete button above a spacer to remove it.</string>
+    <string name="configure_add_spacer_max_hint">Spacer limit reached for the icons you have enabled. Turn off icons or remove a spacer to add another.</string>
     <string name="statusbar_background_label">Statusbar background</string>
     <string name="statusbar_background_default_black">Default black background</string>
     <string name="statusbar_background_match_app">Match app background</string>
@@ -30,4 +33,14 @@
     <string name="grant_accessibility">Enable status tray service</string>
     <string name="preview_section">preview</string>
     <string name="tray_clock">Clock</string>
+    <string name="icon_network">Network</string>
+    <string name="icon_wifi">Wi-Fi</string>
+    <string name="icon_mute">Silent</string>
+    <string name="icon_notifications">Notification icons</string>
+    <string name="icon_hotspot">Wi-Fi hotspot</string>
+    <string name="icon_bluetooth_audio">Bluetooth audio</string>
+    <string name="icon_battery">Battery</string>
+    <string name="grant_notification_access">Allow notification access</string>
+    <string name="grant_bluetooth_connect">Allow Bluetooth</string>
+    <string name="icons_preview_section">preview</string>
 </resources>

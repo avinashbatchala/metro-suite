@@ -4,9 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.bluetooth.BluetoothAdapter
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.telephony.PhoneStateListener
 import android.telephony.SignalStrength
 import android.telephony.TelephonyCallback
@@ -96,6 +99,25 @@ class TrayState(context: Context) {
     var ringerMuted by mutableStateOf(false)
         private set
 
+    var hotspotActive by mutableStateOf(false)
+        private set
+
+    var bluetoothAudio by mutableStateOf<BluetoothAudioKind?>(null)
+        private set
+
+    /** Packages with active notifications eligible for the cycling tray glyph. */
+    var notificationPackages by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    private var notificationCycleIndex by mutableStateOf(0)
+
+    var iconFlags by mutableStateOf(trayPrefs.iconFlags)
+        private set
+
+    /** Configure-page icon order + spacers. */
+    var layout by mutableStateOf(trayPrefs.layout)
+        private set
+
     var lastExpandedAtMs by mutableLongStateOf(0L)
         private set
 
@@ -114,6 +136,16 @@ class TrayState(context: Context) {
     private var telephonyCallback: TelephonyCallback? = null
     @Suppress("DEPRECATION")
     private var phoneStateListener: PhoneStateListener? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Package currently shown for the notification-app glyph (null when none). */
+    val notificationPackage: String?
+        get() {
+            if (!iconFlags.notifications) return null
+            if (notificationPackages.isEmpty()) return null
+            val index = notificationCycleIndex.mod(notificationPackages.size)
+            return notificationPackages[index]
+        }
 
     val snapshot: TraySnapshot
         get() = TraySnapshot(
@@ -125,6 +157,11 @@ class TrayState(context: Context) {
             dataConnectionLabel = dataConnectionLabel,
             signalBars = signalBars,
             ringerMuted = ringerMuted,
+            hotspotActive = hotspotActive,
+            bluetoothAudio = bluetoothAudio,
+            notificationPackage = notificationPackage,
+            iconFlags = iconFlags,
+            layout = layout,
             battery = battery,
             theme = theme,
             notificationShadeOpen = notificationShadeOpen,
@@ -132,15 +169,17 @@ class TrayState(context: Context) {
             shellFillAnimationMs = shellFillAnimationMs,
         )
 
-    /** Left icons + battery when present — drives stagger timing for auto-collapse. */
+    /** Icons that stagger on expand/collapse — every occupying icon except the persistent rightmost. */
     fun animatingIconCount(): Int {
-        val left = TrayIndicatorOrder.visibleLeft(
-            dataConnectionLabel = dataConnectionLabel,
-            wifiConnected = signalBars.wifiBands != null,
-            ringerMuted = ringerMuted,
-        ).size
-        val batteryIcon = if (battery.present) 1 else 0
-        return left + batteryIcon
+        val occupying = TrayLayout.liveOccupying(
+            slots = layout,
+            flags = iconFlags,
+        )
+        return TrayLayout.animatingIcons(occupying).size
+    }
+
+    private val notificationStoreListener: () -> Unit = {
+        mainHandler.post { refreshNotificationPackages() }
     }
 
     private val themeReceiver = object : BroadcastReceiver() {
@@ -165,7 +204,11 @@ class TrayState(context: Context) {
                 WifiManager.RSSI_CHANGED_ACTION,
                 WifiManager.NETWORK_STATE_CHANGED_ACTION,
                 WifiManager.WIFI_STATE_CHANGED_ACTION,
-                -> refreshWifiSignal()
+                WIFI_AP_STATE_CHANGED_ACTION,
+                -> {
+                    refreshWifiSignal()
+                    refreshHotspot()
+                }
             }
         }
     }
@@ -177,6 +220,12 @@ class TrayState(context: Context) {
                 AudioManager.RINGER_MODE_CHANGED_ACTION,
                 -> refreshRingerMute()
             }
+        }
+    }
+
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshBluetoothAudio()
         }
     }
 
@@ -268,6 +317,40 @@ class TrayState(context: Context) {
         ringerMuted = RingerMuteSource.isMuted(appContext)
     }
 
+    fun refreshHotspot() {
+        hotspotActive = WifiHotspotSource.isActive(appContext)
+    }
+
+    fun refreshBluetoothAudio() {
+        bluetoothAudio = BluetoothAudioSource.current(appContext)
+    }
+
+    fun refreshIconFlags() {
+        iconFlags = trayPrefs.iconFlags
+    }
+
+    fun refreshLayout() {
+        layout = trayPrefs.layout
+    }
+
+    fun refreshNotificationPackages() {
+        val next = StatusBarNotificationStore.packages()
+        if (notificationPackages != next) {
+            notificationPackages = next
+            if (notificationPackages.isEmpty()) {
+                notificationCycleIndex = 0
+            } else {
+                notificationCycleIndex = notificationCycleIndex.mod(notificationPackages.size)
+            }
+        }
+    }
+
+    /** Advances the notification-app glyph among active packages (call from overlay ticker). */
+    fun advanceNotificationCycle() {
+        if (notificationPackages.size <= 1) return
+        notificationCycleIndex = (notificationCycleIndex + 1) % notificationPackages.size
+    }
+
     fun refreshCellularSignal(signalStrength: SignalStrength? = null) {
         val bars = if (signalStrength != null) {
             CellularSignalLevels.fromSignalStrength(signalStrength)
@@ -285,6 +368,9 @@ class TrayState(context: Context) {
         refreshSignalBars()
         refreshDataConnectionLabel()
         refreshRingerMute()
+        refreshHotspot()
+        refreshBluetoothAudio()
+        refreshNotificationPackages()
         expanded = true
         lastExpandedAtMs = nowMs
     }
@@ -428,6 +514,7 @@ class TrayState(context: Context) {
             addAction(WifiManager.RSSI_CHANGED_ACTION)
             addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION)
             addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+            addAction(WIFI_AP_STATE_CHANGED_ACTION)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(wifiReceiver, wifiFilter, Context.RECEIVER_NOT_EXPORTED)
@@ -445,9 +532,26 @@ class TrayState(context: Context) {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             context.registerReceiver(ringerReceiver, ringerFilter)
         }
+        val bluetoothFilter = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(AudioManager.ACTION_HEADSET_PLUG)
+            addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(bluetoothReceiver, bluetoothFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(bluetoothReceiver, bluetoothFilter)
+        }
+        StatusBarNotificationStore.addListener(notificationStoreListener)
+        refreshIconFlags()
         refreshDataConnectionLabel()
         refreshSignalBars()
         refreshRingerMute()
+        refreshHotspot()
+        refreshBluetoothAudio()
+        refreshNotificationPackages()
         registerTelephonyUpdates(context)
     }
 
@@ -456,12 +560,17 @@ class TrayState(context: Context) {
         runCatching { context.unregisterReceiver(batteryReceiver) }
         runCatching { context.unregisterReceiver(wifiReceiver) }
         runCatching { context.unregisterReceiver(ringerReceiver) }
+        runCatching { context.unregisterReceiver(bluetoothReceiver) }
+        StatusBarNotificationStore.removeListener(notificationStoreListener)
         unregisterTelephonyUpdates()
     }
 
     companion object {
         /** Same action string the volume HUD listens on for stream level changes. */
         private const val VOLUME_CHANGED_ACTION = "android.media.VOLUME_CHANGED_ACTION"
+        /** Soft-AP state broadcast (hidden API string, still delivered by WifiManager). */
+        private const val WIFI_AP_STATE_CHANGED_ACTION =
+            "android.net.wifi.WIFI_AP_STATE_CHANGED"
     }
 
     private fun registerTelephonyUpdates(context: Context) {

@@ -173,4 +173,53 @@ class StatusTrayPreferencesTest {
             StatusTrayPreferences(context).backgroundMode,
         )
     }
+
+    @Test
+    fun iconFlags_defaultAllOn() {
+        val flags = prefs.iconFlags
+        assertTrue(flags.network)
+        assertTrue(flags.wifi)
+        assertTrue(flags.mute)
+        assertTrue(flags.notifications)
+        assertTrue(flags.hotspot)
+        assertTrue(flags.bluetoothAudio)
+        assertTrue(flags.battery)
+    }
+
+    @Test
+    fun iconFlags_persistAcrossInstances() {
+        prefs.iconFlags = TrayIconFlags(
+            network = true,
+            wifi = false,
+            mute = true,
+            notifications = false,
+            hotspot = true,
+            bluetoothAudio = false,
+            battery = true,
+        )
+        val again = StatusTrayPreferences(RuntimeEnvironment.getApplication()).iconFlags
+        assertTrue(again.network)
+        assertFalse(again.wifi)
+        assertTrue(again.mute)
+        assertFalse(again.notifications)
+        assertTrue(again.hotspot)
+        assertFalse(again.bluetoothAudio)
+        assertTrue(again.battery)
+    }
+
+    @Test
+    fun layout_defaultsToWpOrder() {
+        assertEquals(TrayLayout.DEFAULT, prefs.layout)
+    }
+
+    @Test
+    fun layout_persistsAcrossInstances() {
+        val slots = TrayLayout.addSpacer(
+            TrayLayout.move(TrayLayout.DEFAULT, fromIndex = 0, toIndex = 3),
+            TrayIconFlags(),
+        )
+        prefs.layout = slots
+        val again = StatusTrayPreferences(RuntimeEnvironment.getApplication()).layout
+        assertEquals(TrayLayout.serialize(slots), TrayLayout.serialize(again))
+    }
 }

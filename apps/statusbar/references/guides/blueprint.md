@@ -8,17 +8,17 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 
 ### Page 1 — Collapsed tray
 
-- Layout: WP **32dp** content band across the top; **clock only** (right-aligned); battery and other indicators hidden
+- Layout: WP **32dp** content band across the top; **rightmost layout icon only** (usually clock, trailing-aligned); every other group hidden
 - Coverage: the overlay window is sized to the **full system status-bar inset height** (status bar / notch / hole-punch), so no part of the Android bar peeks through below the WP band. Content is vertically centered within that height; the WP band is never shorter than 32dp.
 - Background: opaque theme color (or translucent/hidden per app request)
 - Interactions: tap anywhere on tray, or going home / Start, expands the indicator row; **swipe down** opens the Android notification shade and hides the Metro tray while that shade is open
 
 ### Page 2 — Expanded tray
 
-- Layout: same height; full indicator row left-aligned in WP order; battery + clock on the right
-- Indicator order L→R: cellular + data label, Wi-Fi, mute (when ringer volume is 0); battery + clock on the right
-- Interactions: icons drop in one-by-one from above (**200ms**/icon, **90ms** stagger, right → left); hold **3s / 5s / 10s** or **Never** (setup **Hide icons after** ListPicker; WP default **5000ms**); timed options exit upward one-by-one (same R→L order)
-- Cellular bars, data label, Wi-Fi arcs, mute (ringer volume 0), and battery use live device telemetry
+- Layout: same height; all enabled layout groups **freely justified** across the tray (`SpaceBetween`) with **uniform left/right group padding** (network cluster, Wi-Fi, mute, … stay as fixed groups)
+- Indicator order L→R (default): cellular + data label, Wi-Fi, mute (when ringer volume is 0), notification app (cycles), Wi-Fi hotspot, Bluetooth audio (headset/speaker), battery, clock
+- Interactions: icons drop in one-by-one from above (**200ms**/icon, **90ms** stagger, **left → right**); hold **3s / 5s / 10s** or **Never** (setup **Hide icons after** ListPicker; WP default **5000ms**); timed options exit upward one-by-one (same L→R order) until only the rightmost icon remains
+- Cellular bars, data label, Wi-Fi arcs, mute (ringer volume 0), hotspot, Bluetooth audio, notification apps, and battery use live device telemetry when their icons-tab toggle is on
 
 ### Page 3 — Progress tray state
 
@@ -27,9 +27,9 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 
 ### Page 4 — Setup
 
-- **Layout:** Fixed `STATUS BAR` app overline + pivot title `customisation` (do not scroll). Scrollable body: master **Show status bar** toggle + **Statusbar background** / **Hide icons after** / **Notch position** ListPickers + **preview** tray + accent **permissions** section with body copy and overlay / accessibility / phone-state grants.
+- **Layout:** Fixed `STATUS BAR` app overline + pivot tabs `customise` | `icons` (do not scroll). **customise** scrollable body: master **Show status bar** toggle + **Statusbar background** / **Hide icons after** ListPickers + **configure statusbar** border button (subtitle: Add spacers, move icons around.) + **preview** tray + accent **permissions** section with body copy and overlay / accessibility / phone-state / notification-access / Bluetooth grants. **icons** scrollable body: toggles for Network, Wi-Fi, Silent, Notification icons, Wi-Fi hotspot, Bluetooth audio, Battery + bottom **preview** glyph strip (order: network bars, network type, Wi-Fi, silent, notification app, hotspot, Bluetooth audio, battery, clock). **configure** subpage: centered tray preview with accent drag thumbs sticking out under each enabled icon / spacer; drag thumbs to reorder; **add spacer** border button at the bottom (subtitle: You can use spacers to cover the notch and active mic areas.); tap a spacer thumb to remove it. Multiple spacers allowed.
 - **Navigation:** Launcher → Status Bar app.
-- **Interactions:** Grant overlay + enable accessibility, then master toggle starts/stops the overlay FGS. Boot respects the same flag. Phone-state permission is optional (enables the mobile network label).
+- **Interactions:** Grant overlay + enable accessibility, then master toggle starts/stops the overlay FGS. Boot respects the same flag. Phone-state permission is optional (enables the mobile network label). Notification access is optional (cycles active notification app icons). Bluetooth connect is optional (headset vs speaker glyph).
 
 ## System behavior
 
@@ -44,6 +44,9 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 | Cellular | Real `SignalStrength` level (`0..4`) mapped to four filled bars; data label from telephony display info |
 | Wi-Fi | Real `WifiManager` RSSI mapped to three arcs (`0..3`); icon hidden when Wi-Fi is off/disconnected |
 | Mute | Shown after Wi-Fi when `STREAM_RING` volume is 0 (speaker + X glyph); participates in expand/collapse stagger |
+| Notification app | Cycles active notification package icons (notification listener); icons-tab toggle |
+| Wi-Fi hotspot | Soft-AP / tethered hotspot glyph when active; icons-tab toggle |
+| Bluetooth audio | Headset or speaker glyph when BT A2DP/SCO is connected; icons-tab toggle |
 | Coverage | Window height = system status-bar inset (incl. cutout), so the Android bar is fully covered |
 | Side insets | Physical left/right padding from cutout + waterfall + top rounded-corner chords; when Android privacy dots appear near the clock, the clock animates a small end nudge left (200ms, opaque tray — dots paint on top) |
 | Notification shade | Swipe down on the tray opens the Android notification shade; the Metro overlay hides while the shade is open (accessibility overlay would otherwise paint on top of SystemUI) |

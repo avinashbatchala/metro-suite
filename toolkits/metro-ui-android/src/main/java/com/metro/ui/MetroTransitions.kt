@@ -29,7 +29,7 @@ object MetroTransitions {
     const val AppBarButtonOvershootPeakOffsetFraction = -0.2f
     const val StatusTrayExpandMs = 200
     const val StatusTrayCollapseMs = 200
-    /** Per-icon delay when indicators drop in / exit upward (right → left). */
+    /** Per-icon delay when indicators drop in / exit upward (left → right). */
     const val StatusTrayIconStaggerMs = 90
     /** Hold after staggered enter before staggered exit. */
     const val StatusTrayAutoCollapseMs = 5000

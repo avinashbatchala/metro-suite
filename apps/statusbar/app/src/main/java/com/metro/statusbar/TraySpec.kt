@@ -8,7 +8,8 @@ object TraySpec {
     /** Vertical drag past this distance (dp) opens the Android notification shade. */
     const val SHADE_OPEN_DRAG_DP = 28
     const val START_PADDING_DP = 10
-    const val END_PADDING_DP = 2
+    /** Trailing inset — keep tight so the rightmost glyph (usually clock) sits near the edge. */
+    const val END_PADDING_DP = 0
     /**
      * Extra horizontal clearance when the user places the notch on the left or right.
      * Sized for a typical corner punch-hole (diameter + margin from the screen edge);
@@ -22,10 +23,12 @@ object TraySpec {
     const val PRIVACY_CLOCK_NUDGE_DP = 14
     /** Gap between cellular signal bars and the data connection label (4G, 5G, …). */
     const val CELLULAR_DATA_LABEL_GAP_DP = 2
-    /** Extra leading space before Wi-Fi so it sits clearly apart from the network group. */
-    const val WIFI_LEADING_PADDING_DP = 8
-    /** Extra leading space before mute so it sits a touch clear of Wi-Fi. */
-    const val MUTE_LEADING_PADDING_DP = 4
+    /**
+     * Symmetric horizontal padding applied between tray groups (not on the outer edges).
+     * Edge groups sit flush against [START_PADDING_DP] / [END_PADDING_DP] so the clock
+     * does not pick up an extra trailing inset.
+     */
+    const val ICON_GROUP_PADDING_DP = 4
     /** Per-icon slide duration when dropping in or exiting upward. */
     const val EXPAND_ANIMATION_MS = 200L
     const val COLLAPSE_ANIMATION_MS = 200L
@@ -33,7 +36,7 @@ object TraySpec {
     const val CREEP_MS = 200L
     /** Clock nudge when privacy dots appear / disappear. */
     const val PRIVACY_CLOCK_NUDGE_MS = 200L
-    /** Delay between successive icons (right → left) on enter and exit. */
+    /** Delay between successive icons (left → right) on enter and exit. */
     const val ICON_STAGGER_MS = 90L
     /** WP8.1 default hold after the last enter finishes; setup can choose 3s / 5s / 10s / never. */
     const val AUTO_COLLAPSE_MS = MetroStatusBar.AUTO_COLLAPSE_MS
@@ -189,9 +192,9 @@ data class BatteryStatus(
 }
 
 /**
- * WP8.1 system tray indicators (left → right), per
- * `references/images/image.png`. [Battery] is rendered on the right next to the clock; the rest
- * form the left indicator row.
+ * WP8.1 system tray indicators (layout order), per `references/images/image.png`.
+ * [Battery] is a free-justified layout slot like the others; [Cellular]/[DataConnection]
+ * form the Network group.
  */
 enum class TrayIndicator {
     Cellular,
@@ -203,6 +206,11 @@ enum class TrayIndicator {
     QuietHours,
     DrivingMode,
     Ringer,
+    /** Cycles active notification app icons when the icons-tab toggle is on. */
+    NotificationApp,
+    WifiHotspot,
+    /** Bluetooth A2DP / SCO audio — headset or speaker glyph via [TraySnapshot.bluetoothAudio]. */
+    BluetoothAudio,
     Location,
     Battery,
 }
@@ -231,6 +239,22 @@ data class TraySnapshot(
     val signalBars: SignalBarsStatus,
     /** True when ringer stream volume is 0 — shows the mute glyph after Wi-Fi. */
     val ringerMuted: Boolean = false,
+    /** Soft-AP / Wi-Fi hotspot active. */
+    val hotspotActive: Boolean = false,
+    /** Connected Bluetooth audio device; null when none. */
+    val bluetoothAudio: BluetoothAudioKind? = null,
+    /**
+     * Package currently shown for the notification-app glyph (cycled among active notifications).
+     * Null when the toggle is off, access is missing, or there are no eligible notifications.
+     */
+    val notificationPackage: String? = null,
+    /** Icons-tab allow-list; clock is always shown. */
+    val iconFlags: TrayIconFlags = TrayIconFlags(),
+    /**
+     * Configure-page ordered slots (icons + spacers). Live tray and setup preview honor this
+     * order; spacers reserve empty width for notch / privacy-mic regions.
+     */
+    val layout: List<TrayLayoutSlot> = TrayLayout.DEFAULT,
     val battery: BatteryStatus,
     val theme: TrayThemeSnapshot,
     /**
@@ -251,36 +275,54 @@ data class TraySnapshot(
 )
 
 object TrayIndicatorOrder {
-    /** Collapsed resting tray shows clock only — no left-side indicators. */
+    /**
+     * Collapsed resting tray keeps only the rightmost layout icon (often clock); everything
+     * else is hidden.
+     */
     val collapsed: List<TrayIndicator> = emptyList()
 
     /**
-     * Left-side indicators revealed on tap / home: network (cellular + data label), Wi-Fi, and
-     * mute (when ringer is 0). Battery and clock live on the right.
+     * Default L→R indicator set used when a custom [TrayLayout] is not applied: network
+     * (cellular + data), Wi-Fi, mute, notification app, hotspot, Bluetooth audio. Battery and
+     * clock are separate layout slots that freely justify with the rest.
      */
     val expanded: List<TrayIndicator> = listOf(
         TrayIndicator.Cellular,
         TrayIndicator.DataConnection,
         TrayIndicator.Wifi,
         TrayIndicator.Ringer,
+        TrayIndicator.NotificationApp,
+        TrayIndicator.WifiHotspot,
+        TrayIndicator.BluetoothAudio,
     )
 
     /**
-     * Left-row glyphs that actually draw for [dataConnectionLabel] / [wifiConnected] /
-     * [ringerMuted]. Skips [TrayIndicator.DataConnection] when there is no label,
-     * [TrayIndicator.Wifi] when Wi-Fi is off/disconnected, and [TrayIndicator.Ringer] when the
-     * ringer is not muted so stagger timing matches visible icons.
+     * Glyphs that actually draw given live conditions and [TrayIconFlags].
+     * Skips data label / Wi-Fi / mute / notification / hotspot / Bluetooth when their toggle is
+     * off or their live condition is false so stagger timing matches visible icons.
      */
     fun visibleLeft(
         dataConnectionLabel: String?,
         wifiConnected: Boolean,
         ringerMuted: Boolean = false,
+        hotspotActive: Boolean = false,
+        bluetoothAudio: BluetoothAudioKind? = null,
+        notificationPackage: String? = null,
+        iconFlags: TrayIconFlags = TrayIconFlags(),
     ): List<TrayIndicator> =
         expanded.filter {
             when (it) {
-                TrayIndicator.DataConnection -> dataConnectionLabel != null
-                TrayIndicator.Wifi -> wifiConnected
-                TrayIndicator.Ringer -> ringerMuted
+                TrayIndicator.Cellular,
+                TrayIndicator.DataConnection,
+                -> iconFlags.network &&
+                    (it != TrayIndicator.DataConnection || dataConnectionLabel != null)
+                TrayIndicator.Wifi -> iconFlags.wifi && wifiConnected
+                TrayIndicator.Ringer -> iconFlags.mute && ringerMuted
+                TrayIndicator.NotificationApp ->
+                    iconFlags.notifications && !notificationPackage.isNullOrBlank()
+                TrayIndicator.WifiHotspot -> iconFlags.hotspot && hotspotActive
+                TrayIndicator.BluetoothAudio ->
+                    iconFlags.bluetoothAudio && bluetoothAudio != null
                 else -> true
             }
         }
@@ -289,7 +331,8 @@ object TrayIndicatorOrder {
 object TrayCollapseScheduler {
     /**
      * Auto-collapse after the staggered enter finishes plus the hold timeout.
-     * [animatingIconCount] includes left indicators and battery when present.
+     * [animatingIconCount] is the number of icons that stagger in/out (all live icons except
+     * the persistent rightmost).
      * Negative [holdMs] (e.g. [StatusTrayPreferences.TIMEOUT_NEVER_MS]) means never collapse.
      */
     fun shouldAutoCollapse(

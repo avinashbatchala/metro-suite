@@ -90,26 +90,29 @@ class TrayCollapseSchedulerTest {
     }
 
     @Test
-    fun expandedIndicatorOrder_isNetworkWifiMute() {
+    fun expandedIndicatorOrder_isNetworkWifiMuteHotspotBluetooth() {
         assertEquals(
             listOf(
                 TrayIndicator.Cellular,
                 TrayIndicator.DataConnection,
                 TrayIndicator.Wifi,
                 TrayIndicator.Ringer,
+                TrayIndicator.NotificationApp,
+                TrayIndicator.WifiHotspot,
+                TrayIndicator.BluetoothAudio,
             ),
             TrayIndicatorOrder.expanded,
         )
     }
 
     @Test
-    fun collapsedTray_showsClockOnly_noLeftIndicators() {
+    fun collapsedTray_hidesLeftIndicators() {
         assertEquals(emptyList<TrayIndicator>(), TrayIndicatorOrder.collapsed)
     }
 
     @Test
-    fun battery_isNotInTheLeftIndicatorRow() {
-        // Battery is drawn on the right next to the clock, not in either left row.
+    fun battery_isLayoutSlotNotLegacyLeftRow() {
+        // Battery is a free-justified layout slot, not part of the legacy left indicator list.
         assertFalse(TrayIndicatorOrder.expanded.contains(TrayIndicator.Battery))
         assertFalse(TrayIndicatorOrder.collapsed.contains(TrayIndicator.Battery))
     }

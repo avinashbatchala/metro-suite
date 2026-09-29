@@ -623,7 +623,7 @@ WP8.1 Messaging conversation chrome — square body + right-triangle tail. Used 
 | List / content press nudge | snap in / ~90ms out | Ease-out; ~6dp down-left; `metroClickable` fires onClick immediately |
 | App bar show/hide | 200ms | Slide from bottom |
 | Live tile flip | 600ms | Turnstile |
-| Status tray | 200ms/icon staggered R→L | Hold 5000ms then staggered exit up |
+| Status tray | 200ms/icon staggered L→R | Hold 5000ms then staggered exit up |
 | Page pivot load | 200ms enter / 280ms exit | Ease-out; enter `rotateY` 22.5° → 0°, translate x +15% → 0 (hinge x 0); exit tilt-back `rotateY` 0° → −28°, translate x 0 → −15%, hinge x +15%, softer camera, fade. **In-app drill-ins:** every non-root page uses `MetroSubpageHost` + `MetroPagePivotLoad` (enter + exit). Do **not** apply to Start/launcher tile motion, panorama hub roots that already own intro motion, or shell overlay surfaces (lock screen, volume HUD, status tray, toast, soft keys, incoming/in-call). Shell **setup/config** activities and their subpages **do** use it. |
 | App launch continuum | 500ms outer / 350ms inner enter; 280ms exit | Disco Start-tile match via `MetroAppLaunchPivot`: enter outer `rotateY` 70° → 0° + inner `translateX(60dp)` → 0 (alpha snaps on); exit `rotateY` 0° → −40°, slide −25% width, opacity holds then drops, left-edge hinge. **App open:** Start owns [MetroAppOpenSplash]; suite apps flip out with [MetroAppPivotShell]. Constants: `MetroTransitions.TilePivot*`. |
 | Page pivot swing | 200ms enter / 280ms exit | Hinge `rotateY` 50° → 0° + fade, **no** X slide; closer camera (0.55× width). `MetroPagePivotSwing` — shared-hinge swings (not Start tiles; those use Disco continuum / `MetroAppLaunchPivot`). `skipEnter` holds rest without disposing content |

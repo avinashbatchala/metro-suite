@@ -201,7 +201,7 @@ Official **Windows Phone 8 / 8.1** 20-color set (Settings → start+theme → Ac
 
 - Height: **32dp**
 - Default: clock visible (right-aligned); other indicators hidden until user taps tray
-- On tap or going home: indicators drop in one-by-one from above (right → left), hold **5 seconds**, then exit upward the same way
+- On tap or going home: indicators drop in one-by-one from above (left → right), hold **5 seconds**, then exit upward the same way until only the rightmost icon remains
 - Indicator order (left → right): cellular signal, Wi-Fi, Bluetooth, alarm, location, battery
 - Supports: opaque, translucent (`backgroundOpacity` 0.5), or hidden per-app
 - Progress: indeterminate accent spinner in tray during long operations
@@ -350,7 +350,7 @@ Live tiles are **not** drawn inside the launcher from hard-coded per-app logic. 
 | Panorama scroll | Physics-based deceleration | Friction coefficient matching WP scroll viewer |
 | Content press nudge | snap on press / ~90ms out | Ease-out; ~6dp down-left (`metroClickable`; onClick immediate) |
 | App bar show/hide | 200ms | Slide from bottom |
-| Status tray expand | 200ms/icon staggered R→L drop | Hold 5000ms then staggered exit up |
+| Status tray expand | 200ms/icon staggered L→R drop | Hold 5000ms then staggered exit up |
 | Live tile flip | 600ms | WP8.1 turnstile animation |
 | Page pivot load | 200ms enter / 280ms exit | Ease-out; left-hinge `rotateY` swing-in / slower tilt-back exit (`MetroPagePivotLoad`). **Suite default for in-app drill-ins** via `MetroSubpageHost` (not Start, not panorama roots, not shell overlays / in-call). |
 | App launch continuum | 500ms / 350ms enter; 280ms exit | Disco Start-tile match (`MetroAppLaunchPivot` / `MetroTransitions.TilePivot*`): open splash + activity Back exit. |
