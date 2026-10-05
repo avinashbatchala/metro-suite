@@ -43,7 +43,6 @@ import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 
-private val ConnectedHubRowHeight = 90.dp
 private val ConnectedAppIconSize = 40.dp
 private val ConnectedAppIconInset = 4.dp
 private val ConnectedHubGlyphSize = 52.dp
@@ -99,7 +98,6 @@ private fun ConnectedHubRow(
     MetroListItem(
         title = title,
         subtitle = subtitle,
-        modifier = Modifier.height(ConnectedHubRowHeight),
         leading = {
             Image(
                 painter = painterResource(glyphRes),
@@ -179,9 +177,7 @@ fun ConnectedAppListScreen(
                 MetroListItem(
                     title = stringResource(R.string.settings_connected_apps_section),
                     subtitle = stringResource(R.string.settings_connected_apps_tap_select),
-                    modifier = Modifier
-                        .padding(top = 16.dp)
-                        .height(ConnectedHubRowHeight),
+                    modifier = Modifier.padding(top = 16.dp),
                     onClick = { state.open(pickerRoute) },
                 )
             }

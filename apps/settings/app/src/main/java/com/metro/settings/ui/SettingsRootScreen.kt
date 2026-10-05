@@ -2,7 +2,6 @@ package com.metro.settings.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,9 +32,6 @@ import com.metro.ui.rememberMetroListPivotController
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
-
-/** WP8.1 system settings rows stay at single-line height even with a value subtitle. */
-private val SettingsRowHeight = 76.dp
 
 /** Stagger index 0 is pivot chrome; list rows start at 1. */
 private const val ListStaggerStart = 1
@@ -218,10 +214,11 @@ private fun SystemSettingsList(
                 staggerIndex = ListStaggerStart + index,
                 listPivot = listPivot,
             ) {
+                // Let MetroListItem size to its title + subtitle (min 90dp); a fixed 76dp row
+                // clipped the value subtitle, especially at larger system font scales.
                 MetroListItem(
                     title = row.title,
                     subtitle = row.subtitle,
-                    modifier = Modifier.height(SettingsRowHeight),
                     onClick = {
                         if (!listPivot.exiting) listPivot.requestExit(row.onClick)
                     },
@@ -286,7 +283,6 @@ private fun ApplicationsSettingsList(
                         MetroListItem(
                             title = entry.title,
                             subtitle = entry.listSubtitle,
-                            modifier = Modifier.height(SettingsRowHeight),
                             onClick = {
                                 if (!listPivot.exiting) {
                                     listPivot.requestExit { onOpen(entry) }
@@ -300,7 +296,6 @@ private fun ApplicationsSettingsList(
                         MetroListItem(
                             title = entry.title,
                             subtitle = entry.listSubtitle,
-                            modifier = Modifier.height(SettingsRowHeight),
                             onClick = {
                                 if (!listPivot.exiting) {
                                     listPivot.requestExit { onOpen(entry) }
