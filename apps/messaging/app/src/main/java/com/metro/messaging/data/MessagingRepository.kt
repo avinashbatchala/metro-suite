@@ -91,6 +91,30 @@ class MessagingRepository(
         return StubMessagingDataSource.threadForAddress(normalized, null)
     }
 
+    /**
+     * Persists read state for every inbox message in [threadId].
+     *
+     * Only the default SMS app may write the Telephony provider; a READ_SMS-only app can't, so
+     * that path is skipped (the in-memory thread badge is still cleared by the UI state).
+     * Returns true when a provider write was attempted.
+     */
+    fun markThreadRead(threadId: Long): Boolean {
+        if (threadId <= 0L || !isDefaultSmsApp) return false
+        return runCatching {
+            val values = ContentValues().apply {
+                put(Telephony.Sms.READ, 1)
+                put(Telephony.Sms.SEEN, 1)
+            }
+            appContext.contentResolver.update(
+                Telephony.Sms.CONTENT_URI,
+                values,
+                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
+                arrayOf(threadId.toString()),
+            )
+            true
+        }.getOrDefault(false)
+    }
+
     fun loadDraft(threadId: Long): DraftState? = draftStore.load(threadId)
 
     fun saveDraft(threadId: Long, text: String) {

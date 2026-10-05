@@ -312,6 +312,11 @@ class MessagingState(
         notifyChanged()
         conversationLoadJob = scope.launch {
             try {
+                // Persist read state to the SMS provider so the badge clears everywhere (system,
+                // other apps, the Start tile) and does not return on the next thread reload.
+                val markedRead = withContext(Dispatchers.IO) {
+                    repository.markThreadRead(threadId)
+                }
                 val (loadedMessages, draft) = withContext(Dispatchers.IO) {
                     repository.loadMessages(threadId) to
                         (repository.loadDraft(threadId)?.text.orEmpty())
@@ -320,6 +325,10 @@ class MessagingState(
                 if ((route as? MessagingRoute.Conversation)?.threadId != threadId) return@launch
                 messages = loadedMessages
                 composerText = draft
+                if (markedRead) {
+                    reloadThreads()
+                    MessagingTileRefresh.request(appContext)
+                }
             } finally {
                 if (generation == conversationLoadGeneration) {
                     isLoadingMessages = false
