@@ -11,6 +11,9 @@ import java.util.concurrent.TimeUnit
 object CalendarLogic {
     private val locale: Locale = Locale.US
 
+    /** Android stores all-day event boundaries in UTC regardless of the device zone. */
+    private val utc: ZoneId = ZoneId.of("UTC")
+
     fun epochDayFromMillis(millis: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long =
         // LocalDate.ofInstant is API 34+; atZone/toLocalDate is available back to API 26.
         Instant.ofEpochMilli(millis).atZone(zoneId).toLocalDate().toEpochDay()
@@ -56,10 +59,26 @@ object CalendarLogic {
         return time
     }
 
+    /**
+     * Epoch day the event *starts* on in the local calendar. All-day events are anchored in UTC
+     * (provider storage), so a Monday all-day event is not shifted to Sunday in negative-offset
+     * zones. Timed events use the device zone.
+     */
+    fun eventStartEpochDay(event: CalendarEvent, zoneId: ZoneId = ZoneId.systemDefault()): Long =
+        epochDayFromMillis(event.startMillis, if (event.allDay) utc else zoneId)
+
+    /**
+     * Inclusive last epoch day the event covers, for agenda range filtering. Android's END is
+     * exclusive, so step back one millisecond before mapping to a day.
+     */
+    fun eventEndEpochDay(event: CalendarEvent, zoneId: ZoneId = ZoneId.systemDefault()): Long {
+        val zone = if (event.allDay) utc else zoneId
+        val endExclusive = if (event.endMillis > event.startMillis) event.endMillis else event.startMillis + 1
+        return epochDayFromMillis(endExclusive - 1L, zone)
+    }
+
     fun formatEventDuration(event: CalendarEvent, zoneId: ZoneId = ZoneId.systemDefault()): String {
         if (event.allDay) {
-            // Android stores all-day boundaries in UTC regardless of local zone.
-            val utc = ZoneId.of("UTC")
             val startDay = epochDayFromMillis(event.startMillis, utc)
             val endDay = epochDayFromMillis(event.endMillis, utc)
             val days = (endDay - startDay).coerceAtLeast(1)
@@ -94,13 +113,16 @@ object CalendarLogic {
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): List<DayBucket> {
         val endEpochDay = startEpochDay + dayCount
-        val grouped = events
-            .filter { event ->
-                val eventDay = epochDayFromMillis(event.startMillis, zoneId)
-                eventDay in startEpochDay until endEpochDay
-            }
-            .groupBy { event -> epochDayFromMillis(event.startMillis, zoneId) }
-            .toSortedMap()
+        val grouped = sortedMapOf<Long, MutableList<CalendarEvent>>()
+        events.forEach { event ->
+            val startDay = eventStartEpochDay(event, zoneId)
+            val endDay = eventEndEpochDay(event, zoneId)
+            // Keep multi-day events that began before the window but still overlap it; drop
+            // events entirely outside the window.
+            if (startDay >= endEpochDay || endDay < startEpochDay) return@forEach
+            val bucketDay = startDay.coerceIn(startEpochDay, endEpochDay - 1)
+            grouped.getOrPut(bucketDay) { mutableListOf() }.add(event)
+        }
 
         return grouped.map { (day, dayEvents) ->
             DayBucket(
@@ -202,7 +224,7 @@ object CalendarLogic {
         todayEpochDay: Long = todayEpochDay(),
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): List<String> {
-        val eventDay = epochDayFromMillis(event.startMillis, zoneId)
+        val eventDay = eventStartEpochDay(event, zoneId)
         val timeText = tileTimeRange(event, zoneId)
         val timeLine = if (eventDay != todayEpochDay) {
             "${tileDayLabel(eventDay, zoneId)}: $timeText"

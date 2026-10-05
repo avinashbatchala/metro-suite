@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
@@ -97,6 +98,113 @@ class CalendarLogicTest {
         assertEquals("8 AM", slots.first().label)
         assertFalse(slots.any { it.events.isNotEmpty() })
     }
+
+    // --- Timezone / all-day / recurrence-instance edge cases -------------------------------
+
+    @Test
+    fun allDayEvent_groupedUnderLocalDay_negativeOffset() {
+        // Provider stores all-day BEGIN/END in UTC. In a negative-offset zone the naive local
+        // mapping shifts a Monday all-day event to Sunday; eventStartEpochDay must not.
+        val zone = ZoneId.of("-05:00")
+        val event = sampleEvent(
+            allDay = true,
+            startMillis = isoMillis("2026-06-26T00:00:00Z"),
+            endMillis = isoMillis("2026-06-27T00:00:00Z"),
+        )
+        val day = LocalDate.of(2026, 6, 26).toEpochDay()
+        assertEquals(day, CalendarLogic.eventStartEpochDay(event, zone))
+        val buckets = CalendarLogic.groupIntoAgendaBuckets(listOf(event), day, dayCount = 1, zoneId = zone)
+        assertEquals(day, buckets.single().epochDay)
+        assertEquals(1, buckets.single().events.size)
+    }
+
+    @Test
+    fun allDayEvent_mappedToCorrectDay_positiveOffset() {
+        val zone = ZoneId.of("+05:00")
+        val event = allDayEvent("2026-06-26")
+        val day = LocalDate.of(2026, 6, 26).toEpochDay()
+        assertEquals(day, CalendarLogic.eventStartEpochDay(event, zone))
+        assertEquals(1, CalendarLogic.allDayEventsForDay(listOf(event), day, zone).size)
+    }
+
+    @Test
+    fun multiDayAllDay_appearsOnEachCoveredDay() {
+        val zone = ZoneId.of("UTC")
+        val event = sampleEvent(
+            allDay = true,
+            startMillis = isoMillis("2026-06-26T00:00:00Z"),
+            endMillis = isoMillis("2026-06-29T00:00:00Z"),
+        )
+        val days = listOf("2026-06-26", "2026-06-27", "2026-06-28")
+        days.forEach { d ->
+            assertEquals("expected event on $d", 1, CalendarLogic.eventsForDay(listOf(event), epochDayOf(d), zone).size)
+        }
+        assertTrue(CalendarLogic.eventsForDay(listOf(event), epochDayOf("2026-06-29"), zone).isEmpty())
+    }
+
+    @Test
+    fun timedEventCrossingMidnight_appearsOnBothDays() {
+        val zone = ZoneId.of("UTC")
+        val event = sampleEvent(
+            startMillis = isoMillis("2026-06-26T23:00:00Z"),
+            endMillis = isoMillis("2026-06-27T01:00:00Z"),
+        )
+        assertEquals(1, CalendarLogic.eventsForDay(listOf(event), epochDayOf("2026-06-26"), zone).size)
+        assertEquals(1, CalendarLogic.eventsForDay(listOf(event), epochDayOf("2026-06-27"), zone).size)
+    }
+
+    @Test
+    fun allDayEvent_onDstTransition_keepsItsDay() {
+        val zone = ZoneId.of("America/New_York")
+        val event = allDayEvent("2026-03-08") // US spring-forward day
+        val day = epochDayOf("2026-03-08")
+        assertEquals(day, CalendarLogic.eventStartEpochDay(event, zone))
+        assertEquals(1, CalendarLogic.eventsForDay(listOf(event), day, zone).size)
+    }
+
+    @Test
+    fun agenda_keepsMultiDayEventThatStartedBeforeWindow() {
+        val zone = ZoneId.of("UTC")
+        val event = sampleEvent(
+            allDay = true,
+            startMillis = isoMillis("2026-06-21T00:00:00Z"),
+            endMillis = isoMillis("2026-06-23T00:00:00Z"), // covers 21 + 22
+        )
+        val windowStart = epochDayOf("2026-06-22")
+        val buckets = CalendarLogic.groupIntoAgendaBuckets(listOf(event), windowStart, dayCount = 2, zoneId = zone)
+        assertEquals(1, buckets.size)
+        assertEquals(windowStart, buckets.single().epochDay)
+    }
+
+    @Test
+    fun agenda_dropsEventEntirelyOutsideWindow() {
+        val zone = ZoneId.of("UTC")
+        val event = allDayEvent("2026-06-20")
+        val buckets = CalendarLogic.groupIntoAgendaBuckets(listOf(event), epochDayOf("2026-06-25"), dayCount = 3, zoneId = zone)
+        assertTrue(buckets.isEmpty())
+    }
+
+    @Test
+    fun tileEventLines_prefixesWeekdayForNonToday() {
+        val zone = ZoneId.of("UTC")
+        val today = epochDayOf("2026-06-26")
+        val tomorrow = allDayEvent("2026-06-27")
+        val lines = CalendarLogic.tileEventLines(tomorrow, today, zone)
+        assertEquals("Sat: All day", lines.last())
+
+        val todayEvent = allDayEvent("2026-06-26")
+        assertEquals("All day", CalendarLogic.tileEventLines(todayEvent, today, zone).last())
+    }
+
+    private fun isoMillis(iso: String): Long = Instant.parse(iso).toEpochMilli()
+
+    private fun epochDayOf(iso: String): Long = LocalDate.parse(iso).toEpochDay()
+
+    private fun allDayEvent(isoDate: String): CalendarEvent = sampleEvent(
+        allDay = true,
+        startMillis = isoMillis("${isoDate}T00:00:00Z"),
+        endMillis = isoMillis("${LocalDate.parse(isoDate).plusDays(1)}T00:00:00Z"),
+    )
 
     private fun sampleEvent(
         id: Long = 1L,
