@@ -12,11 +12,6 @@
     <string name="all_day">All day</string>
     <string name="today">today</string>
     <string name="new_event">new</string>
-    <string name="view_type">view</string>
-    <string name="view_type_day">day</string>
-    <string name="view_type_week">week</string>
-    <string name="view_type_month">month</string>
-    <string name="view_type_year">year</string>
     <string name="create_event_stub">Event creation not available in v1</string>
     <string name="sync_calendars">sync calendars</string>
     <string name="sync_done">Syncing your calendars…</string>

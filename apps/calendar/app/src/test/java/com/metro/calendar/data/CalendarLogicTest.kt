@@ -1,6 +1,5 @@
 package com.metro.calendar.data
 
-import com.metro.calendar.data.CalendarViewType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -97,72 +96,6 @@ class CalendarLogicTest {
         assertEquals(5, slots.size)
         assertEquals("8 AM", slots.first().label)
         assertFalse(slots.any { it.events.isNotEmpty() })
-    }
-
-    @Test
-    fun buildTabTitles_dayStartsWithToday() {
-        val titles = CalendarLogic.buildTabTitles(CalendarViewType.Day, tabCount = 3, zoneId = zoneId)
-        assertEquals("today", titles[0])
-        assertEquals("tomorrow", titles[1])
-    }
-
-    @Test
-    fun epochDayForTab_dayIncrements() {
-        val day0 = CalendarLogic.epochDayForTab(CalendarViewType.Day, 0, zoneId)
-        val day1 = CalendarLogic.epochDayForTab(CalendarViewType.Day, 1, zoneId)
-        assertEquals(day0 + 1, day1)
-    }
-
-    @Test
-    fun epochDayForTab_dayRespectsPivotStart() {
-        val pivot = LocalDate.of(2026, 3, 10).toEpochDay()
-        val day0 = CalendarLogic.epochDayForTab(
-            CalendarViewType.Day,
-            0,
-            zoneId,
-            dayPivotStartEpochDay = pivot,
-        )
-        val day2 = CalendarLogic.epochDayForTab(
-            CalendarViewType.Day,
-            2,
-            zoneId,
-            dayPivotStartEpochDay = pivot,
-        )
-        assertEquals(pivot, day0)
-        assertEquals(pivot + 2, day2)
-    }
-
-    @Test
-    fun buildTabTitles_dayLabelsRelativeToToday() {
-        val today = LocalDate.now(zoneId)
-        val pivot = today.minusDays(2).toEpochDay()
-        val titles = CalendarLogic.buildTabTitles(
-            CalendarViewType.Day,
-            tabCount = 4,
-            zoneId = zoneId,
-            dayPivotStartEpochDay = pivot,
-        )
-        assertEquals(CalendarLogic.dayNameLower(pivot, zoneId) + " " + today.minusDays(2).dayOfMonth, titles[0])
-        assertEquals("today", titles[2])
-        assertEquals("tomorrow", titles[3])
-    }
-
-    @Test
-    fun buildTabTitles_monthStartsWithCurrentMonth() {
-        val today = LocalDate.now(zoneId)
-        val titles = CalendarLogic.buildTabTitles(CalendarViewType.Month, tabCount = 2, zoneId = zoneId)
-        assertEquals(CalendarLogic.monthNameLower(today.toEpochDay(), zoneId), titles[0])
-        assertEquals(
-            CalendarLogic.monthNameLower(today.plusMonths(1).toEpochDay(), zoneId),
-            titles[1],
-        )
-    }
-
-    @Test
-    fun weekStartEpochDay_isMonday() {
-        val friday = LocalDate.of(2026, 6, 26).toEpochDay()
-        val weekStart = CalendarLogic.weekStartEpochDay(friday, zoneId)
-        assertEquals(LocalDate.of(2026, 6, 22).toEpochDay(), weekStart)
     }
 
     private fun sampleEvent(

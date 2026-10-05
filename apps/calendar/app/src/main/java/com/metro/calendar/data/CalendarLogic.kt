@@ -1,13 +1,10 @@
 package com.metro.calendar.data
 
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -41,11 +38,6 @@ object CalendarLogic {
             .getDisplayName(TextStyle.SHORT, locale)
             .lowercase(locale)
 
-    fun monthYearLabel(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val date = LocalDate.ofEpochDay(epochDay)
-        return date.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale)).uppercase(locale)
-    }
-
     fun monthNameLower(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         LocalDate.ofEpochDay(epochDay)
             .month
@@ -54,12 +46,6 @@ object CalendarLogic {
 
     fun yearLabel(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         LocalDate.ofEpochDay(epochDay).year.toString()
-
-    fun todayButtonLabel(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val date = LocalDate.ofEpochDay(epochDay)
-        val month = date.month.getDisplayName(TextStyle.SHORT, locale)
-        return "${date.dayOfMonth} $month"
-    }
 
     fun formatEventTime(event: CalendarEvent, zoneId: ZoneId = ZoneId.systemDefault()): String {
         if (event.allDay) return "All day"
@@ -238,116 +224,5 @@ object CalendarLogic {
             normalized == 12 -> "12 PM"
             else -> "${normalized - 12} PM"
         }
-    }
-
-    fun weekStartEpochDay(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long {
-        val date = LocalDate.ofEpochDay(epochDay)
-        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()
-    }
-
-    fun tabCountForViewType(viewType: CalendarViewType): Int = when (viewType) {
-        CalendarViewType.Year -> 5
-        else -> 12
-    }
-
-    fun buildTabTitles(
-        viewType: CalendarViewType,
-        tabCount: Int = tabCountForViewType(viewType),
-        zoneId: ZoneId = ZoneId.systemDefault(),
-        dayPivotStartEpochDay: Long? = null,
-    ): List<String> {
-        val today = LocalDate.now(zoneId)
-        val dayStart = dayPivotStartEpochDay?.let(LocalDate::ofEpochDay) ?: today
-        return (0 until tabCount).map { index ->
-            tabTitle(viewType, index, today, dayStart, zoneId)
-        }
-    }
-
-    fun epochDayForTab(
-        viewType: CalendarViewType,
-        tabIndex: Int,
-        zoneId: ZoneId = ZoneId.systemDefault(),
-        dayPivotStartEpochDay: Long? = null,
-    ): Long {
-        val today = LocalDate.now(zoneId)
-        val dayStart = dayPivotStartEpochDay?.let(LocalDate::ofEpochDay) ?: today
-        return when (viewType) {
-            CalendarViewType.Day -> dayStart.plusDays(tabIndex.toLong()).toEpochDay()
-            CalendarViewType.Week -> {
-                val thisWeekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                thisWeekStart.plusWeeks(tabIndex.toLong()).toEpochDay()
-            }
-            CalendarViewType.Month -> {
-                today.withDayOfMonth(1).plusMonths(tabIndex.toLong()).toEpochDay()
-            }
-            CalendarViewType.Year -> {
-                LocalDate.of(today.year + tabIndex, 1, 1).toEpochDay()
-            }
-        }
-    }
-
-    fun tabIndexForEpochDay(
-        viewType: CalendarViewType,
-        epochDay: Long,
-        zoneId: ZoneId = ZoneId.systemDefault(),
-        dayPivotStartEpochDay: Long? = null,
-    ): Int {
-        val today = LocalDate.now(zoneId)
-        val date = LocalDate.ofEpochDay(epochDay)
-        val dayStart = dayPivotStartEpochDay?.let(LocalDate::ofEpochDay) ?: today
-        return when (viewType) {
-            CalendarViewType.Day -> {
-                ChronoUnit.DAYS.between(dayStart, date).toInt().coerceAtLeast(0)
-            }
-            CalendarViewType.Week -> {
-                val thisWeekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                val targetWeekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                ChronoUnit.WEEKS.between(thisWeekStart, targetWeekStart).toInt().coerceAtLeast(0)
-            }
-            CalendarViewType.Month -> {
-                val months = (date.year - today.year) * 12 + (date.monthValue - today.monthValue)
-                months.coerceAtLeast(0)
-            }
-            CalendarViewType.Year -> {
-                (date.year - today.year).coerceAtLeast(0)
-            }
-        }
-    }
-
-    fun weekDayEpochDays(weekStartEpochDay: Long): List<Long> =
-        (0 until 7).map { weekStartEpochDay + it }
-
-    fun monthsInYear(year: Int): List<Int> = (1..12).toList()
-
-    private fun tabTitle(
-        viewType: CalendarViewType,
-        tabIndex: Int,
-        today: LocalDate,
-        dayStart: LocalDate,
-        zoneId: ZoneId,
-    ): String = when (viewType) {
-        CalendarViewType.Day -> {
-            val date = dayStart.plusDays(tabIndex.toLong())
-            when (date) {
-                today -> "today"
-                today.plusDays(1) -> "tomorrow"
-                else -> "${dayNameLower(date.toEpochDay(), zoneId)} ${date.dayOfMonth}"
-            }
-        }
-        CalendarViewType.Week -> when (tabIndex) {
-            0 -> "this week"
-            1 -> "next week"
-            else -> {
-                val weekStart = today
-                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                    .plusWeeks(tabIndex.toLong())
-                "${monthNameLower(weekStart.toEpochDay(), zoneId)} ${weekStart.dayOfMonth}"
-            }
-        }
-        CalendarViewType.Month -> {
-            val monthDate = today.withDayOfMonth(1).plusMonths(tabIndex.toLong())
-            monthNameLower(monthDate.toEpochDay(), zoneId)
-        }
-        CalendarViewType.Year -> (today.year + tabIndex).toString()
     }
 }
