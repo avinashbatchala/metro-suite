@@ -45,7 +45,6 @@ import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.SettingSection
 import com.pranshulgg.weather_master_app.core.ui.components.SettingTile
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.feature.editlocation.ui.EditLocationBottomSheet
 import com.pranshulgg.weather_master_app.feature.editlocation.ui.EditLocationScreenDialogs
@@ -147,14 +146,6 @@ fun EditLocationScreen(
         title = stringResource(R.string.location_edit),
         navigationIcon = { NavigateUpBtn(navController) },
         floatingActionButtonPosition = FabPosition.Center,
-        actions = {
-            Box(
-                modifier = Modifier.metroClickable { navController.navigate(NavRoutes.API_KEYS_CONFIG) },
-                contentAlignment = Alignment.Center
-            ) {
-                Symbol(R.drawable.key_24px)
-            }
-        }
     ) { paddingValues ->
         Column(
             modifier =
@@ -315,9 +306,7 @@ fun EditLocationScreen(
                 },
                 onDismiss = viewModel::hideWeatherSourcesForLocationSheet,
                 sheetState = sheetState,
-                onClickApiConfig = {
-                    navController.navigate(NavRoutes.API_KEYS_CONFIG)
-                },
+                onClickApiConfig = {},
                 showActions = false,
                 apiKeys = uiState.apiKeys
             )
@@ -333,9 +322,7 @@ fun EditLocationScreen(
                     viewModel.updateSelectedAlertSource(it)
                 },
                 onDismiss = viewModel::hideAlertSourcesSheet,
-                onClickApiConfig = {
-                    navController.navigate(NavRoutes.API_KEYS_CONFIG)
-                },
+                onClickApiConfig = {},
                 apiKeys = uiState.apiKeys,
                 countryCode = locations.activeLocation.countryCode
             )
@@ -350,10 +337,7 @@ fun EditLocationScreen(
                     viewModel.updateSelectedAirQualitySource(it)
                 },
                 onDismiss = viewModel::hideAirQualitySourcesSheet,
-                onClickApiConfig = {
-                    viewModel.hideWeatherSourcesForLocationSheet()
-                    navController.navigate(NavRoutes.API_KEYS_CONFIG)
-                },
+                onClickApiConfig = {},
                 apiKeys = uiState.apiKeys,
                 countryCode = locations.activeLocation.countryCode
             )

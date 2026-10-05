@@ -6,12 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.metro.system.MetroPreferences
 import com.metro.ui.MetroActivities
 import com.metro.ui.MetroAppPivotShell
 import com.metro.ui.MetroSplash
 import com.metro.ui.MetroSystemTheme
 import com.pranshulgg.weather_master_app.core.prefs.AppPrefs.initPrefs
-import com.pranshulgg.weather_master_app.core.prefs.helper.PreferencesHelper
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.GetDeviceLocation
 import com.pranshulgg.weather_master_app.data.store.InitializationStore
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,13 +36,7 @@ class MainActivity : ComponentActivity() {
         initPrefs(this)
         super.onCreate(savedInstanceState)
 
-        val theme = PreferencesHelper.getString("app_theme") ?: "Dark"
-        val isDark = resolveThemeDark(
-            theme,
-            resources.configuration.uiMode and
-                    android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-                    android.content.res.Configuration.UI_MODE_NIGHT_YES
-        )
+        val isDark = MetroPreferences(this).isDark
 
         enableEdgeToEdge(
             navigationBarStyle = if (isDark) {
@@ -67,17 +61,5 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         locationHelper.stopUpdates()
-    }
-
-    private fun resolveThemeDark(
-        appTheme: String,
-        systemDark: Boolean
-    ): Boolean {
-        return when (appTheme) {
-            "Dark" -> true
-            "Light" -> false
-            "System" -> systemDark
-            else -> systemDark
-        }
     }
 }

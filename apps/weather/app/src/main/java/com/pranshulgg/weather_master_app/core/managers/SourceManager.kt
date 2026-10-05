@@ -128,28 +128,7 @@ class SourceManager @Inject constructor(
                 nwsDao.deleteGridPointsForLocation(locationId)
             }
 
-            Source.ACCU_WEATHER -> {
-                cleanAccuWeatherData(
-                    locationId = locationId,
-                    airQualitySource = airQualitySource,
-                    alertSource = alertSource
-                )
-            }
-
             else -> Unit
-        }
-    }
-
-    private suspend fun cleanAccuWeatherData(
-        locationId: String,
-        airQualitySource: Source,
-        alertSource: Source
-    ) {
-        if (
-            airQualitySource != Source.ACCU_WEATHER &&
-            alertSource != Source.ACCU_WEATHER
-        ) {
-            locationKeysDao.deleteCityKeyForLocation(locationId)
         }
     }
 
@@ -160,13 +139,6 @@ class SourceManager @Inject constructor(
     ) {
         airQualityDao.deleteCurrentAirQuality(locationId)
         airQualityDao.deleteHourlyAirQuality(locationId)
-
-        if (
-            currentWeatherSource != Source.ACCU_WEATHER &&
-            currentAlertSource != Source.ACCU_WEATHER
-        ) {
-            locationKeysDao.deleteCityKeyForLocation(locationId)
-        }
     }
 
     private suspend fun cleanAlertsData(
@@ -175,12 +147,5 @@ class SourceManager @Inject constructor(
         currentAirQualitySource: Source
     ) {
         alertsDao.deleteAlertsForLocation(locationId)
-
-        if (
-            currentWeatherSource != Source.ACCU_WEATHER &&
-            currentAirQualitySource != Source.ACCU_WEATHER
-        ) {
-            locationKeysDao.deleteCityKeyForLocation(locationId)
-        }
     }
 }

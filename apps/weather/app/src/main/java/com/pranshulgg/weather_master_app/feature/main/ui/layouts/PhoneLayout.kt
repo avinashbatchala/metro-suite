@@ -40,10 +40,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
-import com.pranshulgg.weather_master_app.core.model.domain.airquality.AirQuality
 import com.pranshulgg.weather_master_app.core.model.domain.alerts.Alert
 import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
-import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherBlock
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.model.weather.TemperatureUnit
 import com.pranshulgg.weather_master_app.core.model.weather.toIcon
@@ -67,7 +65,6 @@ import com.pranshulgg.weather_master_app.core.utils.formatters.to24HourTimeStrin
 import com.pranshulgg.weather_master_app.core.utils.formatters.toWeekdayString
 import com.pranshulgg.weather_master_app.core.utils.weather.forecast.findMatchingHourly
 import com.pranshulgg.weather_master_app.core.utils.weather.location.getFullLocationName
-import com.pranshulgg.weather_master_app.data.store.WeatherBlocksStoreState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -81,17 +78,10 @@ fun PhoneLayout(
     weather: Weather,
     units: WeatherUnits,
     context: Context,
-    isFroggyLayout: Boolean,
     navController: NavController,
     alerts: List<Alert>,
     prefs: AppPrefsState,
-    onWeatherSourceInfoClick: () -> Unit,
-    isShowSummary: Boolean,
-    airQuality: AirQuality?,
-    weatherBlocks: WeatherBlocksStoreState,
-    onUpdateBlocks: (List<WeatherBlock>) -> Unit,
     onLocationSelect: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit = {},
-    onScroll: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var currentPage by remember { mutableIntStateOf(0) }
@@ -517,12 +507,8 @@ private fun PlacesPage(
         onPin = {
             com.pranshulgg.weather_master_app.synergy.WeatherTilePin.pin(
                 context = context,
-                placeLabel = weather.location.customName ?: weather.location.name,
-                latitude = weather.location.latitude,
-                longitude = weather.location.longitude,
-                timezone = weather.location.timezone,
-                locationId = weather.location.id,
-                size = "wide"
+                location = weather.location,
+                size = "4x2",
             )
         },
         modifier = Modifier.fillMaxSize()

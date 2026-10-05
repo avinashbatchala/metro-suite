@@ -116,7 +116,7 @@ class WeatherManager @Inject constructor(
                     delay(duration = (minLoadingTime - elapsed).milliseconds)
                 }
             } finally {
-                externalManager.refreshWidgets()
+                externalManager.refreshLiveTiles()
                 externalManager.refreshNotifications()
                 locationStore.setLoading(false)
             }

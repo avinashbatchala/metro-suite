@@ -26,7 +26,8 @@ fun SwitchTile(
             MetroToggleSwitch(
                 checked = checked,
                 onCheckedChange = { if (checked != it) onCheckedChange(it) },
-                enabled = switchEnabled
+                enabled = switchEnabled,
+                showStatus = false,
             )
         }
     )
@@ -51,7 +52,8 @@ fun SingleSwitchTile(
             MetroToggleSwitch(
                 checked = checked,
                 onCheckedChange = { if (checked != it) onCheckedChange(it) },
-                enabled = switchEnabled
+                enabled = switchEnabled,
+                showStatus = false,
             )
         }
     )

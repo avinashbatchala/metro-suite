@@ -2,65 +2,13 @@ package com.pranshulgg.weather_master_app.core.ui.navigation
 
 object NavRoutes {
     const val MAIN = "main"
-
     const val SEARCH = "search"
-
     const val SETTINGS = "settings"
-
     const val UNITS = "units"
-
-    const val LANGUAGE = "language"
-    const val APPEARANCE = "appearance"
-
-    const val DAILY = "daily"
-
-    fun daily(index: Int): String {
-        return "$DAILY/$index"
-    }
-
     const val BACKGROUND_UPDATES = "background_updates"
-
-    const val BACKUP_RESTORE = "backup_restore"
-
     const val ABOUT = "about"
-
     const val TERMS_CONDITIONS = "terms_conditions"
     const val PRIVACY_POLICY = "privacy_policy"
-
-    const val LICENSE = "LICENSE"
-
-    const val SOURCES = "sources"
-
-    const val UV_INDEX = "uv_index"
-    const val HUMIDITY = "humidity"
-    const val VISIBILITY = "visibility"
-    const val SUN_MOON = "sun_moon"
-    const val PRESSURE = "pressure"
-
-    const val WIND = "wind"
-
-
-    const val RAIN = "rain"
-    const val SNOW = "snow"
-
-    const val AIR_QUALITY = "airquality"
-
-    const val WORKER_INFO = "worker_info"
-
+    const val LICENSE = "license"
     const val EDIT_LOCATION = "edit_location"
-
-    const val ALERTS = "alerts"
-
-    const val API_KEYS_CONFIG = "api_keys_config"
-
-    const val NOTIFICATIONS = "notifications"
-
-    fun alerts(locationId: String): String {
-        return "$ALERTS/$locationId"
-    }
-
-
-    fun blockScreen(block: String, index: Int, locationId: String): String {
-        return "$block/$index/$locationId"
-    }
 }

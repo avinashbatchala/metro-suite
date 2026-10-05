@@ -18,6 +18,9 @@ import androidx.core.content.edit
 import androidx.core.location.LocationManagerCompat
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
+import com.pranshulgg.weather_master_app.core.model.sources.Source
+import com.pranshulgg.weather_master_app.core.utils.ids.UuidGenerator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.locationtech.jts.geom.Coordinate
@@ -25,6 +28,7 @@ import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.io.geojson.GeoJsonReader
 import java.io.InputStream
+import java.time.ZoneId
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -211,4 +215,25 @@ class ChinaOfflineGeocoder @Inject constructor(
 
         return isInside
     }
+}
+
+fun DeviceLocation.toDomain(): Location {
+    val formattedLatitude = kotlin.math.round(latitude!! * 100000) / 100000
+    val formattedLongitude = kotlin.math.round(longitude!! * 100000) / 100000
+
+    return Location(
+        id = UuidGenerator.generateId(),
+        name = "$formattedLatitude, $formattedLongitude",
+        latitude = formattedLatitude,
+        longitude = formattedLongitude,
+        country = "",
+        timezone = ZoneId.systemDefault().id,
+        countryCode = "",
+        state = "",
+        source = Source.OPEN_METEO,
+        isFavorite = false,
+        isPinned = false,
+        isDefault = false,
+        isDeviceLocation = true
+    )
 }

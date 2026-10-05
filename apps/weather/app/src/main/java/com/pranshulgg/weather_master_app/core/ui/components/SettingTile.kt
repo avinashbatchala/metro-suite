@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.metro.ui.MetroStaggeredPivotEnter
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
@@ -122,6 +123,11 @@ fun SettingSection(
     noPadding: Boolean = false,
     errorTile: Boolean = false,
     isModalOption: Boolean = false,
+    /**
+     * When non-null, each tile enters with the suite's [MetroStaggeredPivotEnter] motion
+     * starting at this index (typically 1, with the page title owning slot 0).
+     */
+    staggerStartIndex: Int? = null,
 ) {
 
     val itemBgColor = Color.Unspecified
@@ -144,9 +150,23 @@ fun SettingSection(
         val nonNullTiles = tiles.filterNotNull()
 
         nonNullTiles.forEachIndexed { index, tile ->
-            val shape = RoundedCornerShape(0.dp)
+            val startIndex = staggerStartIndex
+            if (startIndex == null) {
+                SettingTileRow(tile = tile, itemBgColor = itemBgColor)
+            } else {
+                MetroStaggeredPivotEnter(staggerIndex = startIndex + index) {
+                    SettingTileRow(tile = tile, itemBgColor = itemBgColor)
+                }
+            }
+        }
+    }
+}
 
-            when (tile) {
+@Composable
+private fun SettingTileRow(tile: SettingTile, itemBgColor: Color) {
+    val shape = RoundedCornerShape(0.dp)
+
+    when (tile) {
                 is SettingTile.TextTile -> TextTile(
                     headline = tile.title,
                     description = tile.description,
@@ -244,8 +264,6 @@ fun SettingSection(
                     isDescriptionAsValue = tile.isDescriptionAsValue,
                     itemBgColor = itemBgColor
                 )
-            }
-        }
     }
 }
 

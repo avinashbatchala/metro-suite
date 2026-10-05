@@ -6,9 +6,6 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:name=".WeatherMasterApplication"
@@ -34,10 +31,6 @@
 
 
         </activity>
-        <activity
-            android:name=".widgets.config.WidgetConfigActivity"
-            android:theme="@style/Theme.Metro"
-            android:exported="true" />
 
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
@@ -70,166 +63,6 @@
                 android:name="com.metro.tile.provider"
                 android:value="true" />
         </provider>
-
-        <receiver
-            android:name=".feature.notifications.scheduled.ScheduledNotification"
-            android:enabled="true" />
-
-        <!--WIDGETS-->
-        <receiver
-            android:name=".widgets.weather.WeatherWidgetReceiver"
-            android:label="Weather 1"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/weather_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.pill.WidgetPillReceiver"
-            android:label="Pill"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_pill_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.summary.SummaryWidgetReceiver"
-            android:label="Day Summary"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/summary_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.weatherhorizontal.WeatherHorizontalWidgetReceiver"
-            android:label="Weather 2"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/weather_widget_horizontal_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.glance.GlanceWidgetReceiver"
-            android:label="Glance"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/glance_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.weather3.Weather3WidgetReceiver"
-            android:label="Weather 3"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/weather3_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.weather4.Weather4WidgerReceiver"
-            android:label="Weather 4"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/weather4_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.hourly.WidgetHourlyReceiver"
-            android:label="Hourly"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/hourly_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.uvindex.UvIndexWidgetReceiver"
-            android:label="UV index"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/uv_index_widget_info" />
-        </receiver>
-
-
-        <receiver
-            android:name=".widgets.weather5.Weather5WidgetReceiver"
-            android:label="Weather 5"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/weather5_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".widgets.froggy.FroggyWidgetReceiver"
-            android:label="Froggy"
-            android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/froggy_widget_info" />
-        </receiver>
 
     </application>
 

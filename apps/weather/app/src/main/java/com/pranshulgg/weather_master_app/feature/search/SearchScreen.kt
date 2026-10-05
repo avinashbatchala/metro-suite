@@ -40,7 +40,6 @@ import com.metro.ui.MetroEmptyState
 import com.metro.ui.MetroListItem
 import com.metro.ui.MetroTextBox
 import com.metro.ui.MetroTheme
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
 import com.pranshulgg.weather_master_app.core.utils.formatters.toTitleCase
 import com.pranshulgg.weather_master_app.feature.search.ui.SearchScreenBottomSheets
 import com.pranshulgg.weather_master_app.feature.shared.ui.SharedBottomSheet
@@ -162,7 +161,6 @@ fun SearchScreen(navController: NavController) {
         onDismiss = viewModel::hideWeatherSourcesForLocationSheet,
         sheetState = sheetState,
         onClickApiConfig = {
-            navController.navigate(NavRoutes.API_KEYS_CONFIG)
             viewModel.hideWeatherSourcesForLocationSheet()
         },
         apiKeys = uiState.apiKeys

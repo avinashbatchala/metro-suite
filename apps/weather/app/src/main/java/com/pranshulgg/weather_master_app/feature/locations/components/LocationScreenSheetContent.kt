@@ -19,7 +19,8 @@ fun LocationScreenSheetContent(
     locationName: String,
     onDelete: () -> Unit,
     onSetAsDefault: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onPinToStart: () -> Unit
 ) {
     Column(modifier = Modifier.padding(bottom = 8.dp)) {
         MetroText(
@@ -46,6 +47,11 @@ fun LocationScreenSheetContent(
             title = stringResource(R.string.action_set_default),
             leading = { SettingsTileIcon(R.drawable.home_pin_24px) },
             onClick = onSetAsDefault
+        )
+        MetroListItem(
+            title = "pin to start",
+            leading = { SettingsTileIcon(R.drawable.home_pin_24px) },
+            onClick = onPinToStart
         )
     }
 }

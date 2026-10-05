@@ -14,9 +14,10 @@ import com.pranshulgg.weather_master_app.core.managers.WeatherManager
 import com.pranshulgg.weather_master_app.core.managers.WeatherUnitsManager
 import com.pranshulgg.weather_master_app.core.managers.requests.AutoRefreshes
 import com.pranshulgg.weather_master_app.core.managers.requests.PendingRequests
+import com.pranshulgg.weather_master_app.core.model.domain.AppException
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
-import com.pranshulgg.weather_master_app.core.model.sources.Source
-import com.pranshulgg.weather_master_app.core.model.weather.openmeteo.OpenMeteoModel
+import com.pranshulgg.weather_master_app.core.model.domain.toMessageRes
+import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.data.repository.WeatherContextRepository
 import com.pranshulgg.weather_master_app.data.store.LocationStore
 import com.pranshulgg.weather_master_app.feature.main.MainScreenWeatherUiState
@@ -43,7 +44,8 @@ class WeatherViewModel @Inject constructor(
     private val weatherUnitsManager: WeatherUnitsManager,
     private val weatherBlocksManager: WeatherBlocksManager,
     private val pendingRequests: PendingRequests,
-    private val autoRefreshes: AutoRefreshes
+    private val autoRefreshes: AutoRefreshes,
+    private val weatherContextRepository: WeatherContextRepository
 ) : ViewModel() {
 
     private var _uiState = mutableStateOf(MainScreenWeatherUiState())
@@ -109,6 +111,17 @@ class WeatherViewModel @Inject constructor(
             getWeather(location, isManualRefresh = true)
         }
 
+    }
+
+    fun saveDeviceLocation() {
+        viewModelScope.launch {
+            try {
+                weatherContextRepository.saveDeviceLocation()
+            } catch (e: Exception) {
+                if (e is kotlin.coroutines.cancellation.CancellationException) throw e
+                SnackbarManager.show(AppException.CurrentLocationUnavailable().toMessageRes())
+            }
+        }
     }
 
 

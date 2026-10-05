@@ -26,7 +26,7 @@ import com.pranshulgg.weather_master_app.data.provider.devicelocation.DeviceLoca
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.GetDeviceLocation
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.getCountryCode
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.isLocationEnabled
-import com.pranshulgg.weather_master_app.feature.intro.toDomain
+import com.pranshulgg.weather_master_app.data.provider.devicelocation.toDomain
 import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject
 import kotlinx.coroutines.CancellableContinuation
@@ -251,7 +251,7 @@ class WeatherContextRepository @Inject constructor(
             }
 
             saveLocation(
-                location.toDomain(context).copy(
+                location.toDomain().copy(
                     name = address.city,
                     country = address.country,
                     countryCode = countryCode
@@ -259,7 +259,7 @@ class WeatherContextRepository @Inject constructor(
             )
         } else {
             saveLocation(
-                location.toDomain(context)
+                location.toDomain()
             )
         }
     }

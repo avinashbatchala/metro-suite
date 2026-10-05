@@ -89,14 +89,6 @@ class MainScreenViewModel @Inject constructor(
 
     }
 
-    fun hideChangelogSheet() {
-        _uiState.value = _uiState.value.copy(isChangelogSheetOpen = false)
-    }
-
-    fun showChangelogSheet() {
-        _uiState.value = _uiState.value.copy(isChangelogSheetOpen = true)
-    }
-
     fun saveBlocks(blocks: List<WeatherBlock>) {
         viewModelScope.launch {
             weatherBlocksManager.saveBlocks(items = blocks)

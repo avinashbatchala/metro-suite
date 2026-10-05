@@ -1,46 +1,34 @@
 package com.pranshulgg.weather_master_app.feature.main
 
-import android.util.Log
-import androidx.activity.compose.BackHandler
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.rememberBottomSheetState
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.BuildConfig
 import com.pranshulgg.weather_master_app.R
-import com.pranshulgg.weather_master_app.core.managers.WeatherBlocksManager
-import com.pranshulgg.weather_master_app.core.model.domain.airquality.AirQuality
-import com.pranshulgg.weather_master_app.core.model.domain.alerts.Alert
-import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.model.domain.toMessageRes
-import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherBlock
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
-import com.pranshulgg.weather_master_app.core.prefs.helper.PreferencesHelper
 import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
-import com.pranshulgg.weather_master_app.feature.intro.IntroScreen
-import com.pranshulgg.weather_master_app.feature.locations.LocationsScreen
+import com.pranshulgg.weather_master_app.data.provider.devicelocation.rememberLocationPermissionLauncher
 import com.pranshulgg.weather_master_app.feature.main.ui.MainScreenBottomSheets
 import com.pranshulgg.weather_master_app.feature.main.ui.MainScreenDialogs
-import com.pranshulgg.weather_master_app.feature.main.ui.NavigationDrawer
 import com.pranshulgg.weather_master_app.feature.shared.WeatherViewModel
-import com.pranshulgg.weather_master_app.feature.shared.ui.SharedBottomSheet
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 data class MainScreenWeatherUiState(
@@ -54,7 +42,6 @@ data class MainScreenUiState(
     val isNewVersionAvailable: Boolean = false,
     val lastestVersionUrl: String = "https://github.com/PranshulGG/WeatherMaster/releases/latest",
     val isUnsupportedSourceDialogOpen: Boolean = false,
-    val isChangelogSheetOpen: Boolean = false,
     val isGooglePlayStoreRelease: Boolean = BuildConfig.IS_PLAYSTORE_BUILD
 )
 
@@ -64,47 +51,49 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
     val viewModel: MainScreenViewModel = hiltViewModel()
     val uiState = viewModel.uiState.value
     val uriHandler = LocalUriHandler.current
-    val savedVersion = PreferencesHelper.getString("saved_version")
     val prefs = LocalAppPrefs.current
 
     val locationStore = viewModel.location.collectAsState().value
     val weatherStore = viewModel.weather.collectAsState().value
     val unitsStore = viewModel.units.collectAsState().value
-    val weatherBlocks = viewModel.weatherBlocks.collectAsState().value
-
-
-    if (locationStore.locations.isEmpty()) {
-        IntroScreen(navController)
-        return
-    }
-
-    LaunchedEffect(Unit) {
-        weatherViewModel.errors.collect { exp ->
-            SnackbarManager.show(messageResource = exp.toMessageRes())
-        }
-    }
 
     val context = LocalContext.current
     val activeLocation = locationStore.activeLocation
 
-    val density = LocalDensity.current
-    val widthDp = with(density) {
-        LocalWindowInfo.current.containerSize.width.toDp()
-    }
+    val scope = rememberCoroutineScope()
 
-    val isTabletLike = if (!prefs.isTabletLayoutEnabled) false else widthDp > 600.dp
+    // First run: no saved places yet, so ask for location and add the device location.
+    val requestLocation = rememberLocationPermissionLauncher(
+        onForegroundGranted = { weatherViewModel.saveDeviceLocation() },
+        onDenied = { SnackbarManager.show(R.string.location_permission_required) }
+    )
+
+    var autoLocationHandled by remember { mutableStateOf(false) }
+    LaunchedEffect(locationStore.locations) {
+        // Wait a beat for the store to load before deciding there are truly no places.
+        if (!autoLocationHandled && locationStore.locations.isEmpty()) {
+            delay(1200)
+            if (!autoLocationHandled && locationStore.locations.isEmpty()) {
+                autoLocationHandled = true
+                requestLocation()
+            }
+        }
+    }
 
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Expanded, SheetValue.Hidden)
     )
 
-
-    val scope = rememberCoroutineScope()
-
     LaunchedEffect(weatherViewModel.isUnSupportedSource) {
         if (weatherViewModel.isUnSupportedSource) {
             viewModel.showUnsupportedSelectedSourceDialog()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        weatherViewModel.errors.collect { exp ->
+            SnackbarManager.show(messageResource = exp.toMessageRes())
         }
     }
 
@@ -122,15 +111,6 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
             viewModel.dismissNewVersionSnackbar()
         }
     }
-
-    LaunchedEffect(Unit) {
-
-        if (BuildConfig.APP_VERSION != savedVersion) {
-            viewModel.showChangelogSheet()
-            PreferencesHelper.setString("saved_version", BuildConfig.APP_VERSION)
-        }
-    }
-
 
     MainScreenScaffold(
         navController = navController,
@@ -152,21 +132,12 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
         },
         context = context,
         onWeatherSourceInfoClick = viewModel::showWeatherSourcesInfoForLocationSheet,
-        isTabletLike = isTabletLike,
         prefs = prefs,
-        units = unitsStore,
-        isLoading = locationStore.isActiveLocationLoading,
-        activeLocation = locationStore.activeLocation,
-        weatherBlocks = weatherBlocks,
-        onUpdateBlocks = {
-            viewModel.saveBlocks(it)
-        }
+        units = unitsStore
     )
-
 
     // WEATHER SOURCES INFO DIALOG
     MainScreenBottomSheets.WeatherSourcesInfoForLocationSheet(viewModel, activeLocation, sheetState)
-
 
     // SOURCE NOT AVAILABLE
     MainScreenDialogs.UnsupportedSelectedSourceDialog(
@@ -178,15 +149,4 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
             }
         }
     )
-
-
-    // CHANGELOG DIALOG
-    SharedBottomSheet.ChangelogBottomSheet(
-        sheetState,
-        onDismiss = viewModel::hideChangelogSheet,
-        show = uiState.isChangelogSheetOpen
-    )
 }
-
-
-

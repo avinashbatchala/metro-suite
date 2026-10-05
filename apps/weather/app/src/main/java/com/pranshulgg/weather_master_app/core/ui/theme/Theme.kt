@@ -4,7 +4,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.metro.ui.MetroSystemTheme
-import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
 
 /**
  * Kept for secondary surfaces (widget config). Delegates to the suite-wide
@@ -23,12 +22,4 @@ fun WeatherMasterTheme(
 }
 
 @Composable
-fun isThemeDark(): Boolean {
-    val prefs = LocalAppPrefs.current
-
-    return when (prefs.appTheme) {
-        "Dark" -> true
-        "Light" -> false
-        else -> isSystemInDarkTheme()
-    }
-}
+fun isThemeDark(): Boolean = isSystemInDarkTheme()

@@ -2,42 +2,49 @@ package com.pranshulgg.weather_master_app.core.ui.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import com.metro.ui.MetroTransitions
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/**
+ * WP page-pivot navigation motion shared with the metro suite. A forward push fades the
+ * incoming page in from the right with a subtle side slide + scale settle; Back mirrors it.
+ *
+ * Durations and easings come from [MetroTransitions] so weather drills in and out exactly
+ * like calendar / people / dialer ([MetroPagePivotLoad] language), rather than a long fade.
+ */
 object NavTransitions {
 
-    private const val FADE_IN = 550
-    private const val FADE_OUT = 400
+    /** Enter offset as a fraction of viewport width; small so it reads as a settle, not a slide. */
+    private const val PUSH_START_FRACTION = 14
+    private const val POP_START_FRACTION = 18
+    private const val EXIT_FRACTION = 18
+    private const val POP_EXIT_FRACTION = 14
 
-    fun enter(): EnterTransition = fadeIn(tween(FADE_IN))
-//        slideInHorizontally(
-//            animationSpec = tween(FADE_IN),
-//            initialOffsetX = { 1 * it }
-//        ) + fadeIn(tween(FADE_IN))
+    private const val ENTER_SCALE = 0.96f
+    private const val EXIT_SCALE = 0.98f
 
-    fun exit(): ExitTransition = fadeOut(tween(FADE_OUT))
-//        slideOutHorizontally(
-//            animationSpec = tween(FADE_OUT),
-//            targetOffsetX = { 1 * -it / 4 }
-//        ) + fadeOut(tween(FADE_OUT))
+    fun enter(): EnterTransition =
+        fadeIn(MetroTransitions.pageTween<Float>()) +
+            slideInHorizontally(MetroTransitions.pageTween()) { fullWidth -> fullWidth / PUSH_START_FRACTION } +
+            scaleIn(MetroTransitions.pageTween(), initialScale = ENTER_SCALE)
 
-    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-    fun popEnter(): EnterTransition = fadeIn(tween(FADE_IN))
-//        slideInHorizontally(
-//            animationSpec = tween(FADE_IN),
-//            initialOffsetX = { 1 * -it / 4 }
-//        ) + fadeIn(tween(FADE_IN))
+    fun exit(): ExitTransition =
+        fadeOut(MetroTransitions.pagePivotExitTween<Float>()) +
+            slideOutHorizontally(MetroTransitions.pagePivotExitTween()) { fullWidth -> -fullWidth / EXIT_FRACTION } +
+            scaleOut(MetroTransitions.pagePivotExitTween(), targetScale = EXIT_SCALE)
 
-    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-    fun popExit(): ExitTransition = fadeOut(tween(FADE_OUT))
-//        slideOutHorizontally(
-//            animationSpec = tween(FADE_OUT),
-//            targetOffsetX = { 1 * it }
-//        ) + fadeOut(tween(FADE_OUT))
+    fun popEnter(): EnterTransition =
+        fadeIn(MetroTransitions.pageTween<Float>()) +
+            slideInHorizontally(MetroTransitions.pageTween()) { fullWidth -> -fullWidth / POP_START_FRACTION } +
+            scaleIn(MetroTransitions.pageTween(), initialScale = EXIT_SCALE)
+
+    fun popExit(): ExitTransition =
+        fadeOut(MetroTransitions.pagePivotExitTween<Float>()) +
+            slideOutHorizontally(MetroTransitions.pagePivotExitTween()) { fullWidth -> fullWidth / POP_EXIT_FRACTION } +
+            scaleOut(MetroTransitions.pagePivotExitTween(), targetScale = ENTER_SCALE)
 }

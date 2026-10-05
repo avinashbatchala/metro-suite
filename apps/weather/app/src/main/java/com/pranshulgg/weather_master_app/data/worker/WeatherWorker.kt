@@ -6,8 +6,8 @@ import androidx.annotation.RequiresPermission
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
-import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.model.weather.WeatherResult
 import com.pranshulgg.weather_master_app.core.prefs.helper.PreferencesHelper
 import com.pranshulgg.weather_master_app.data.provider.SourceRepositoryProvider
@@ -17,9 +17,7 @@ import com.pranshulgg.weather_master_app.data.repository.data.SourceDataReposito
 import com.pranshulgg.weather_master_app.data.worker.gadgetbridge.sendGadgetBridgeWeatherData
 import com.pranshulgg.weather_master_app.data.worker.notification.BackgroundWeatherUpdateNotification
 import com.pranshulgg.weather_master_app.data.worker.notification.BackgroundWeatherUpdateNotification.showErrorNotification
-import com.pranshulgg.weather_master_app.data.worker.widgets.WeatherWidgetUpdater
-import com.pranshulgg.weather_master_app.data.worker.widgets.widgetWeatherMapper
-import com.pranshulgg.weather_master_app.feature.notifications.ongoing.OnGoingNotification
+import com.pranshulgg.weather_master_app.synergy.WeatherTileSync
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -46,9 +44,6 @@ class WeatherWorker @AssistedInject constructor(
 
             val sendDataToGadgetBridge = PreferencesHelper.getBool(
                 "isSendDataToGadgetbridge"
-            ) ?: false
-            val isOnGoingNotificationEnabled = PreferencesHelper.getBool(
-                "isOnGoingNotificationEnabled"
             ) ?: false
 
 
@@ -93,11 +88,7 @@ class WeatherWorker @AssistedInject constructor(
                 sendGadgetBridgeWeatherData(applicationContext, weather)
             }
 
-            if (isOnGoingNotificationEnabled) {
-                OnGoingNotification.update(weather, applicationContext, units)
-            }
-
-            updateAllWidgets(applicationContext, weather, units)
+            refreshLiveTiles(applicationContext, locations)
 
             PreferencesHelper.setLong("LAST_WORKER_SUCCESS_RUN", System.currentTimeMillis())
 
@@ -113,14 +104,15 @@ class WeatherWorker @AssistedInject constructor(
 
     companion object {
 
-        suspend fun updateAllWidgets(
+        /**
+         * Asks the MetroSuite launcher to re-read this app's Start live tile for every saved
+         * location, replacing the old Android-appwidget refresh path.
+         */
+        fun refreshLiveTiles(
             context: Context,
-            data: Weather,
-            units: WeatherUnits,
+            locations: List<Location>,
         ) {
-            val json = widgetWeatherMapper(data, context, units)
-
-            WeatherWidgetUpdater(context).update(json)
+            locations.forEach { WeatherTileSync.request(context, it.id) }
         }
 
     }

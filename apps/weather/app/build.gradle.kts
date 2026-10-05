@@ -187,10 +187,6 @@ dependencies {
     implementation(libs.hilt.work)
     ksp(libs.hilt.metadata.jvm)
 
-    implementation(libs.androidx.glance)
-
-    implementation(libs.androidx.glance.appwidget)
-
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

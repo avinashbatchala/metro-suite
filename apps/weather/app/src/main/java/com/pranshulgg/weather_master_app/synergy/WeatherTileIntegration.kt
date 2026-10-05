@@ -7,6 +7,7 @@ import com.metro.system.MetroTileContract
 import com.metro.system.MetroTileData
 import com.metro.system.MetroTileProvider
 import com.metro.system.MetroTileUpdates
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.model.weather.TemperatureUnit
@@ -31,27 +32,27 @@ interface WeatherTileEntryPoint {
 }
 
 /**
- * Exports the current location's weather as a MetroSuite Start live tile.
+ * Exports one live tile per saved location as a MetroSuite Start tile.
  *
- * The launcher discovers this via manifest metadata [MetroTileContract.METADATA_TILE_PROVIDER]
- * on authority `{applicationId}.tiles` and reads it through [MetroTileContract.readTile].
+ * Tile id is the location id; the launcher's default id ([MetroTileContract.DEFAULT_TILE_ID])
+ * resolves to the default location. Discovered via manifest metadata
+ * [MetroTileContract.METADATA_TILE_PROVIDER] on authority `{applicationId}.tiles`.
  */
 class WeatherTileProvider : MetroTileProvider() {
     override fun buildTileData(tileId: String): MetroTileData? {
-        if (tileId != MetroTileContract.DEFAULT_TILE_ID) return null
         val ctx = context ?: return null
-        return WeatherTileDataSource(ctx).buildTileData() ?: emptyTile(ctx)
+        return WeatherTileDataSource(ctx).buildTileData(tileId)
     }
 }
 
 /**
- * Builds a [MetroTileData] from the cached weather for the default location. Reads the Room
+ * Builds a [MetroTileData] from the cached weather for the requested location. Reads the Room
  * database synchronously (the provider is called on a binder thread by the launcher).
  */
 class WeatherTileDataSource(context: Context) {
     private val appContext = context.applicationContext
 
-    fun buildTileData(): MetroTileData? {
+    fun buildTileData(tileId: String): MetroTileData? {
         val entryPoint = EntryPointAccessors.fromApplication(
             appContext,
             WeatherTileEntryPoint::class.java,
@@ -59,8 +60,12 @@ class WeatherTileDataSource(context: Context) {
         val contextRepository = entryPoint.weatherContextRepository()
         val units = runBlocking { entryPoint.weatherUnitsRepository().getUnitsOnce() }
             ?: WeatherUnits.getDefault()
-        val location = runBlocking { contextRepository.getLocationsOnce() }
-            .firstOrNull { it.isDefault } ?: return null
+        val locations = runBlocking { contextRepository.getLocationsOnce() }
+        val location = if (tileId == MetroTileContract.DEFAULT_TILE_ID) {
+            locations.firstOrNull { it.isDefault } ?: locations.firstOrNull()
+        } else {
+            locations.firstOrNull { it.id == tileId }
+        } ?: return null
         val weather = runBlocking {
             runCatching { contextRepository.getWeatherForLocation(location.id) }.getOrNull()
         } ?: return null
@@ -69,59 +74,57 @@ class WeatherTileDataSource(context: Context) {
 }
 
 private fun Weather.toTileData(context: Context, units: WeatherUnits): MetroTileData {
-    val temperature = TemperatureUnit.CELSIUS
-        .convert(current.temperature, units.tempUnit)
-        ?.roundToInt()
+    val today = daily.firstOrNull()
+    val temperature = TemperatureUnit.CELSIUS.convert(current.temperature, units.tempUnit)?.roundToInt()
+    val high = TemperatureUnit.CELSIUS.convert(today?.temperatureMax, units.tempUnit)?.roundToInt()
+    val low = TemperatureUnit.CELSIUS.convert(today?.temperatureMin, units.tempUnit)?.roundToInt()
     val condition = current.weatherCondition.toLabel(context)
     val accentHex = MetroPreferences(context).accentColorHex
     val placeLabel = location.customName ?: location.name
 
-    // Resolve the condition icon so the back face can show it; the drawable resource is exported
-    // as an android.resource:// URI the launcher can load.
     val iconRes = current.weatherCondition.toIcon(
         targetTimeMilli = getCurrentTimeFor(location.timezone),
-        daily = daily.firstOrNull(),
+        daily = today,
     )
+
+    val backFace = buildString {
+        append(temperature?.let { "$it°" } ?: "--")
+        if (condition.isNotBlank()) append("  $condition")
+        if (high != null && low != null) append("\nH $high°   L $low°")
+    }
 
     return MetroTileData(
         title = placeLabel,
         backgroundColorHex = accentHex,
-        backFaceTitle = listOfNotNull(
-            temperature?.let { "$it°" },
-            condition,
-        ).joinToString("  "),
+        backFaceTitle = backFace,
         backFaceImageUri = "android.resource://${context.packageName}/$iconRes",
     )
 }
 
-private fun emptyTile(context: Context): MetroTileData = MetroTileData(
-    title = "weather",
-    backgroundColorHex = MetroPreferences(context).accentColorHex,
-)
-
-/** Tells the launcher to re-read this app's tile (e.g. after a weather refresh). */
+/** Tells the launcher to re-read a tile (e.g. after a weather refresh). */
 object WeatherTileSync {
-    fun request(context: Context) {
-        MetroTileUpdates.requestUpdate(context.applicationContext, context.packageName)
+    fun request(context: Context, tileId: String? = null) {
+        MetroTileUpdates.requestUpdate(
+            context.applicationContext,
+            context.packageName,
+            tileId ?: MetroTileContract.DEFAULT_TILE_ID,
+        )
     }
 }
 
 /**
- * Asks the MetroSuite launcher to pin the weather tile to Start. Replaces the old
- * `com.ab.action.PIN_WEATHER_TILE` bridge to the Win10 launcher.
+ * Asks the MetroSuite launcher to pin a location's weather tile to Start.
+ * Replaces the old `com.ab.action.PIN_WEATHER_TILE` bridge to the Win10 launcher.
  */
 object WeatherTilePin {
-    fun pin(
-        context: Context,
-        @Suppress("UNUSED_PARAMETER") placeLabel: String? = null,
-        @Suppress("UNUSED_PARAMETER") latitude: Double? = null,
-        @Suppress("UNUSED_PARAMETER") longitude: Double? = null,
-        @Suppress("UNUSED_PARAMETER") timezone: String? = null,
-        @Suppress("UNUSED_PARAMETER") locationId: String? = null,
-        @Suppress("UNUSED_PARAMETER") size: String = "wide",
-    ): Boolean {
-        WeatherTileSync.request(context)
-        MetroIntents.requestPinTile(context.applicationContext, context.packageName)
+    fun pin(context: Context, location: Location, size: String? = null): Boolean {
+        WeatherTileSync.request(context, location.id)
+        MetroIntents.requestPinTile(
+            context = context.applicationContext,
+            packageName = context.packageName,
+            tileId = location.id,
+            size = size,
+        )
         return true
     }
 }

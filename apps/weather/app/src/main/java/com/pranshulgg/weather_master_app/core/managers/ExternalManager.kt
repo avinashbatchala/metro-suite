@@ -1,14 +1,10 @@
 package com.pranshulgg.weather_master_app.core.managers
 
 import android.content.Context
-import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
-import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
-import com.pranshulgg.weather_master_app.core.prefs.helper.PreferencesHelper
-import com.pranshulgg.weather_master_app.data.store.LocationStore
+import com.pranshulgg.weather_master_app.data.repository.WeatherContextRepository
 import com.pranshulgg.weather_master_app.data.store.WeatherStore
 import com.pranshulgg.weather_master_app.data.store.WeatherUnitsStore
 import com.pranshulgg.weather_master_app.data.worker.WeatherBackgroundUpdateScheduler
-import com.pranshulgg.weather_master_app.feature.notifications.ongoing.OnGoingNotification
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,37 +15,25 @@ import javax.inject.Singleton
 class ExternalManager @Inject constructor(
     private val weatherStore: WeatherStore,
     private val weatherUnitsStore: WeatherUnitsStore,
+    private val weatherContextRepository: WeatherContextRepository,
     @ApplicationContext val context: Context
 ) {
 
 
-    suspend fun refreshWidgets() {
+    suspend fun refreshLiveTiles() {
         val weather = weatherStore.data.value.weather
-        val units = weatherUnitsStore.data.value.units
         if (weather != null && weather.location.isDefault) {
-            WeatherBackgroundUpdateScheduler.updateAllWidgets(
+            val locations = weatherContextRepository.getLocationsOnce()
+            WeatherBackgroundUpdateScheduler.refreshLiveTiles(
                 context = context,
-                data = weather,
-                units = units
+                locations = locations
             )
         }
     }
 
     fun refreshNotifications() {
-        val units = weatherUnitsStore.data.value.units
-        val weather = weatherStore.data.value.weather
-
-        val isOnGoingNotificationEnabled = PreferencesHelper.getBool(
-            "isOnGoingNotificationEnabled"
-        ) ?: false
-
-        if (weather != null && weather.location.isDefault && isOnGoingNotificationEnabled) {
-            OnGoingNotification.update(
-                context = context,
-                weather = weather,
-                units = units
-            )
-        }
+        // Notifications are no longer part of the trimmed Metro weather experience.
+        // Kept as a no-op so the shared weather refresh pipeline stays intact.
     }
 
 }

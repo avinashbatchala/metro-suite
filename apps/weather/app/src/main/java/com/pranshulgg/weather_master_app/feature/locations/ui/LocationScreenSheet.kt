@@ -3,11 +3,13 @@ package com.pranshulgg.weather_master_app.feature.locations.ui
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.ui.components.ActionBottomSheet
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.feature.locations.LocationsScreenViewModel
 import com.pranshulgg.weather_master_app.feature.locations.components.LocationScreenSheetContent
+import com.pranshulgg.weather_master_app.synergy.WeatherTilePin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -18,6 +20,7 @@ fun LocationScreenSheet(
 ) {
 
     val uiState = viewModel.uiState.value
+    val context = LocalContext.current
 
     if (uiState.isBottomSheetOpen)
 
@@ -47,6 +50,12 @@ fun LocationScreenSheet(
                 onEdit = {
                     hide()
                     onEdit()
+                },
+                onPinToStart = {
+                    hide()
+                    uiState.longClickedLocation?.let { location ->
+                        WeatherTilePin.pin(context, location, size = "4x2")
+                    }
                 }
             )
 

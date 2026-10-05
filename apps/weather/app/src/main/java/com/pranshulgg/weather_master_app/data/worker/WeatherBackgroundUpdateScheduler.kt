@@ -6,8 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
-import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import java.util.concurrent.TimeUnit
 
 object WeatherBackgroundUpdateScheduler {
@@ -42,11 +41,10 @@ object WeatherBackgroundUpdateScheduler {
             .cancelUniqueWork(WORK_NAME)
     }
 
-    suspend fun updateAllWidgets(
+    fun refreshLiveTiles(
         context: Context,
-        data: Weather,
-        units: WeatherUnits,
+        locations: List<Location>,
     ) {
-        WeatherWorker.updateAllWidgets(context, data, units)
+        WeatherWorker.refreshLiveTiles(context, locations)
     }
 }
