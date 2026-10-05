@@ -55,7 +55,10 @@ private const val CYCLE_PAN_MS = 3_000
 private const val CYCLE_SLIDE_MS = 600
 /** Extra scale so the cropped photo can drift upward without empty edges. */
 private val CYCLE_PAN_OVERFLOW = TilePhotoLoader.KEN_BURNS_OVERFLOW
-private const val TILE_PHOTO_CACHE_MAX_BYTES = 48 * 1024 * 1024
+// Photos are decoded at <= 1280 px (~6.5 MB each in ARGB_8888). A 24 MB budget holds a
+// multi-cell gallery mosaic without evicting/re-decoding every flip, while still halving the
+// old 48 MB cap that pinned tens of megabytes on Start.
+private const val TILE_PHOTO_CACHE_MAX_BYTES = 24 * 1024 * 1024
 
 /** Pick a different cell at random so the Photos live tile never walks library order. */
 internal fun nextRandomCycleIndex(

@@ -26,7 +26,10 @@ object TilePhotoLoader {
     const val MAX_TILE_EDGE_DP = 420f
     const val KEN_BURNS_OVERFLOW = 0.18f
     const val DECODE_MIN_PX = 768
-    const val DECODE_MAX_PX = 2048
+
+    // Cap the decoded edge: tiles never render wider than ~1.3k px, and a 2048 px ARGB bitmap
+    // is 16 MB on its own. Lowering the ceiling cuts both decode time and native-heap pressure.
+    const val DECODE_MAX_PX = 1280
 
     fun decodeTargetPx(context: Context): Int {
         val density = context.resources.displayMetrics.density

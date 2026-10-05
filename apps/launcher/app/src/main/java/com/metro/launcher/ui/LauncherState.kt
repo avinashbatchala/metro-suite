@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.database.ContentObserver
+import android.os.SystemClock
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -188,6 +189,9 @@ class LauncherState(context: Context) {
     var appOpenSplash by mutableStateOf<AppOpenSplashRequest?>(null)
         private set
 
+    /** Coalesces resume/Home refresh storms so a rapid Home press does not re-run everything. */
+    private var lastRefreshElapsed = 0L
+
     private var pinnedEntries by mutableStateOf(repository.loadPinnedTiles(gridColumns))
     /**
      * Bumped on every pin/unpin/reorder mutation. [refreshAllAsync] discards results started
@@ -315,7 +319,7 @@ class LauncherState(context: Context) {
         // Keep API sync-looking for callers, but never resolve live providers on the calling
         // thread (permission callbacks / tests may be on main).
         persistScope.launch {
-            withContext(Dispatchers.Main) { refreshAllAsync() }
+            withContext(Dispatchers.Main) { refreshAllAsync(force = true) }
         }
     }
 
@@ -323,7 +327,13 @@ class LauncherState(context: Context) {
      * Loads pinned layout on the caller thread, then resolves live tile ContentProviders on
      * [Dispatchers.IO] so Start can paint before SMS/contacts/media queries finish.
      */
-    suspend fun refreshAllAsync() {
+    suspend fun refreshAllAsync(force: Boolean = false) {
+        // Home/onNewIntent/ON_RESUME can all fire within a few frames (and unlock fires a
+        // Settings ContentObserver storm). Re-running the full discover + live-provider pass
+        // that often just churns allocations and GC; debounce the burst.
+        val nowElapsed = SystemClock.elapsedRealtime()
+        if (!force && nowElapsed - lastRefreshElapsed < 350L) return
+        lastRefreshElapsed = nowElapsed
         isRefreshingContent = true
         try {
             // Flush in-flight pin/unpin writes so a resume reload cannot clobber them.

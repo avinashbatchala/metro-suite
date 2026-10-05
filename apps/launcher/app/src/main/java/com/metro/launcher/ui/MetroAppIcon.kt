@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -21,6 +22,16 @@ import com.metro.system.MetroIconPacks
 import com.metro.ui.MetroColors
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
+
+/** Bounded cache so remounting Start tiles / pickers does not re-decode glyphs. */
+private val metroAppIconCache = object : android.util.LruCache<String, ImageBitmap>(96) {}
+
+private inline fun cachedGlyph(key: String, decode: () -> ImageBitmap?): ImageBitmap? {
+    metroAppIconCache.get(key)?.let { return it }
+    val decoded = decode() ?: return null
+    metroAppIconCache.put(key, decoded)
+    return decoded
+}
 
 /**
  * Renders a Start / list glyph for [packageName].
@@ -45,9 +56,11 @@ fun MetroAppIcon(
         if (iconPackPackage.isNullOrBlank()) {
             null
         } else {
-            MetroIconPacks.loadIconForPackage(context, iconPackPackage, packageName)
-                ?.toBitmap(pixelSize, pixelSize)
-                ?.asImageBitmap()
+            cachedGlyph("pack|$packageName|$pixelSize|$iconPackPackage") {
+                MetroIconPacks.loadIconForPackage(context, iconPackPackage, packageName)
+                    ?.toBitmap(pixelSize, pixelSize)
+                    ?.asImageBitmap()
+            }
         }
     }
     if (packIcon != null) {
@@ -76,7 +89,9 @@ fun MetroAppIcon(
     }
 
     val installedIcon = remember(packageName, pixelSize, iconPackPackage) {
-        MetroAppBranding.loadAppIcon(context, packageName)?.toBitmap(pixelSize, pixelSize)?.asImageBitmap()
+        cachedGlyph("app|$packageName|$pixelSize") {
+            MetroAppBranding.loadAppIcon(context, packageName)?.toBitmap(pixelSize, pixelSize)?.asImageBitmap()
+        }
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {

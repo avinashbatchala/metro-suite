@@ -302,14 +302,35 @@ private fun ScrimOverlay(alpha: Float) {
     )
 }
 
+/** Album art is drawn at most tile-sized; never decode a full-resolution cover. */
+private const val ALBUM_ART_MAX_EDGE_PX = 1024
+
+private val albumArtCache = object : android.util.LruCache<String, ImageBitmap>(8 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+}
+
 private fun decodeAlbumArt(context: android.content.Context, uriString: String): ImageBitmap? {
-    return runCatching {
+    albumArtCache.get(uriString)?.let { return it }
+    val decoded = runCatching {
         val uri = Uri.parse(uriString)
-        val stream = when (uri.scheme?.lowercase()) {
-            "http", "https" -> URL(uriString).openStream()
-            "file" -> uri.path?.let { File(it).inputStream() }
-            else -> context.contentResolver.openInputStream(uri)
-        } ?: return null
-        stream.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+        val bytes: ByteArray = when (uri.scheme?.lowercase()) {
+            "http", "https" -> URL(uriString).openStream().use { it.readBytes() }
+            "file" -> File(uri.path!!).readBytes()
+            else -> context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        val longest = maxOf(bounds.outWidth, bounds.outHeight)
+        while (longest / sample > ALBUM_ART_MAX_EDGE_PX) sample *= 2
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+            inScaled = false
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
     }.getOrNull()
+    if (decoded != null) albumArtCache.put(uriString, decoded)
+    return decoded
 }
