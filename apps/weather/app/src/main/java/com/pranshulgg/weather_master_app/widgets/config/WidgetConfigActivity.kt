@@ -1,0 +1,181 @@
+package com.pranshulgg.weather_master_app.widgets.config
+
+import android.appwidget.AppWidgetManager
+import android.content.Intent
+import android.graphics.Color
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.lifecycle.lifecycleScope
+import com.pranshulgg.weather_master_app.core.prefs.AppPrefs
+import com.pranshulgg.weather_master_app.core.prefs.AppPrefs.initPrefs
+import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
+import com.pranshulgg.weather_master_app.core.prefs.helper.PreferencesHelper
+import com.pranshulgg.weather_master_app.core.ui.theme.ThemeVariantType
+import com.pranshulgg.weather_master_app.core.ui.theme.WeatherMasterTheme
+import com.pranshulgg.weather_master_app.core.ui.theme.isThemeDark
+import com.pranshulgg.weather_master_app.data.worker.widgets.WeatherWidgetUpdater
+import com.pranshulgg.weather_master_app.widgets.froggy.FroggyWidget
+import com.pranshulgg.weather_master_app.widgets.froggy.FroggyWidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.froggy.ui.FroggyWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.glance.GlanceWidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.glance.ui.GlanceWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.hourly.WidgetHourlyReceiver
+import com.pranshulgg.weather_master_app.widgets.hourly.ui.HourlyWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.pill.WidgetPillReceiver
+import com.pranshulgg.weather_master_app.widgets.pill.ui.WeatherPillWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.uvindex.UvIndexWidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.uvindex.ui.UvIndexWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.weather.WeatherWidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.weather.ui.WeatherWidgetConfig
+import com.pranshulgg.weather_master_app.widgets.weather4.Weather4WidgerReceiver
+import com.pranshulgg.weather_master_app.widgets.weather4.ui.Weather4Config
+import com.pranshulgg.weather_master_app.widgets.weather3.Weather3WidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.weather3.ui.Weather3WidgetConfig
+import com.pranshulgg.weather_master_app.widgets.weather5.Weather5Widget
+import com.pranshulgg.weather_master_app.widgets.weather5.Weather5WidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.weather5.ui.Weather5WidgetConfig
+import com.pranshulgg.weather_master_app.widgets.weatherhorizontal.WeatherHorizontalWidgetReceiver
+import com.pranshulgg.weather_master_app.widgets.weatherhorizontal.ui.WeatherHorizontalConfig
+import kotlinx.coroutines.launch
+
+class WidgetConfigActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        initPrefs(this)
+        enableEdgeToEdge()
+
+        val widgetId =
+            intent.getIntExtra(
+                AppWidgetManager.EXTRA_APPWIDGET_ID,
+                AppWidgetManager.INVALID_APPWIDGET_ID
+            )
+
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            finish()
+            return
+        }
+        val provider =
+            AppWidgetManager
+                .getInstance(this)
+                .getAppWidgetInfo(widgetId)
+                ?.provider
+        setResult(RESULT_CANCELED)
+
+        val updater = WeatherWidgetUpdater(this)
+
+        val onDone: (WidgetConfig) -> Unit = {
+            lifecycleScope.launch {
+
+                updater.saveWidgetConfig(
+                    context = this@WidgetConfigActivity,
+                    widgetId,
+                    it
+                )
+
+                setResult(
+                    RESULT_OK,
+                    Intent().apply {
+                        putExtra(
+                            AppWidgetManager.EXTRA_APPWIDGET_ID,
+                            widgetId
+                        )
+                    }
+                )
+
+                finish()
+            }
+        }
+        val theme = PreferencesHelper.getString("app_theme") ?: "Dark"
+
+        val isDark = resolveThemeDark(
+            theme,
+            resources.configuration.uiMode and
+                    android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES
+        )
+
+        enableEdgeToEdge(
+            navigationBarStyle = if (isDark) {
+                SystemBarStyle.dark(Color.TRANSPARENT)
+            } else {
+                SystemBarStyle.light(
+                    Color.TRANSPARENT, Color.TRANSPARENT
+                )
+            }
+        )
+        setContent {
+            CompositionLocalProvider(
+                LocalAppPrefs provides AppPrefs.state()
+            ) {
+
+                WeatherMasterTheme(
+                    isThemeDark(),
+                    dynamicTheme = true,
+                    themeVariantType = ThemeVariantType.EXPRESSIVE,
+                ) {
+                    when (provider?.className) {
+                        GlanceWidgetReceiver::class.java.name -> {
+                            GlanceWidgetConfig(onDone = { onDone(it) })
+                        }
+
+                        Weather3WidgetReceiver::class.java.name -> {
+                            Weather3WidgetConfig(onDone = { onDone(it) })
+                        }
+
+                        WeatherWidgetReceiver::class.java.name -> {
+                            WeatherWidgetConfig(onDone = { onDone(it) })
+                        }
+
+                        WeatherHorizontalWidgetReceiver::class.java.name -> {
+                            WeatherHorizontalConfig(onDone = { onDone(it) })
+                        }
+
+                        Weather4WidgerReceiver::class.java.name -> {
+                            Weather4Config { onDone(it) }
+                        }
+
+                        WidgetHourlyReceiver::class.java.name -> {
+                            HourlyWidgetConfig { onDone(it) }
+                        }
+
+                        UvIndexWidgetReceiver::class.java.name -> {
+                            UvIndexWidgetConfig { onDone(it) }
+                        }
+
+                        Weather5WidgetReceiver::class.java.name -> {
+                            Weather5WidgetConfig { onDone(it) }
+                        }
+
+                        WidgetPillReceiver::class.java.name -> {
+                            WeatherPillWidgetConfig { onDone(it) }
+                        }
+
+                        FroggyWidgetReceiver::class.java.name -> {
+                            FroggyWidgetConfig { onDone(it) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    private fun resolveThemeDark(
+        appTheme: String,
+        systemDark: Boolean
+    ): Boolean {
+        return when (appTheme) {
+            "Dark" -> true
+            "Light" -> false
+            "System" -> systemDark
+            else -> systemDark
+        }
+    }
+
+}
+

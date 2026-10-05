@@ -1,0 +1,103 @@
+package com.pranshulgg.weather_master_app.data.local.dao.weather
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherCurrent
+import com.pranshulgg.weather_master_app.core.model.sources.Source
+import com.pranshulgg.weather_master_app.core.model.weather.openmeteo.OpenMeteoModel
+import com.pranshulgg.weather_master_app.data.local.entity.location.WeatherLocationEntity
+import com.pranshulgg.weather_master_app.data.local.entity.weather.WeatherWithRelations
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface WeatherContextDao {
+
+    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    suspend fun insertWeatherLocation(
+        weatherLocation: WeatherLocationEntity
+    )
+
+    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    suspend fun insertAllLocations(locations: List<WeatherLocationEntity>)
+
+    @Query("DELETE FROM weather_locations")
+    suspend fun deleteAllLocations()
+
+    @Query("SELECT * FROM weather_locations ORDER BY isDefault DESC")
+    fun getLocations(): Flow<List<WeatherLocationEntity>>
+
+    @Query("DELETE FROM weather_locations WHERE id = :id")
+    suspend fun deleteLocation(id: String)
+
+    @Query("UPDATE weather_locations SET isDefault = 0")
+    suspend fun clearDefaultLocations()
+
+    @Query("UPDATE weather_locations SET isDefault = 1 WHERE id = :id")
+    suspend fun updateDefaultLocation(id: String)
+
+    @Query("SELECT COUNT(*) FROM weather_locations")
+    suspend fun getLocationsCount(): Int
+
+    @Query("SELECT * FROM weather_locations WHERE isDefault = 1 LIMIT 1")
+    fun getDefaultLocation(): Flow<WeatherLocationEntity?>
+
+    @Query("UPDATE weather_locations SET lat = :lat, lon = :lon, name = :name, country = :country, countryCode = :countryCode, timezone = :timezone WHERE isDeviceLocation = 1")
+    suspend fun updateDeviceLocation(
+        lat: Double,
+        lon: Double,
+        name: String,
+        country: String,
+        countryCode: String,
+        timezone: String
+    )
+
+    @Transaction
+    @Query("SELECT * FROM weather_locations WHERE id = :locationId LIMIT 1")
+    suspend fun getWeatherForLocation(locationId: String): WeatherWithRelations
+
+    @Transaction
+    @Query("SELECT * FROM weather_locations WHERE id = :locationId")
+    suspend fun getWeatherDataForLocation(locationId: String): WeatherWithRelations?
+
+    @Transaction
+    @Query("SELECT * FROM weather_locations")
+    fun getWeatherForTotalLocations(): Flow<List<WeatherWithRelations>>
+
+
+    @Query("UPDATE weather_locations SET source = :source WHERE id = :id")
+    suspend fun updateSourceForLocation(id: String, source: Source)
+
+    @Query("DELETE FROM weather_daily WHERE locationId = :id")
+    suspend fun deleteDailyDataForLocation(id: String)
+
+    @Query("DELETE FROM weather_hourly WHERE locationId = :id")
+    suspend fun deleteHourlyDataForLocation(id: String)
+
+    @Query("SELECT * FROM weather_locations ORDER BY isDefault DESC")
+    suspend fun getLocationsOnce(): List<WeatherLocationEntity>
+
+    @Query("SELECT * FROM weather_locations WHERE isDeviceLocation = 1 LIMIT 1")
+    suspend fun getDeviceLocation(): WeatherLocationEntity
+
+    @Query("SELECT * FROM weather_locations WHERE id = :id LIMIT 1")
+    suspend fun getLocationForId(id: String): WeatherLocationEntity
+
+    @Query("UPDATE weather_locations SET airQualitySource = :source WHERE id = :id")
+    suspend fun updateAirQualitySourceForLocation(id: String, source: Source)
+
+    @Query("UPDATE weather_locations SET alertSource = :source WHERE id = :id")
+    suspend fun updateAlertSourceForLocation(id: String, source: Source)
+
+
+    @Query("UPDATE weather_locations SET customName = :name WHERE id = :id")
+    suspend fun updateLocationCustomName(id: String, name: String?)
+
+    @Query("UPDATE weather_locations SET openMeteoModel = :model WHERE id = :id")
+    suspend fun updateOpenMeteoModelForLocation(id: String, model: OpenMeteoModel)
+
+    @Query("UPDATE weather_locations SET alertsLastFetchedAt = :time WHERE id = :id")
+    suspend fun updateAlertsLastFetchedAt(id: String, time: Long)
+}

@@ -1,0 +1,202 @@
+import java.util.Properties
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp") version "2.3.6"
+    id("com.google.dagger.hilt.android")
+    id("androidx.room")
+    kotlin("plugin.serialization") version "2.3.21"
+}
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+
+val geoNamesUserNameKey =
+    providers.gradleProperty("GEO_NAMES_USERNAME").orNull
+        ?: System.getenv("GEO_NAMES_USERNAME")
+        ?: ""
+
+val mfKey = providers.gradleProperty("MF_KEY").orNull ?: System.getenv("MF_KEY")
+?: ""
+val accuKey = providers.gradleProperty("ACCU_KEY").orNull ?: System.getenv("ACCU_KEY")
+?: ""
+val weatherapiKey =
+    providers.gradleProperty("WEATHERAPI_KEY").orNull ?: System.getenv("WEATHERAPI_KEY")
+    ?: ""
+val keystoreFile = file("../keystore/release.jks")
+val hasKeystore = keystoreFile.exists()
+
+val versionNameString = "3.10.6"
+
+val playStore = false
+
+android {
+    namespace = "com.pranshulgg.weather_master_app"
+    compileSdk {
+        version = release(37)
+    }
+    android.buildFeatures.buildConfig = true
+
+    defaultConfig {
+        applicationId = "com.metroweather.app"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 67
+        versionName = versionNameString
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "GEO_NAMES_USERNAME",
+            "\"$geoNamesUserNameKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "MF_KEY",
+            "\"$mfKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "ACCU_KEY",
+            "\"$accuKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "WEATHERAPI_KEY",
+            "\"$weatherapiKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "APP_VERSION",
+            "\"v${versionNameString}\""
+        )
+
+        buildConfigField(
+            "boolean",
+            "IS_PLAYSTORE_BUILD",
+            playStore.toString()
+        )
+    }
+
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+//        isCoreLibraryDesugaringEnabled = true
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+}
+
+
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+dependencies {
+    // MetroSuite shared Windows design system (metro-os/toolkits/metro-ui-android).
+    implementation("com.metro.ui:metro-ui-android:1.0.0")
+    // MetroSuite system contract (live-tile provider, pin requests, theme broadcasts).
+    implementation("com.metro.system:metro-system-sdk:1.0.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.materialKolor)
+    implementation(libs.androidx.foundation.layout)
+    implementation(libs.coil.compose)
+    implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.okhttp.logging)
+    implementation(libs.common.suncalc)
+    implementation(libs.androidx.appcompat)
+
+    implementation(libs.jts.core)
+    implementation(libs.jts.io.common)
+
+    implementation(libs.jackson.module.kotlin)
+
+//    coreLibraryDesugaring(libs.desugar.jdk.libs) // Not sure but it causes timezone crashes on some devices
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.converter.jaxb)
+    ksp(libs.room.compiler)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler)
+    ksp(libs.hilt.compiler)
+    implementation(libs.reorderable)
+    implementation(libs.androidx.foundation.layout)
+    implementation(libs.androidx.animation.core)
+    implementation(libs.core.splashscreen)
+
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.metadata.jvm)
+
+    implementation(libs.androidx.glance)
+
+    implementation(libs.androidx.glance.appwidget)
+
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}

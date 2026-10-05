@@ -1,0 +1,97 @@
+package com.pranshulgg.weather_master_app.data.worker.widgets
+
+import android.content.Context
+import androidx.glance.GlanceId
+import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.state.updateAppWidgetState
+import androidx.glance.appwidget.updateAll
+import com.pranshulgg.weather_master_app.widgets.WeatherWidgetStateDefinition
+import com.pranshulgg.weather_master_app.widgets.config.WidgetConfig
+import com.pranshulgg.weather_master_app.widgets.froggy.FroggyWidget
+import com.pranshulgg.weather_master_app.widgets.glance.GlanceWidget
+import com.pranshulgg.weather_master_app.widgets.hourly.WidgetHourly
+import com.pranshulgg.weather_master_app.widgets.pill.WidgetPill
+import com.pranshulgg.weather_master_app.widgets.summary.SummaryWidget
+import com.pranshulgg.weather_master_app.widgets.uvindex.UvIndexWidget
+import com.pranshulgg.weather_master_app.widgets.weather.WeatherWidget
+import com.pranshulgg.weather_master_app.widgets.weather3.Weather3Widget
+import com.pranshulgg.weather_master_app.widgets.weather4.Weather4Widget
+import com.pranshulgg.weather_master_app.widgets.weather5.Weather5Widget
+import com.pranshulgg.weather_master_app.widgets.weatherhorizontal.WeatherHorizontalWidget
+
+class WeatherWidgetUpdater(
+    private val context: Context
+) {
+
+    private val widget = WeatherWidget()
+    private val pill = WidgetPill()
+    private val summary = SummaryWidget()
+    private val widgetHorizontal = WeatherHorizontalWidget()
+    private val widgetGlance = GlanceWidget()
+
+    private val widgetWeather3 = Weather3Widget()
+
+    private val widgetWeather4 = Weather4Widget()
+
+    private val widgetHourly = WidgetHourly()
+
+    private val widgetUvIndex = UvIndexWidget()
+
+    private val widgetWeather5 = Weather5Widget()
+
+    private val widgetFroggy = FroggyWidget()
+
+    suspend fun update(json: String) {
+        val manager = GlanceAppWidgetManager(context)
+        suspend fun <T : GlanceAppWidget> updateWidgets(
+            widget: T,
+            ids: List<GlanceId>
+        ) {
+            ids.forEach { id ->
+                updateAppWidgetState(context, WeatherWidgetStateDefinition, id) { current ->
+                    current.copy(json = json, config = current.config)
+                }
+
+            }
+
+            widget.updateAll(context)
+
+        }
+        updateWidgets(widget, manager.getGlanceIds(WeatherWidget::class.java))
+        updateWidgets(pill, manager.getGlanceIds(WidgetPill::class.java))
+        updateWidgets(summary, manager.getGlanceIds(SummaryWidget::class.java))
+        updateWidgets(widgetHorizontal, manager.getGlanceIds(WeatherHorizontalWidget::class.java))
+        updateWidgets(widgetGlance, manager.getGlanceIds(GlanceWidget::class.java))
+        updateWidgets(widgetWeather3, manager.getGlanceIds(Weather3Widget::class.java))
+        updateWidgets(widgetWeather4, manager.getGlanceIds(Weather4Widget::class.java))
+        updateWidgets(widgetHourly, manager.getGlanceIds(WidgetHourly::class.java))
+        updateWidgets(widgetUvIndex, manager.getGlanceIds(UvIndexWidget::class.java))
+        updateWidgets(widgetWeather5, manager.getGlanceIds(Weather5Widget::class.java))
+        updateWidgets(widgetFroggy, manager.getGlanceIds(FroggyWidget::class.java))
+
+    }
+
+    suspend fun saveWidgetConfig(
+        context: Context,
+        widgetId: Int,
+        config: WidgetConfig
+    ) {
+
+        val manager =
+            GlanceAppWidgetManager(context)
+
+        val glanceId =
+            manager.getGlanceIdBy(widgetId)
+
+        updateAppWidgetState(
+            context,
+            WeatherWidgetStateDefinition,
+            glanceId
+        ) {
+            it.copy(
+                config = config
+            )
+        }
+    }
+}

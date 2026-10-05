@@ -1,0 +1,208 @@
+package com.pranshulgg.weather_master_app.feature.main.ui
+
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.metro.ui.MetroDimens
+import com.metro.ui.MetroText
+import com.metro.ui.MetroTextStyle
+import com.metro.ui.MetroTheme
+import com.pranshulgg.weather_master_app.R
+import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
+import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
+import com.pranshulgg.weather_master_app.core.model.weather.TemperatureUnit
+import com.pranshulgg.weather_master_app.core.model.weather.toIcon
+import com.pranshulgg.weather_master_app.core.model.weather.toLabel
+import com.pranshulgg.weather_master_app.core.ui.components.Gap
+import com.pranshulgg.weather_master_app.core.ui.components.Symbol
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherIconBox
+import com.pranshulgg.weather_master_app.core.utils.formatters.getCurrentTimeFor
+import com.pranshulgg.weather_master_app.core.utils.formatters.getLastUpdatedTimeString
+import kotlin.math.roundToInt
+
+@Composable
+fun CurrentWeatherCard(
+    weather: Weather,
+    units: WeatherUnits,
+    context: Context,
+    isFroggyLayout: Boolean = true
+) {
+
+    if (isFroggyLayout) {
+        Column(
+            modifier = Modifier
+                .padding(start = MetroDimens.ScreenHorizontalMargin, end = MetroDimens.ScreenHorizontalMargin, top = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                CardRowContent(weather, units, context)
+            }
+            MinMaxTempRow(weather, units, context)
+        }
+    } else {
+        PixelStyleCurrentWeatherCard(weather, units, context)
+    }
+
+}
+
+@Composable
+private fun CardRowContent(weather: Weather, units: WeatherUnits, context: Context) {
+
+    val current = weather.current
+
+    val currentTemp = TemperatureUnit.CELSIUS.convert(current.temperature, units.tempUnit)
+
+    val feelsLike = TemperatureUnit.CELSIUS.convert(current.feelsLike, units.tempUnit)
+
+    Column {
+        MetroText(
+            text = stringResource(R.string.time_now),
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MetroText(
+                text = "${currentTemp?.roundToInt() ?: "-"}°",
+                style = MetroTextStyle.PageTitle,
+                color = MetroTheme.colors.primaryText
+            )
+            WeatherIconBox(
+                current.weatherCondition.toIcon(
+                    targetTimeMilli = getCurrentTimeFor(weather.location.timezone),
+                    daily = weather.daily.firstOrNull()
+                ),
+                size = 42.dp
+            )
+        }
+    }
+    Column(horizontalAlignment = Alignment.End) {
+        MetroText(
+            text = current.weatherCondition.toLabel(context),
+            style = MetroTextStyle.ListItemTitle,
+            color = MetroTheme.colors.primaryText
+        )
+        MetroText(
+            text = stringResource(R.string.temp_feels_like, "${feelsLike?.roundToInt() ?: "-"}°"),
+            style = MetroTextStyle.Body,
+            color = MetroTheme.colors.secondaryText
+        )
+    }
+}
+
+
+@Composable
+private fun MinMaxTempRow(
+    weather: Weather,
+    units: WeatherUnits,
+    context: Context,
+    isFroggyLayout: Boolean = true
+) {
+
+    val daily = weather.daily.getOrNull(0)
+
+    val maxTemp = TemperatureUnit.CELSIUS.convert(daily?.temperatureMax, units.tempUnit)
+    val minTemp = TemperatureUnit.CELSIUS.convert(daily?.temperatureMin, units.tempUnit)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isFroggyLayout) Arrangement.SpaceBetween else Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+
+        ) {
+        MetroText(
+            text = "${
+                stringResource(
+                    R.string.temp_max,
+                    "${maxTemp?.roundToInt() ?: "-"}°"
+                )
+            } ${
+                stringResource(
+                    R.string.temp_min,
+                    "${minTemp?.roundToInt() ?: "-"}°"
+                )
+            }",
+            style = if (isFroggyLayout) MetroTextStyle.ListItemSubtitle else MetroTextStyle.ListItemTitle,
+            color = MetroTheme.colors.secondaryText
+        )
+        if (isFroggyLayout)
+            LastUpdatedTextRow(weather.current.lastUpdatedInMilli, context)
+    }
+}
+
+
+@Composable
+private fun LastUpdatedTextRow(timeMilli: Long, context: Context) {
+    val lastUpdated = getLastUpdatedTimeString(context, timeMilli)
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Symbol(
+            R.drawable.schedule_48px,
+            color = MetroTheme.colors.secondaryText,
+            size = 14.dp
+        )
+        Gap(horizontal = 4.dp)
+        MetroText(
+            text = lastUpdated,
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText
+        )
+    }
+}
+
+@Composable
+fun PixelStyleCurrentWeatherCard(weather: Weather, units: WeatherUnits, context: Context) {
+    val current = weather.current
+
+    val currentTemp = TemperatureUnit.CELSIUS.convert(current.temperature, units.tempUnit)
+
+    val feelsLike = TemperatureUnit.CELSIUS.convert(current.feelsLike, units.tempUnit)
+
+    Column(
+        modifier = Modifier
+            .padding(start = MetroDimens.ScreenHorizontalMargin, end = MetroDimens.ScreenHorizontalMargin, top = 24.dp)
+            .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            WeatherIconBox(
+                current.weatherCondition.toIcon(
+                    targetTimeMilli = getCurrentTimeFor(weather.location.timezone),
+                    daily = weather.daily.firstOrNull()
+                ),
+                size = 32.dp
+            )
+            Gap(horizontal = 6.dp)
+            MetroText(
+                text = current.weatherCondition.toLabel(context),
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.primaryText
+            )
+        }
+        MetroText(
+            text = "${currentTemp?.roundToInt() ?: "-"}°",
+            style = MetroTextStyle.PageTitle,
+            color = MetroTheme.colors.primaryText
+        )
+        MetroText(
+            text = stringResource(R.string.temp_feels_like, "${feelsLike?.roundToInt() ?: "-"}°"),
+            style = MetroTextStyle.Body,
+            color = MetroTheme.colors.secondaryText
+        )
+        Gap(vertical = 6.dp)
+        MinMaxTempRow(weather, units, context, false)
+    }
+}

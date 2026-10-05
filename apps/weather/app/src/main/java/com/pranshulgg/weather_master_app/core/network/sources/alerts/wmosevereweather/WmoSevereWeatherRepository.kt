@@ -1,0 +1,145 @@
+package com.pranshulgg.weather_master_app.core.network.sources.alerts.wmosevereweather
+
+import android.util.Xml
+import com.pranshulgg.weather_master_app.core.model.domain.AppException
+import com.pranshulgg.weather_master_app.core.model.domain.alerts.Alert
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
+import com.pranshulgg.weather_master_app.core.model.sources.Source
+import com.pranshulgg.weather_master_app.core.model.weather.alerts.AlertResult
+import com.pranshulgg.weather_master_app.core.model.weather.alerts.AlertResultType
+import com.pranshulgg.weather_master_app.core.model.weather.alerts.AlertsDataPack
+import com.pranshulgg.weather_master_app.core.model.weather.alerts.FinishedAlertsResult
+import com.pranshulgg.weather_master_app.core.network.calls.safeApiCall
+import com.pranshulgg.weather_master_app.core.network.sources.alerts.wmosevereweather.model.WmoCapAlert
+import com.pranshulgg.weather_master_app.core.utils.weather.cache.shouldReturnAlertsCache
+import com.pranshulgg.weather_master_app.data.local.dao.alerts.AlertsDao
+import com.pranshulgg.weather_master_app.data.local.dao.weather.WeatherContextDao
+import com.pranshulgg.weather_master_app.data.local.mapper.alerts.sources.wmosevereweather.wmoSevereWeatherAlertsMapper
+import com.pranshulgg.weather_master_app.data.local.mapper.alerts.toDomain
+import com.pranshulgg.weather_master_app.data.local.mapper.alerts.toEntity
+import com.pranshulgg.weather_master_app.data.repository.alerts.AlertCacheModel
+import com.pranshulgg.weather_master_app.data.repository.alerts.AlertRepository
+import com.pranshulgg.weather_master_app.data.repository.capability.AirQualityCapability
+import com.pranshulgg.weather_master_app.data.repository.capability.AlertCapability
+import com.pranshulgg.weather_master_app.data.repository.capability.WeatherCapability
+import com.pranshulgg.weather_master_app.data.repository.data.BaseRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.xmlpull.v1.XmlPullParser
+import java.io.InputStream
+import javax.inject.Inject
+
+class WmoSevereWeatherRepository @Inject constructor(
+    private val api: WmoSevereWeatherApi,
+    private val dao: AlertsDao,
+    private val weatherContextDao: WeatherContextDao
+) : BaseRepository() {
+
+    override val alertSource = Source.WMO_SEVERE_WEATHER
+    override val weatherSource = Source.NONE
+    override val airQualitySource = Source.NONE
+
+    override fun alertCapability(): AlertCapability? {
+        return object : AlertCapability {
+            override suspend fun fetchAndProcess(
+                location: Location,
+                isManualRefresh: Boolean,
+                isForceRefresh: Boolean,
+                alertCacheModel: AlertCacheModel
+            ): AlertsDataPack {
+
+                val cqlFilter =
+                    "INTERSECTS(wkb_geometry, POINT (${location.latitude} ${location.longitude})) AND row_type NEQ 'BOUNDARY'"
+
+                val response = safeApiCall { api.fetchAlerts(cqlFilter = cqlFilter) }.getOrThrow()
+
+
+                val alertsWithCap = response.features.filter {
+                    it.properties != null
+                }.map { feature ->
+                    val url = feature.properties?.capUrl ?: feature.properties?.rLink
+
+                    val capAlert = if (!url.isNullOrBlank()) {
+                        val responseAlert = api.fetchAlertsXml(url)
+
+                        if (responseAlert.isSuccessful) {
+                            responseAlert.body()?.byteStream()?.use { stream ->
+                                parseAlertXmlBody(stream)
+                            }
+                        } else {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+
+                    feature to capAlert
+                }
+
+
+                val domain = wmoSevereWeatherAlertsMapper(alertsWithCap, location.id)
+
+                return AlertsDataPack(domain, location)
+            }
+
+            override suspend fun saveToDb(data: AlertsDataPack, alertCacheModel: AlertCacheModel) {
+                useGenericSaveImplementationForAlerts(data, dao, weatherContextDao)
+            }
+
+            override fun finishedResult(data: List<Alert>): FinishedAlertsResult {
+                return FinishedAlertsResult(alerts = data)
+            }
+        }
+    }
+
+    override fun weatherCapability(): WeatherCapability? = null
+    override fun airQualityCapability(): AirQualityCapability? = null
+}
+
+private fun parseAlertXmlBody(stream: InputStream): WmoCapAlert {
+    val parser = Xml.newPullParser()
+    parser.setInput(stream, null)
+
+
+    var type = parser.eventType
+
+    var language: String? = null
+    var event: String? = null
+    var severity: String? = null
+    var effective: String? = null
+    var expires: String? = null
+    var senderName: String? = null
+    var description: String? = null
+    var headline: String? = null
+
+    while (type != XmlPullParser.END_DOCUMENT) {
+
+        when (type) {
+            XmlPullParser.START_TAG -> {
+                when (parser.name) {
+                    "language" -> language = parser.nextText()
+                    "event" -> event = parser.nextText()
+                    "severity" -> severity = parser.nextText()
+                    "effective" -> effective = parser.nextText()
+                    "expires" -> expires = parser.nextText()
+                    "senderName" -> senderName = parser.nextText()
+                    "description" -> description = parser.nextText()
+                    "headline" -> headline = parser.nextText()
+                }
+            }
+        }
+        type = parser.next()
+    }
+    return WmoCapAlert(
+        language = language,
+        event = event,
+        severity = severity,
+        effective = effective,
+        expires = expires,
+        senderName = senderName,
+        headline = headline,
+        description = description
+    )
+
+
+}

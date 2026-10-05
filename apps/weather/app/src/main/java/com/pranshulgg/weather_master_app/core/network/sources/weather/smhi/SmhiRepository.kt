@@ -1,0 +1,71 @@
+package com.pranshulgg.weather_master_app.core.network.sources.weather.smhi
+
+import com.pranshulgg.weather_master_app.core.model.domain.location.Location
+import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
+import com.pranshulgg.weather_master_app.core.model.sources.Source
+import com.pranshulgg.weather_master_app.core.model.weather.FinishedWeatherResult
+import com.pranshulgg.weather_master_app.core.model.weather.WeatherDataPack
+import com.pranshulgg.weather_master_app.core.network.calls.safeApiCall
+import com.pranshulgg.weather_master_app.data.local.dao.weather.WeatherContextDao
+import com.pranshulgg.weather_master_app.data.local.dao.weather.WeatherDao
+import com.pranshulgg.weather_master_app.data.local.mapper.weather.sources.smhi.toDomain
+import com.pranshulgg.weather_master_app.data.repository.capability.AirQualityCapability
+import com.pranshulgg.weather_master_app.data.repository.capability.AlertCapability
+import com.pranshulgg.weather_master_app.data.repository.capability.WeatherCapability
+import com.pranshulgg.weather_master_app.data.repository.data.BaseRepository
+import com.pranshulgg.weather_master_app.data.repository.weather.CacheModel
+import java.util.Locale
+import javax.inject.Inject
+
+
+class SmhiRepository @Inject constructor(
+    val dao: WeatherContextDao,
+    val weatherDao: WeatherDao,
+    val api: SmhiApi
+) : BaseRepository() {
+
+    override val weatherSource = Source.SMHI
+    override val airQualitySource = Source.NONE
+    override val alertSource = Source.NONE
+
+    override fun weatherCapability(): WeatherCapability? {
+        return object : WeatherCapability {
+            override suspend fun fetchAndProcess(
+                location: Location,
+                isManualRefresh: Boolean,
+                isForceRefresh: Boolean,
+                cacheModel: CacheModel
+            ): WeatherDataPack {
+                val response = safeApiCall {
+                    // SMHI returns 404 for coordinates with more than 6 decimal places
+                    api.fetchWeather(
+                        location.latitude.toCoordinateString(),
+                        location.longitude.toCoordinateString()
+                    )
+                }.getOrThrow()
+
+                val domain = response.toDomain(location)
+
+                return WeatherDataPack(domain)
+            }
+
+            override suspend fun saveToDb(data: WeatherDataPack, cacheModel: CacheModel) {
+                useGenericSaveImplementationForWeather(
+                    existingHourly = cacheModel.cachedHourly,
+                    data.weather,
+                    weatherDao
+                )
+            }
+
+            override fun finishedResult(data: Weather): FinishedWeatherResult {
+                return FinishedWeatherResult(weather = data)
+            }
+        }
+    }
+
+    override fun airQualityCapability(): AirQualityCapability? = null
+    override fun alertCapability(): AlertCapability? = null
+
+}
+
+private fun Double.toCoordinateString(): String = String.format(Locale.ROOT, "%.4f", this)

@@ -1,0 +1,152 @@
+package com.pranshulgg.weather_master_app.feature.blocks.screens.uvindex
+
+import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavController
+import com.metro.ui.MetroText
+import com.metro.ui.MetroTextStyle
+import com.metro.ui.MetroTheme
+import com.pranshulgg.weather_master_app.R
+import com.pranshulgg.weather_master_app.core.model.weather.uv.UvIndex
+import com.pranshulgg.weather_master_app.core.model.weather.uv.getUvIndex
+import com.pranshulgg.weather_master_app.core.model.weather.uv.toColor
+import com.pranshulgg.weather_master_app.core.model.weather.uv.toLabel
+import com.pranshulgg.weather_master_app.core.ui.components.AvatarIcon
+import com.pranshulgg.weather_master_app.core.ui.components.Gap
+import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
+import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
+import com.pranshulgg.weather_master_app.core.utils.formatters.getCurrentTimeFor
+import com.pranshulgg.weather_master_app.core.utils.formatters.to12HourTimeString
+import com.pranshulgg.weather_master_app.core.utils.formatters.to24HourTimeString
+import com.pranshulgg.weather_master_app.core.utils.formatters.toDateString
+import com.pranshulgg.weather_master_app.core.utils.weather.forecast.findMatchingHourly
+import com.pranshulgg.weather_master_app.feature.blocks.BlocksScreenViewModel
+import com.pranshulgg.weather_master_app.feature.blocks.components.AboutCard
+import com.pranshulgg.weather_master_app.feature.blocks.components.AboutCardText
+import com.pranshulgg.weather_master_app.feature.blocks.components.NoHourlyDataAvailable
+import com.pranshulgg.weather_master_app.feature.blocks.components.ScaleCard
+import com.pranshulgg.weather_master_app.feature.blocks.screens.uvindex.components.UvIndexHourlyCard
+import kotlin.math.max
+import kotlin.math.roundToInt
+
+@Composable
+fun UvIndexScreen(navController: NavController, index: Int = 0, locationId: String) {
+
+    val viewModel: BlocksScreenViewModel = hiltViewModel()
+
+    val weather = viewModel.weather.collectAsState().value.weather
+    val hourly = weather?.hourly ?: return
+    val context = LocalContext.current
+
+    val time =
+        if (index != 0) weather.daily[index].time else getCurrentTimeFor(weather.location.timezone)
+
+    val data =
+        findMatchingHourly(
+            hourly,
+            time,
+            weather.location.source,
+            weather.location.timezone,
+            keepPastHour = index == 0
+
+
+        )
+
+    val uvIndexes = UvIndex.entries
+    val date = toDateString(weather.daily[index].time, weather.location.timezone)
+    val uvIndexData = data.map { it.uvIndex }
+    val zoneId = weather.location.timezone
+
+
+    LargeTopBarScaffold(
+        title = stringResource(R.string.weather_uv_index),
+        navigationIcon = { NavigateUpBtn(navController) },
+        actions = {
+            MetroText(
+                text = date,
+                style = MetroTextStyle.ListItemSubtitle,
+                color = MetroTheme.colors.secondaryText,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MetroTheme.colors.background)
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+        ) {
+            if (uvIndexData.isNotEmpty() && !uvIndexData.contains(null)) {
+                UvIndexHourlyCard(data, zoneId)
+            } else {
+                NoHourlyDataAvailable()
+            }
+            Gap(14.dp)
+            AboutCard {
+                AboutCardText(stringResource(R.string.weather_about_uv_index))
+            }
+            Gap(14.dp)
+            ScaleCard {
+                uvIndexes.forEach {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AvatarIcon(
+                            R.drawable.wb_sunny_24px,
+                            containerColor = it.toColor(),
+                            contentColor = Color.White
+                        )
+                        androidx.compose.foundation.layout.Spacer(Modifier.width(14.dp))
+                        MetroText(
+                            text = it.toLabel(context),
+                            color = MetroTheme.colors.primaryText,
+                            style = MetroTextStyle.ListItemTitle,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetroText(
+                            text = getUvIndexScaleFor(it),
+                            color = MetroTheme.colors.secondaryText,
+                            style = MetroTextStyle.Body
+                        )
+                    }
+                }
+            }
+            Gap(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding() + 30.dp)
+
+        }
+    }
+}
+
+private fun getUvIndexScaleFor(index: UvIndex): String {
+    return when (index) {
+        UvIndex.LOW -> "1 - 2"
+        UvIndex.MODERATE -> "3 - 5"
+        UvIndex.HIGH -> "6 - 7"
+        UvIndex.VERY_HIGH -> "8 - 10"
+        UvIndex.EXTREME -> "11+"
+    }
+}

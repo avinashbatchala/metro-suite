@@ -1,0 +1,39 @@
+package com.pranshulgg.weather_master_app.data.local.mapper.airquality
+
+import com.pranshulgg.weather_master_app.core.model.domain.airquality.AirQuality
+import com.pranshulgg.weather_master_app.core.model.domain.airquality.AirQualityCurrent
+import com.pranshulgg.weather_master_app.core.model.domain.airquality.AirQualityHourly
+import com.pranshulgg.weather_master_app.core.utils.weather.cache.isCurrentAirQualitySafe
+import com.pranshulgg.weather_master_app.data.local.entity.airquality.AirQualityWithRelations
+
+
+fun AirQualityWithRelations?.toDomain(): AirQuality? {
+
+    if (this == null) return null
+
+    val airQuality = AirQuality(
+        current = AirQualityCurrent(
+            usAqi = this.current?.usAqi,
+            pm10 = this.current?.pm10,
+            pm25 = this.current?.pm25,
+            carbonMonoxide = this.current?.carbonMonoxide,
+            nitrogenDioxide = this.current?.nitrogenDioxide,
+            sulphurDioxide = this.current?.sulphurDioxide,
+            ozone = this.current?.ozone,
+            lastUpdatedInMilli = this.current?.lastUpdatedInMilli ?: System.currentTimeMillis()
+        ),
+        hourly = List(hourly.size) {
+            AirQualityHourly(
+                time = hourly[it].time,
+                pm10 = hourly[it].pm10,
+                pm25 = hourly[it].pm25,
+                carbonMonoxide = hourly[it].carbonMonoxide,
+                nitrogenDioxide = hourly[it].carbonMonoxide,
+                sulphurDioxide = hourly[it].sulphurDioxide,
+                ozone = hourly[it].ozone
+            )
+        }
+    )
+
+    return if (isCurrentAirQualitySafe(airQuality)) airQuality else null
+}

@@ -24,7 +24,7 @@ source "$ROOT/scripts/lib/metro-common.sh"
 # Same tier order as verify-all.sh
 APP_ORDER=(
   launcher statusbar notifications navbar volume lockscreen
-  browser notes music
+  browser notes music weather
   photos calendar mail messaging people dialer store settings calculator clock files hub widgets conversations
 )
 
@@ -159,18 +159,18 @@ if [[ "$LIST_ONLY" -eq 1 ]]; then
   exit 0
 fi
 
-# Keyboard (AGP 9) cannot includeBuild AGP 8 toolkits — it reads mavenLocal.
-# Publish toolkits first whenever keyboard is in the build set.
+# Keyboard and weather use AGP 9, which cannot includeBuild the AGP 8 toolkits — they read
+# mavenLocal. Publish the toolkits first whenever one of them is in the build set.
 needs_maven_local=0
 for app in "${APPS[@]}"; do
-  if [[ "$app" == "keyboard" ]]; then
+  if [[ "$app" == "keyboard" || "$app" == "weather" ]]; then
     needs_maven_local=1
     break
   fi
 done
 if [[ "$needs_maven_local" -eq 1 ]]; then
   echo ""
-  echo "==> publish toolkits → mavenLocal (required by keyboard)"
+  echo "==> publish toolkits → mavenLocal (required by AGP 9 apps: keyboard, weather)"
   (cd "$ROOT/toolkits/metro-system-sdk" && ./gradlew publishToMavenLocal --quiet)
   (cd "$ROOT/toolkits/metro-ui-android" && ./gradlew publishToMavenLocal --quiet)
 fi
