@@ -33,6 +33,22 @@ data class HourSlot(
     val events: List<CalendarEvent>,
 )
 
+/** WP8.1 Calendar top-level pivots (blueprint): agenda → day → month. */
+enum class CalendarPivot(val title: String) {
+    Agenda("agenda"),
+    Day("day"),
+    Month("month"),
+    ;
+
+    companion object {
+        fun fromIndex(index: Int): CalendarPivot = entries.getOrElse(index) { Agenda }
+    }
+}
+
+/**
+ * Period granularity used by the (out-of-v1-scope) week/year surfaces and the demo view
+ * picker. The blueprint's v1 navigation is [CalendarPivot] only.
+ */
 enum class CalendarViewType {
     Day,
     Week,

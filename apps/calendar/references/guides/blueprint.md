@@ -46,20 +46,23 @@ Max 4 icons. No FAB.
 - **All-day / holiday row:** Below header, all-day events listed with accent-colored title.
 - **Hourly grid:** Time labels on left (8 AM – 8 PM default window, scrollable). Thin horizontal divider lines. Events shown as accent-colored blocks or inline title + time within their hour slot.
 - **Weather:** Out of scope v1 (platform stub acceptable).
-- **Navigation:** Swipe left/right on day content changes selected date by ±1 day.
-- **Interactions:** Tap empty hour slot → stub toast. Tap event → detail stub.
+- **Navigation:** The header carries ‹ / › buttons that change the selected date by ±1 day.
+  (Horizontal flick is reserved for the top-level agenda/day/month pivot, so day paging uses
+  the header chevrons rather than a competing swipe.)
+- **Interactions:** Tap empty hour slot → stub toast. Tap event → event detail overlay.
 
 ### Page 3 — Month pivot
 
 - **Layout:** Black background. Year label small at top-left. Current month name large (`HubTitle`), adjacent months peek in secondary text.
 - **Weekday header row:** Mon–Sun abbreviated, 7 equal columns, thin vertical dividers.
 - **Grid:** 6 rows × 7 columns. Thin white grid lines. Date number top-left of cell. Small colored horizontal bars (2–3 max) in top-right for days with events. Selected day: accent triangle marker top-right. Today: accent underline on date number.
-- **Navigation:** Tap a day → switch to **day** view for that date. Swipe left/right changes month.
+- **Navigation:** Tap a day → switch to **day** view for that date. The header ‹ / › buttons
+  change the month by ±1 (horizontal flick stays with the top-level pivot).
 - **Interactions:** Today action returns to current month and selects today.
 
-## Event detail (v1 stub)
+## Event detail
 
-Overlay page with back affordance. Shows title, date/time, location, calendar name. Out of full create/edit scope in v1 — read-only stub acceptable.
+Overlay page with back affordance. Shows title, date/time, location, calendar name. Create/edit stays out of scope in v1; the overlay is read-only.
 
 ## Live tile
 

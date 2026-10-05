@@ -6,11 +6,12 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.metro.calendar.data.CalendarEvent
 import com.metro.calendar.data.CalendarLogic
-import com.metro.calendar.data.CalendarViewType
+import com.metro.calendar.data.CalendarPivot
 import com.metro.calendar.data.CalendarRepository
 import com.metro.calendar.data.DayBucket
 import com.metro.calendar.data.HourSlot
@@ -39,6 +40,10 @@ class CalendarState(context: Context) {
     var skippedPermissions: Boolean = false
         private set
 
+    /** True when the calendar provider query itself failed (distinct from no permission). */
+    var loadFailed: Boolean = false
+        private set
+
     /** False until the first [refreshPermission] completes — avoids flashing the permission gate. */
     var permissionsChecked: Boolean = false
         private set
@@ -49,50 +54,41 @@ class CalendarState(context: Context) {
     var selectedEpochDay: Long = CalendarLogic.todayEpochDay(zoneId)
         private set
 
-    var viewType: CalendarViewType = CalendarViewType.Day
+    /** Top-level pivot (blueprint): agenda → day → month. */
+    var pivot: CalendarPivot = CalendarPivot.Agenda
         private set
 
-    var tabIndex: Int = 0
+    /** Bumped by the Today action so the agenda list scrolls back to the selected day. */
+    var agendaScrollRequestId: Int = 0
         private set
 
-    var showTypePicker: Boolean = false
+    /** Non-null while the read-only event detail overlay is open. */
+    var eventDetail: CalendarEvent? = null
+        private set
+    var eventDetailExiting: Boolean = false
+        private set
+    var eventDetailEpoch: Int = 0
         private set
 
     var events: List<CalendarEvent> = emptyList()
         private set
 
-    /** First day-tab date; re-anchored when drilling into a day from month view. */
-    private var dayPivotStartEpochDay: Long = CalendarLogic.todayEpochDay(zoneId)
-
     private var loadedStartEpochDay: Long = 0L
     private var loadedEndEpochDay: Long = 0L
     private var rangeLoaded: Boolean = false
 
-    val tabTitles: List<String>
-        get() = CalendarLogic.buildTabTitles(
-            viewType = viewType,
+    val agendaBuckets: List<DayBucket>
+        get() = CalendarLogic.groupIntoAgendaBuckets(
+            events = events,
+            startEpochDay = selectedEpochDay,
+            dayCount = AGENDA_DAY_COUNT,
             zoneId = zoneId,
-            dayPivotStartEpochDay = dayPivotStartEpochDay,
         )
 
-    fun epochDayForPage(page: Int): Long =
-        CalendarLogic.epochDayForTab(
-            viewType = viewType,
-            tabIndex = page,
-            zoneId = zoneId,
-            dayPivotStartEpochDay = dayPivotStartEpochDay,
-        )
-
-    val tabCount: Int
-        get() = CalendarLogic.tabCountForViewType(viewType)
-
-    val selectedDayEvents: List<CalendarEvent>
-        get() = CalendarLogic.eventsForDay(events, selectedEpochDay, zoneId)
-
-    val selectedAllDayEvents: List<CalendarEvent>
+    val dayAllDayEvents: List<CalendarEvent>
         get() = CalendarLogic.allDayEventsForDay(events, selectedEpochDay, zoneId)
 
-    val selectedHourSlots: List<HourSlot>
+    val dayHourSlots: List<HourSlot>
         get() = CalendarLogic.buildHourSlots(events, selectedEpochDay, zoneId = zoneId)
 
     val monthGrid: List<MonthGridCell>
@@ -106,21 +102,6 @@ class CalendarState(context: Context) {
                 zoneId = zoneId,
             )
         }
-
-    val weekDayBuckets: List<DayBucket>
-        get() {
-            val weekStart = CalendarLogic.weekStartEpochDay(selectedEpochDay, zoneId)
-            return CalendarLogic.weekDayEpochDays(weekStart).map { day ->
-                DayBucket(
-                    epochDay = day,
-                    headerLabel = CalendarLogic.dateHeaderLabel(day, zoneId),
-                    events = CalendarLogic.eventsForDay(events, day, zoneId),
-                )
-            }
-        }
-
-    val monthYearLabel: String
-        get() = CalendarLogic.monthYearLabel(selectedEpochDay, zoneId)
 
     fun refreshPermission(context: Context) {
         hasCalendarPermission = ContextCompat.checkSelfPermission(
@@ -138,6 +119,7 @@ class CalendarState(context: Context) {
             reloadEvents()
         } else {
             usingDemoData = true
+            loadFailed = false
             events = repository.loadDemoEvents()
         }
         notifyChanged()
@@ -146,39 +128,48 @@ class CalendarState(context: Context) {
     fun continueWithDemo() {
         skippedPermissions = true
         usingDemoData = true
+        loadFailed = false
         events = repository.loadDemoEvents()
         notifyChanged()
     }
 
+    /**
+     * Loads real provider events. Demo data is only used when the user skipped the permission
+     * gate — a provider query failure shows the empty/error state instead of fake events.
+     */
     fun reloadEvents() {
-        events = if (hasCalendarPermission) {
+        if (hasCalendarPermission) {
             usingDemoData = false
-            runCatching {
+            val loaded = runCatching {
                 repository.loadEventsAround(selectedEpochDay, LOAD_RADIUS_DAYS)
-            }.getOrElse {
-                usingDemoData = true
-                repository.loadDemoEvents()
+            }
+            if (loaded.isSuccess) {
+                events = loaded.getOrDefault(emptyList())
+                loadFailed = false
+                loadedStartEpochDay = selectedEpochDay - LOAD_RADIUS_DAYS
+                loadedEndEpochDay = selectedEpochDay + LOAD_RADIUS_DAYS
+                rangeLoaded = true
+            } else {
+                events = emptyList()
+                loadFailed = true
+                rangeLoaded = false
             }
         } else if (skippedPermissions) {
             usingDemoData = true
-            repository.loadDemoEvents()
+            loadFailed = false
+            events = repository.loadDemoEvents()
+            rangeLoaded = false
         } else {
-            emptyList()
-        }
-        if (!usingDemoData && hasCalendarPermission) {
-            loadedStartEpochDay = selectedEpochDay - LOAD_RADIUS_DAYS
-            loadedEndEpochDay = selectedEpochDay + LOAD_RADIUS_DAYS
-            rangeLoaded = true
-        } else {
+            events = emptyList()
+            loadFailed = false
             rangeLoaded = false
         }
         notifyChanged()
     }
 
     /**
-     * Pulls fresh device-calendar events whenever the selected date drifts near the edge of the
-     * window we last loaded, so swiping months/years ahead always reflects the real Google/device
-     * calendar rather than a stale snapshot.
+     * Pulls fresh provider events whenever the selected date drifts near the edge of the loaded
+     * window, so paging days/months always reflects the real calendar.
      */
     private fun ensureRangeLoaded(epochDay: Long) {
         if (!hasCalendarPermission || usingDemoData) return
@@ -187,71 +178,74 @@ class CalendarState(context: Context) {
         ) {
             return
         }
-        events = runCatching {
-            repository.loadEventsAround(epochDay, LOAD_RADIUS_DAYS)
-        }.getOrElse { return }
+        val loaded = runCatching { repository.loadEventsAround(epochDay, LOAD_RADIUS_DAYS) }
+        if (loaded.isFailure) {
+            loadFailed = true
+            notifyChanged()
+            return
+        }
+        events = loaded.getOrDefault(emptyList())
+        loadFailed = false
         loadedStartEpochDay = epochDay - LOAD_RADIUS_DAYS
         loadedEndEpochDay = epochDay + LOAD_RADIUS_DAYS
         rangeLoaded = true
     }
 
-    fun selectViewType(type: CalendarViewType) {
-        viewType = type
-        if (type == CalendarViewType.Day) {
-            dayPivotStartEpochDay = CalendarLogic.todayEpochDay(zoneId)
-        }
-        tabIndex = 0
-        selectedEpochDay = epochDayForPage(0)
-        showTypePicker = false
-        ensureRangeLoaded(selectedEpochDay)
+    fun selectPivot(value: CalendarPivot) {
+        if (pivot == value) return
+        pivot = value
         notifyChanged()
     }
 
-    fun selectTab(index: Int) {
-        tabIndex = index.coerceIn(0, tabCount - 1)
-        selectedEpochDay = epochDayForPage(tabIndex)
-        ensureRangeLoaded(selectedEpochDay)
-        notifyChanged()
-    }
-
-    fun toggleTypePicker() {
-        showTypePicker = !showTypePicker
-        notifyChanged()
-    }
-
-    fun dismissTypePicker() {
-        if (showTypePicker) {
-            showTypePicker = false
-            notifyChanged()
-        }
-    }
-
-    /** Opens day view for [epochDay] (month-grid drill-down, same pattern as [selectMonth]). */
+    /** Shared selected date: month-grid drill-down and day navigation both move it. */
     fun selectDay(epochDay: Long) {
-        viewType = CalendarViewType.Day
-        dayPivotStartEpochDay = epochDay
         selectedEpochDay = epochDay
-        tabIndex = 0
+        pivot = CalendarPivot.Day
+        ensureRangeLoaded(selectedEpochDay)
+        notifyChanged()
+    }
+
+    fun shiftDay(deltaDays: Long) {
+        selectedEpochDay = LocalDate.ofEpochDay(selectedEpochDay)
+            .plusDays(deltaDays)
+            .toEpochDay()
+        ensureRangeLoaded(selectedEpochDay)
+        notifyChanged()
+    }
+
+    fun shiftMonth(deltaMonths: Long) {
+        selectedEpochDay = LocalDate.ofEpochDay(selectedEpochDay)
+            .plusMonths(deltaMonths)
+            .toEpochDay()
         ensureRangeLoaded(selectedEpochDay)
         notifyChanged()
     }
 
     fun goToToday() {
         selectedEpochDay = CalendarLogic.todayEpochDay(zoneId)
-        if (viewType == CalendarViewType.Day) {
-            dayPivotStartEpochDay = selectedEpochDay
-        }
-        tabIndex = 0
         ensureRangeLoaded(selectedEpochDay)
+        if (pivot == CalendarPivot.Agenda) {
+            agendaScrollRequestId++
+        }
         notifyChanged()
     }
 
-    fun selectMonth(year: Int, month: Int) {
-        viewType = CalendarViewType.Month
-        selectedEpochDay = LocalDate.of(year, month, 1).toEpochDay()
-        tabIndex = CalendarLogic.tabIndexForEpochDay(viewType, selectedEpochDay, zoneId)
-            .coerceIn(0, tabCount - 1)
-        ensureRangeLoaded(selectedEpochDay)
+    fun openEventDetail(event: CalendarEvent) {
+        eventDetail = event
+        eventDetailExiting = false
+        eventDetailEpoch++
+        notifyChanged()
+    }
+
+    fun beginCloseEventDetail() {
+        if (eventDetail == null || eventDetailExiting) return
+        eventDetailExiting = true
+        notifyChanged()
+    }
+
+    fun finishCloseEventDetail() {
+        eventDetail = null
+        eventDetailExiting = false
         notifyChanged()
     }
 
@@ -269,12 +263,9 @@ class CalendarState(context: Context) {
         Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun onEventClick(event: CalendarEvent) {
-        showStub(event.title)
-    }
-
     private companion object {
-        const val LOAD_RADIUS_DAYS = 90
-        const val RELOAD_MARGIN_DAYS = 14
+        const val LOAD_RADIUS_DAYS = 120
+        const val RELOAD_MARGIN_DAYS = 21
+        const val AGENDA_DAY_COUNT = 90
     }
 }

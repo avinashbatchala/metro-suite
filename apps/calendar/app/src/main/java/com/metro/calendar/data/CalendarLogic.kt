@@ -15,7 +15,8 @@ object CalendarLogic {
     private val locale: Locale = Locale.US
 
     fun epochDayFromMillis(millis: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long =
-        LocalDate.ofInstant(Instant.ofEpochMilli(millis), zoneId).toEpochDay()
+        // LocalDate.ofInstant is API 34+; atZone/toLocalDate is available back to API 26.
+        Instant.ofEpochMilli(millis).atZone(zoneId).toLocalDate().toEpochDay()
 
     fun millisFromEpochDay(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long =
         LocalDate.ofEpochDay(epochDay).atStartOfDay(zoneId).toInstant().toEpochMilli()

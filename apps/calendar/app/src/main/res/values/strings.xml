@@ -21,4 +21,13 @@
     <string name="sync_calendars">sync calendars</string>
     <string name="sync_done">Syncing your calendars…</string>
     <string name="tile_footer">Calendar</string>
+    <string name="event_detail_title">event</string>
+    <string name="event_when_label">when</string>
+    <string name="event_location_label">where</string>
+    <string name="event_calendar_label">calendar</string>
+    <string name="load_error">Couldn\'t load your calendar. Tap sync calendars to retry.</string>
+    <string name="previous_day">previous day</string>
+    <string name="next_day">next day</string>
+    <string name="previous_month">previous month</string>
+    <string name="next_month">next month</string>
 </resources>
