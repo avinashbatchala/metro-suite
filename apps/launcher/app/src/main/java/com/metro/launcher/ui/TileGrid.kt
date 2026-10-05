@@ -2096,7 +2096,9 @@ private fun AgendaTileContent(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
         ) {
-            if (footer != null) {
+            // WP8.1 calendar medium (2×2) shows only the date badge; the app-name footer is
+            // wide-only (blueprint §Live tile, live_tile_medium/wide references).
+            if (wide && footer != null) {
                 TileText(
                     text = footer,
                     style = chrome.titleStyle,
