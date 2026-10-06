@@ -179,6 +179,45 @@ grant com.metro.lockscreen android.permission.READ_PHONE_STATE
 grant com.metro.volume android.permission.MODIFY_AUDIO_SETTINGS
 grant com.metro.launcher android.permission.POST_NOTIFICATIONS
 
+# --- content apps -----------------------------------------------------------
+echo "==> content app permissions"
+CONTENT_PERMS=(
+  "com.metro.photos android.permission.READ_MEDIA_IMAGES"
+  "com.metro.photos android.permission.READ_MEDIA_VIDEO"
+  "com.metro.photos android.permission.POST_NOTIFICATIONS"
+  "com.metro.music android.permission.READ_MEDIA_AUDIO"
+  "com.metro.music android.permission.POST_NOTIFICATIONS"
+  "com.metro.people android.permission.READ_CONTACTS"
+  "com.metro.people android.permission.POST_NOTIFICATIONS"
+  "com.metro.dialer android.permission.READ_CONTACTS"
+  "com.metro.dialer android.permission.READ_PHONE_STATE"
+  "com.metro.dialer android.permission.CALL_PHONE"
+  "com.metro.dialer android.permission.READ_CALL_LOG"
+  "com.metro.dialer android.permission.POST_NOTIFICATIONS"
+  "com.metro.calendar android.permission.READ_CALENDAR"
+  "com.metro.calendar android.permission.WRITE_CALENDAR"
+  "com.metro.calendar android.permission.POST_NOTIFICATIONS"
+  "com.metro.messaging android.permission.READ_SMS"
+  "com.metro.messaging android.permission.SEND_SMS"
+  "com.metro.messaging android.permission.RECEIVE_SMS"
+  "com.metro.messaging android.permission.READ_CONTACTS"
+  "com.metro.messaging android.permission.POST_NOTIFICATIONS"
+  "com.metro.weather android.permission.ACCESS_COARSE_LOCATION"
+  "com.metro.weather android.permission.ACCESS_FINE_LOCATION"
+  "com.metro.weather android.permission.POST_NOTIFICATIONS"
+  "com.metro.widgets android.permission.POST_NOTIFICATIONS"
+  "com.metro.widgets android.permission.CAMERA"
+  "com.metro.conversations android.permission.POST_NOTIFICATIONS"
+)
+for spec in "${CONTENT_PERMS[@]}"; do
+  set -- $spec
+  grant "$1" "$2"
+done
+if is_installed com.metro.conversations; then
+  sh cmd notification allow_listener "com.metro.conversations/com.metro.conversations.ConversationsListenerService" >/dev/null 2>&1 \
+    && ok "listener: conversations" || true
+fi
+
 # --- battery exemption ------------------------------------------------------
 echo "==> battery exemption (Doze whitelist)"
 for pkg in "${SHELL_APPS[@]}"; do
