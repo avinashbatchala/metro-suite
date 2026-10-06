@@ -104,6 +104,26 @@ Phase 3: browser, notes, music (parallel OK)
 Phase 4: Tier 2 apps (parallel OK)
 ```
 
+## Keyboard native toolchain (`apps/keyboard`)
+
+`apps/keyboard` vendors FlorisBoard and its `:lib:native` module builds a small Rust static lib via
+CMake (`lib/native/src/main/rust/CMakeLists.txt`, target `fl_native`). It is **only** a dummy shim
+(`dummyAdd`, used once for a debug log), but the CMake configure step hard-fails without a Rust
+toolchain. To build it:
+
+```bash
+# one-time (network): install a minimal Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable
+
+# build/verify with cargo on PATH (CMake adds the android target itself)
+PATH="$HOME/.cargo/bin:$PATH" ./scripts/verify-app.sh keyboard
+PATH="$HOME/.cargo/bin:$PATH" ./scripts/build-apks.sh --release keyboard
+```
+
+Requires NDK `27.1.12297006` + CMake `3.22.1` (both in `apps/keyboard/gradle/tools.versions.toml`).
+For a fast local build, restrict the ABI (`-Pandroid.injected.build.abi=arm64-v8a`); the default
+build compiles all ABIs.
+
 ## Scaffolding a new app
 
 Only when `scope.md` already lists the app:

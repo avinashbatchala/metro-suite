@@ -14,6 +14,17 @@ WP8.1 SIP / Word Flow–style touch keyboard and keyboard settings. Engine is Fl
 | `metro-system-sdk` verified | Yes |
 | Tier 0 shell (launcher/statusbar/navbar) | Recommended before ship |
 | Tier 1 apps | No |
+| Rust toolchain (`rustup` + `cargo`) | Yes — `:lib:native` CMake fails without it |
+| NDK `27.1.12297006` + CMake `3.22.1` | Yes (in `gradle/tools.versions.toml`) |
+
+Build with cargo on PATH:
+
+```bash
+PATH="$HOME/.cargo/bin:$PATH" ./gradlew :app:assembleDebug
+```
+
+The native lib is a dummy shim (`dummyAdd`) only; the keyboard engine is Kotlin/JVM. See root
+`AGENTS.md` § Keyboard native toolchain for the one-time `rustup` install.
 
 ## Screens to implement
 
