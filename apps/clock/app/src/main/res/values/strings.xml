@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">clock</string>
+
+    <!-- Pivots -->
+    <string name="pivot_alarms">alarms</string>
+    <string name="pivot_world_clock">world clock</string>
+    <string name="pivot_timer">timer</string>
+    <string name="pivot_stopwatch">stopwatch</string>
+
+    <!-- Alarms -->
+    <string name="new_alarm">new</string>
+    <string name="alarm">alarm</string>
+    <string name="alarm_label_placeholder">label</string>
+    <string name="alarm_repeat">repeat</string>
+    <string name="alarm_repeat_once">once</string>
+    <string name="alarm_repeat_daily">every day</string>
+    <string name="alarm_repeat_weekdays">weekdays</string>
+    <string name="alarm_repeat_weekends">weekends</string>
+    <string name="alarm_vibrate">vibrate</string>
+    <string name="alarm_snooze">snooze</string>
+    <string name="alarm_snooze_minutes">%1$d minutes</string>
+    <string name="alarm_delete">delete</string>
+    <string name="alarm_save">save</string>
+    <string name="alarm_cancel">cancel</string>
+    <string name="alarm_time">time</string>
+    <string name="alarm_sound_default">default</string>
+    <string name="alarm_sound">sound</string>
+    <string name="alarms_empty">no alarms</string>
+    <string name="alarm_ringing">alarm</string>
+    <string name="alarm_dismiss">dismiss</string>
+    <string name="alarm_snooze_action">snooze</string>
+    <string name="alarm_notification_channel">alarms</string>
+    <string name="alarm_notification_channel_description">Alarm clock notifications</string>
+
+    <!-- Timer -->
+    <string name="timer">timer</string>
+    <string name="new_timer">new</string>
+    <string name="timer_hours">hours</string>
+    <string name="timer_minutes">minutes</string>
+    <string name="timer_seconds">seconds</string>
+    <string name="timer_start">start</string>
+    <string name="timer_pause">pause</string>
+    <string name="timer_resume">resume</string>
+    <string name="timer_reset">reset</string>
+    <string name="timer_delete">delete</string>
+    <string name="timer_running">running</string>
+    <string name="timer_paused">paused</string>
+    <string name="timer_finished">finished</string>
+    <string name="timer_remaining">remaining</string>
+    <string name="timer_empty">no timers</string>
+    <string name="timer_default_label">timer</string>
+    <string name="timer_finished_title">timer finished</string>
+    <string name="timer_notification_channel">timers</string>
+    <string name="timer_notification_channel_description">Timer completion alerts</string>
+    <string name="timer_add">add</string>
+    <string name="timer_error_zero">enter a duration greater than zero</string>
+
+    <!-- Stopwatch -->
+    <string name="stopwatch">stopwatch</string>
+    <string name="new_stopwatch">new</string>
+    <string name="stopwatch_name_placeholder">name</string>
+    <string name="stopwatch_lap">lap</string>
+    <string name="stopwatch_reset">reset</string>
+    <string name="stopwatch_delete">delete</string>
+    <string name="stopwatch_rename">rename</string>
+    <string name="stopwatch_pause">pause</string>
+    <string name="stopwatch_start">start</string>
+    <string name="stopwatch_running">running</string>
+    <string name="stopwatch_paused">paused</string>
+    <string name="stopwatch_empty">no stopwatches</string>
+    <string name="stopwatch_default_name">stopwatch</string>
+    <string name="stopwatch_laps">laps</string>
+    <string name="stopwatch_lap_number">lap %1$d</string>
+    <string name="stopwatch_no_laps">no laps</string>
+
+    <!-- World clock -->
+    <string name="world_clock">world clock</string>
+    <string name="add_city">add</string>
+    <string name="city_picker_title">choose a city</string>
+    <string name="city_search_placeholder">search cities</string>
+    <string name="world_clock_empty">add a city</string>
+    <string name="world_clock_remove">remove</string>
+    <string name="select_cities">choose cities</string>
+
+    <!-- Pin -->
+    <string name="pin_to_start">pin to start</string>
+    <string name="pinned_to_start">pinned to start</string>
+
+    <!-- Common -->
+    <string name="done">done</string>
+    <string name="back">back</string>
+    <string name="more">more</string>
+    <string name="cancel">cancel</string>
+    <string name="delete">delete</string>
+    <string name="am">AM</string>
+    <string name="pm">PM</string>
+
+    <!-- Tile -->
+    <string name="tile_next_alarm">next alarm</string>
+    <string name="tile_no_alarm">clock</string>
+    <string name="tile_more">+%1$d more</string>
+    <string name="tile_label_alarms">alarms</string>
+</resources>

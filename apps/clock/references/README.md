@@ -19,7 +19,16 @@ references/
 
 | Screen | Image | Notes |
 |--------|-------|-------|
-| _(add rows — match AGENTS.md screen table)_ | `images/` | |
+| Alarms pivot | `images/alarms_dark_blue.png` _(pending)_ | list of alarms + toggle |
+| Alarm edit | `images/alarm_edit_dark_blue.png` _(pending)_ | wheel time picker + repeat |
+| Alarm ringing | `images/alarm_ringing_dark_blue.png` _(pending)_ | dismiss / snooze |
+| World clock | `images/worldclock_dark_blue.png` _(pending)_ | city list with local times |
+| Timer | `images/timer_dark_blue.png` _(pending)_ | multiple timers |
+| Stopwatch | `images/stopwatch_dark_blue.png` _(pending)_ | elapsed + laps |
+| Start tiles | `images/tiles_dark_blue.png` _(pending)_ | primary peek cycle + secondary |
+
+See [`known-gaps.md`](known-gaps.md) — WP8.1 first-party captures for world clock / timer /
+stopwatch do not exist; those pivots follow the repo Metro conventions.
 
 ## Image naming
 
