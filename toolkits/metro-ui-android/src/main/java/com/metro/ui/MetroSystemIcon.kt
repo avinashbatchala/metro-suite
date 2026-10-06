@@ -802,13 +802,16 @@ private fun DrawScope.drawSaveGlyph(color: Color) {
 }
 
 private fun DrawScope.drawDialPadGlyph(color: Color, stroke: Stroke) {
-    val gap = size.width * 0.28f
-    val tile = size.width * 0.22f
+    val gap = size.minDimension * 0.20f
+    val tile = size.minDimension * 0.11f
+    val span = gap * 2f + tile
+    val originX = (size.width - span) / 2f
+    val originY = (size.height - span) / 2f
     for (row in 0..2) {
         for (col in 0..2) {
             drawRect(
                 color = color,
-                topLeft = Offset(col * gap, row * gap),
+                topLeft = Offset(originX + col * gap, originY + row * gap),
                 size = Size(tile, tile),
                 style = stroke,
             )
