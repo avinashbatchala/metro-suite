@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 1280" width="768" height="1280" role="img" aria-labelledby="title desc">
+  <title id="title">Bing Weather (WP8/8.1) daily pane — self-authored schematic</title>
+  <desc id="desc">Flat deep-blue daily pane mockup in the same language as hourly: day column, cloud glyph, high/low temperature and precipitation, thin separators. Not an original screenshot.</desc>
+
+  <defs>
+    <g id="cloud" fill="#E8F4FF">
+      <circle cx="-22" cy="6" r="18"/>
+      <circle cx="2" cy="-6" r="24"/>
+      <circle cx="26" cy="6" r="16"/>
+      <rect x="-28" y="4" width="56" height="16"/>
+    </g>
+    <g id="drop" fill="#7FB2D9">
+      <path d="M0,-15 C7,-5 11,3 0,12 C-11,3 -7,-5 0,-15 Z"/>
+    </g>
+  </defs>
+
+  <rect x="0" y="0" width="768" height="1280" fill="#0A2E4E"/>
+
+  <text x="48" y="96" font-family="Segoe UI, Arial, sans-serif" font-size="26" letter-spacing="3" fill="#9CC0DC">SEATTLE, WA</text>
+
+  <text x="48" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#FFFFFF">daily</text>
+  <text x="246" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">hourly</text>
+  <text x="486" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">maps</text>
+  <text x="666" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">today</text>
+
+  <g stroke="#1B4A70" stroke-width="1">
+    <line x1="0" y1="250" x2="768" y2="250"/>
+    <line x1="0" y1="410" x2="768" y2="410"/>
+    <line x1="0" y1="570" x2="768" y2="570"/>
+    <line x1="0" y1="730" x2="768" y2="730"/>
+    <line x1="0" y1="890" x2="768" y2="890"/>
+    <line x1="0" y1="1050" x2="768" y2="1050"/>
+  </g>
+
+  <!-- row 1 -->
+  <text x="48" y="344" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Mon</text>
+  <use href="#cloud" transform="translate(360,330)"/>
+  <text x="512" y="346" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">24&#176; / 15&#176;</text>
+  <use href="#drop" transform="translate(662,326)"/>
+  <text x="730" y="342" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">20%</text>
+
+  <!-- row 2 -->
+  <text x="48" y="504" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Tue</text>
+  <use href="#cloud" transform="translate(360,490)"/>
+  <text x="512" y="506" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">22&#176; / 14&#176;</text>
+  <use href="#drop" transform="translate(662,486)"/>
+  <text x="730" y="502" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">40%</text>
+
+  <!-- row 3 -->
+  <text x="48" y="664" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Wed</text>
+  <use href="#cloud" transform="translate(360,650)"/>
+  <text x="512" y="666" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">19&#176; / 13&#176;</text>
+  <use href="#drop" transform="translate(662,646)"/>
+  <text x="730" y="662" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">70%</text>
+
+  <!-- row 4 -->
+  <text x="48" y="824" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Thu</text>
+  <use href="#cloud" transform="translate(360,810)"/>
+  <text x="512" y="826" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">21&#176; / 14&#176;</text>
+  <use href="#drop" transform="translate(662,806)"/>
+  <text x="730" y="822" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">30%</text>
+
+  <!-- row 5 -->
+  <text x="48" y="984" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Fri</text>
+  <use href="#cloud" transform="translate(360,970)"/>
+  <text x="512" y="986" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">25&#176; / 16&#176;</text>
+  <use href="#drop" transform="translate(662,966)"/>
+  <text x="730" y="982" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">10%</text>
+
+  <!-- row 6 -->
+  <text x="48" y="1144" font-family="Segoe UI, Arial, sans-serif" font-size="38" fill="#FFFFFF">Sat</text>
+  <use href="#cloud" transform="translate(360,1130)"/>
+  <text x="512" y="1146" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="200" fill="#FFFFFF">23&#176; / 15&#176;</text>
+  <use href="#drop" transform="translate(662,1126)"/>
+  <text x="730" y="1142" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#B8D4EA">20%</text>
+</svg>

@@ -52,6 +52,7 @@ apps/<name>/references/
 | [settings](settings/) | `com.metro.settings` | [AGENTS.md](settings/AGENTS.md) |
 | [calculator](calculator/) | `com.metro.calculator` | [AGENTS.md](calculator/AGENTS.md) |
 | [clock](clock/) | `com.metro.clock` | [AGENTS.md](clock/AGENTS.md) |
+| [weather](weather/) | `com.metroweather.app` | [AGENTS.md](weather/AGENTS.md) |
 | [files](files/) | `com.metro.files` | [AGENTS.md](files/AGENTS.md) |
 
 ## Scaffold a new app

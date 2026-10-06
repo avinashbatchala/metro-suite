@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 1280" width="768" height="1280" role="img" aria-labelledby="title desc">
+  <title id="title">Bing Weather (WP8/8.1) today pane — self-authored schematic</title>
+  <desc id="desc">Flat deep-blue today pane mockup: uppercase location, heading track, large hero temperature and condition, then flat detail rows. Not an original screenshot.</desc>
+
+  <rect x="0" y="0" width="768" height="1280" fill="#0A2E4E"/>
+
+  <text x="48" y="96" font-family="Segoe UI, Arial, sans-serif" font-size="26" letter-spacing="3" fill="#9CC0DC">SEATTLE, WA</text>
+
+  <text x="48" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#FFFFFF">today</text>
+  <text x="238" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">daily</text>
+  <text x="428" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">hourly</text>
+  <text x="632" y="196" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="300" fill="#6E97B8">maps</text>
+
+  <!-- hero -->
+  <text x="44" y="480" font-family="Segoe UI, Arial, sans-serif" font-size="190" font-weight="100" fill="#FFFFFF">21&#176;</text>
+  <text x="52" y="548" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="300" fill="#D6E8F6">Partly cloudy</text>
+  <text x="52" y="600" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#9CC0DC">H 24&#176;   L 15&#176;</text>
+
+  <line x1="0" y1="650" x2="768" y2="650" stroke="#1B4A70" stroke-width="1"/>
+  <g stroke="#1B4A70" stroke-width="1">
+    <line x1="0" y1="726" x2="768" y2="726"/>
+    <line x1="0" y1="802" x2="768" y2="802"/>
+    <line x1="0" y1="878" x2="768" y2="878"/>
+    <line x1="0" y1="954" x2="768" y2="954"/>
+    <line x1="0" y1="1030" x2="768" y2="1030"/>
+    <line x1="0" y1="1106" x2="768" y2="1106"/>
+    <line x1="0" y1="1182" x2="768" y2="1182"/>
+  </g>
+
+  <!-- detail rows -->
+  <text x="48" y="700" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">FEELS LIKE</text>
+  <text x="720" y="700" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">20&#176;</text>
+
+  <text x="48" y="776" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">WIND</text>
+  <text x="720" y="776" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">12 km/h</text>
+
+  <text x="48" y="852" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">HUMIDITY</text>
+  <text x="720" y="852" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">62%</text>
+
+  <text x="48" y="928" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">PRECIPITATION</text>
+  <text x="720" y="928" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">0%</text>
+
+  <text x="48" y="1004" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">UV INDEX</text>
+  <text x="720" y="1004" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">2</text>
+
+  <text x="48" y="1080" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">VISIBILITY</text>
+  <text x="720" y="1080" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">16 km</text>
+
+  <text x="48" y="1156" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">SUNRISE</text>
+  <text x="720" y="1156" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">07:24</text>
+
+  <text x="48" y="1232" font-family="Segoe UI, Arial, sans-serif" font-size="28" letter-spacing="2" fill="#9CC0DC">SUNSET</text>
+  <text x="720" y="1232" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="32" fill="#FFFFFF">18:02</text>
+</svg>

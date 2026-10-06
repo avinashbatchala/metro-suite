@@ -57,6 +57,7 @@ These apps form the **Metro Shell** (launcher, status bar, notifications, naviga
 | **Settings** | `com.metro.settings` | System settings mirroring WP8.1 settings hierarchy |
 | **Calculator** | `com.metro.calculator` | Portrait scientific calculator |
 | **Clock** | `com.metro.clock` | Alarms, world clock, timer, stopwatch pivots |
+| **Weather** | `com.metroweather.app` | Windows Phone 8/8.1 Bing Weather–style: `today · daily · hourly · maps` panorama |
 | **Files** | `com.metro.files` | File explorer with pivot filters |
 | **Hub** | `com.metro.hub` | About / suite catalog: panorama hub, GitHub latest-release APK download & install |
 | **Widgets** | `com.metro.widgets` | Homescreen widget catalog: Start-style 4-column grid of custom live tiles (Time, Battery, Notifier, Analog clock, Torch, Lock) |

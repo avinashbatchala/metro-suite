@@ -2,8 +2,6 @@ package com.pranshulgg.weather_master_app.feature.main.ui.layouts
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,24 +10,24 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
+import com.metro.ui.MetroDimens
+import com.metro.ui.MetroEmptyState
+import com.metro.ui.MetroListItem
+import com.metro.ui.MetroPanorama
+import com.metro.ui.MetroText
+import com.metro.ui.MetroTextStyle
+import com.metro.ui.MetroTheme
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.model.domain.alerts.Alert
 import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
@@ -41,14 +39,6 @@ import com.pranshulgg.weather_master_app.core.prefs.AppPrefsState
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
 import com.pranshulgg.weather_master_app.core.ui.components.WeatherGlyph
 import com.pranshulgg.weather_master_app.core.ui.components.toGlyphKind
-import com.metro.ui.MetroAppTitle
-import com.metro.ui.MetroDimens
-import com.metro.ui.MetroEmptyState
-import com.metro.ui.MetroListItem
-import com.metro.ui.MetroPivot
-import com.metro.ui.MetroText
-import com.metro.ui.MetroTextStyle
-import com.metro.ui.MetroTheme
 import com.pranshulgg.weather_master_app.core.utils.formatters.getCurrentTimeFor
 import com.pranshulgg.weather_master_app.core.utils.formatters.getLastUpdatedTimeString
 import com.pranshulgg.weather_master_app.core.utils.formatters.to12HourTimeString
@@ -56,13 +46,15 @@ import com.pranshulgg.weather_master_app.core.utils.formatters.to24HourTimeStrin
 import com.pranshulgg.weather_master_app.core.utils.formatters.toWeekdayString
 import com.pranshulgg.weather_master_app.core.utils.weather.forecast.findMatchingHourly
 import com.pranshulgg.weather_master_app.core.utils.weather.location.getFullLocationName
+import com.pranshulgg.weather_master_app.feature.main.data.toHourlyForecasts
+import com.pranshulgg.weather_master_app.feature.main.ui.layouts.hourly.HourlyPane
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
- * Windows 10 Mobile weather home: a `now · hourly · daily · places` pivot over a flat
- * black background. Content mirrors the wphone MSN Weather app, restyled to the Metro
- * language shared with the launcher.
+ * WP8.1 Bing Weather home: a `today · daily · hourly · maps` panorama over a flat deep
+ * Bing blue surface. The active location reads as an uppercase overline above the pane
+ * headings; locations moved to the application-bar `locations` subpage.
  */
 @Composable
 fun PhoneLayout(
@@ -71,50 +63,89 @@ fun PhoneLayout(
     context: Context,
     alerts: List<Alert>,
     prefs: AppPrefsState,
-    onLocationSelect: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit = {},
-    onAddPlace: () -> Unit = {},
-    onEditLocation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var currentPage by remember { mutableIntStateOf(0) }
-    val titles = listOf("now", "hourly", "daily", "places")
+    val titles = listOf("today", "daily", "hourly", "maps")
     val pagerState = rememberPagerState(pageCount = { titles.size })
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { currentPage = it }
-    }
+    // Hoisted so vertical position survives panorama pane switches.
+    val todayScroll = rememberScrollState()
+    val hourlyScroll = rememberScrollState()
+    val dailyScroll = rememberScrollState()
 
     Column(modifier = modifier.fillMaxSize()) {
-        MetroPivot(
+        WeatherPanoramaHeader(locationName = getFullLocationName(weather.location))
+
+        MetroPanorama(
             titles = titles,
             pagerState = pagerState,
-            modifier = Modifier.weight(1f),
-            header = { MetroAppTitle(title = "weather") },
+            modifier = Modifier.fillMaxSize(),
             onTitleClick = { scope.launch { pagerState.animateScrollToPage(it) } },
             pageContent = { page ->
                 when (page) {
-                    0 -> NowPage(weather, units, context, alerts, prefs.is24HrTimeFormat)
-                    1 -> HourlyPage(weather, units, context, prefs)
-                    2 -> DailyPage(weather, units, context, prefs)
-                    else -> PlacesPage(weather, units, onAddPlace, onEditLocation, onLocationSelect)
+                    0 -> TodayPane(
+                        weather = weather,
+                        units = units,
+                        context = context,
+                        alerts = alerts,
+                        is24 = prefs.is24HrTimeFormat,
+                        scrollState = todayScroll,
+                    )
+
+                    1 -> DailyPane(
+                        weather = weather,
+                        units = units,
+                        scrollState = dailyScroll,
+                    )
+
+                    2 -> HourlyPane(
+                        forecasts = weather.toHourlyForecasts(),
+                        timezone = weather.location.timezone,
+                        is24Hour = prefs.is24HrTimeFormat,
+                        temperatureUnit = units.tempUnit,
+                        today = weather.daily.getOrNull(0),
+                        context = context,
+                        scrollState = hourlyScroll,
+                    )
+
+                    else -> MapsPane()
                 }
-            }
+            },
         )
     }
+}
+
+@Composable
+private fun MapsPane() {
+    WeatherEmptyText("maps aren't available on this device")
+}
+
+/** Text-only empty state that sits on the Bing-blue surface (no opaque panel). */
+@Composable
+private fun WeatherEmptyText(message: String) {
+    MetroText(
+        text = message,
+        style = MetroTextStyle.ListItemTitle,
+        color = MetroTheme.colors.secondaryText,
+        modifier = Modifier.padding(
+            horizontal = MetroDimens.ScreenHorizontalMargin,
+            vertical = 24.dp,
+        ),
+    )
 }
 
 private data class Fact(val icon: Int, val label: String, val value: String)
 
 @Composable
-private fun NowPage(
+private fun TodayPane(
     weather: Weather,
     units: WeatherUnits,
     context: Context,
     alerts: List<Alert>,
-    is24: Boolean
+    is24: Boolean,
+    scrollState: androidx.compose.foundation.ScrollState,
 ) {
-    val scroll = rememberScrollState()
     val current = weather.current
     val today = weather.daily.getOrNull(0)
 
@@ -138,7 +169,7 @@ private fun NowPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .verticalScroll(scrollState)
     ) {
         WeatherHero(weather, units, context, today)
 
@@ -161,12 +192,6 @@ private fun NowPage(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        MetroText(
-            text = getFullLocationName(weather.location),
-            style = MetroTextStyle.Body,
-            color = MetroTheme.colors.secondaryText,
-            modifier = Modifier.padding(start = MetroDimens.ScreenHorizontalMargin)
-        )
         MetroText(
             text = "Updated ${getLastUpdatedTimeString(context, current.lastUpdatedInMilli)} · Open-Meteo",
             style = MetroTextStyle.Body,
@@ -239,85 +264,16 @@ private fun WeatherHero(
 }
 
 @Composable
-private fun HourlyPage(weather: Weather, units: WeatherUnits, context: Context, prefs: AppPrefsState) {
-    val hours = findMatchingHourly(
-        weather.hourly,
-        System.currentTimeMillis(),
-        weather.location.source,
-        weather.location.timezone,
-        alwaysReturn24Hrs = true,
-        keepPastHour = false
-    ).take(24)
-    if (hours.isEmpty()) {
-        MetroEmptyState("no hourly data", modifier = Modifier.padding(MetroDimens.ScreenHorizontalMargin))
-        return
-    }
-
-    val today = weather.daily.getOrNull(0)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
-    ) {
-        Spacer(modifier = Modifier.height(4.dp))
-        hours.forEachIndexed { index, item ->
-            val temp = TemperatureUnit.CELSIUS.convert(item.temperature, units.tempUnit)?.roundToInt()
-            val kind = item.weatherCondition.toGlyphKind(daily = today, targetTimeMilli = item.time)
-            val timeLabel = if (index == 0) "now" else hourLabel(item.time, weather.location.timezone, prefs.is24HrTimeFormat)
-            val precip = item.precipitationProbability
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp)
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MetroText(
-                    text = timeLabel,
-                    style = MetroTextStyle.ListItemTitle,
-                    color = MetroTheme.colors.primaryText,
-                    modifier = Modifier.width(72.dp),
-                    maxLines = 1,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                if (precip != null && precip > 0) {
-                    MetroText(
-                        text = "$precip%",
-                        style = MetroTextStyle.ListItemSubtitle,
-                        color = MetroTheme.colors.secondaryText,
-                        maxLines = 1,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-                MetroText(
-                    text = "${temp ?: "-"}°",
-                    style = MetroTextStyle.ListItemTitle,
-                    color = MetroTheme.colors.primaryText,
-                    maxLines = 1,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                WeatherGlyph(kind, size = 28.dp, color = MetroTheme.colors.primaryText)
-            }
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun DailyPage(
+private fun DailyPane(
     weather: Weather,
     units: WeatherUnits,
-    context: Context,
-    prefs: AppPrefsState
+    scrollState: androidx.compose.foundation.ScrollState,
 ) {
     val daily = weather.daily
     if (daily.isEmpty()) {
-        MetroEmptyState("no daily data", modifier = Modifier.padding(MetroDimens.ScreenHorizontalMargin))
+        WeatherEmptyText("no daily data")
         return
     }
-    val scroll = rememberScrollState()
     val lo = daily.mapNotNull { it.temperatureMin }.minOrNull() ?: 0.0
     val hi = daily.mapNotNull { it.temperatureMax }.maxOrNull() ?: 1.0
     val span = (hi - lo).takeIf { it > 0.0 } ?: 1.0
@@ -325,7 +281,7 @@ private fun DailyPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .verticalScroll(scrollState)
             .padding(horizontal = MetroDimens.ScreenHorizontalMargin)
     ) {
         Spacer(modifier = Modifier.height(4.dp))
@@ -336,7 +292,7 @@ private fun DailyPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 52.dp)
+                    .height(52.dp)
                     .padding(top = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -393,33 +349,6 @@ private fun RangeBar(startFraction: Float, endFraction: Float, modifier: Modifie
         }
     }
 }
-
-@Composable
-private fun PlacesPage(
-    weather: Weather,
-    units: WeatherUnits,
-    onAddPlace: () -> Unit,
-    onEditLocation: () -> Unit,
-    onLocationSelect: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    com.pranshulgg.weather_master_app.feature.locations.ui.PlacesPivotContent(
-        onLocationSelect = onLocationSelect,
-        onAddPlace = onAddPlace,
-        onEdit = onEditLocation,
-        onPin = {
-            com.pranshulgg.weather_master_app.synergy.WeatherTilePin.pin(
-                context = context,
-                location = weather.location,
-                size = "4x2",
-            )
-        },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-private fun hourLabel(millis: Long, timezone: String, is24: Boolean): String =
-    if (is24) to24HourTimeString(millis, timezone) else to12HourTimeString(millis, timezone)
 
 private fun formatTime(millis: Long?, timezone: String, is24: Boolean): String {
     if (millis == null) return "--"

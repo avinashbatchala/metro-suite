@@ -13,13 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import com.metro.ui.MetroAppBarDefaults
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.prefs.AppPrefsState
 import com.pranshulgg.weather_master_app.data.store.WeatherStoreState
 import com.pranshulgg.weather_master_app.data.store.WeatherUnitsStoreState
 import com.pranshulgg.weather_master_app.feature.locations.ui.PlacesPivotContent
+import com.pranshulgg.weather_master_app.feature.main.ui.WeatherPalette
 import com.pranshulgg.weather_master_app.feature.main.ui.layouts.PhoneLayout
 
 @Composable
@@ -38,7 +38,7 @@ fun MainScreenScaffold(
 
     val units = units.units
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(WeatherPalette.BingBlue)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -58,9 +58,6 @@ fun MainScreenScaffold(
                             context = context,
                             alerts = alerts,
                             prefs = prefs,
-                            onLocationSelect = onLocationSelect,
-                            onAddPlace = onOpenSearch,
-                            onEditLocation = onEditLocation,
                             modifier = Modifier.weight(1f)
                         )
                     } else {
