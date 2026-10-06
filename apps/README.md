@@ -54,6 +54,7 @@ apps/<name>/references/
 | [clock](clock/) | `com.metro.clock` | [AGENTS.md](clock/AGENTS.md) |
 | [weather](weather/) | `com.metroweather.app` | [AGENTS.md](weather/AGENTS.md) |
 | [files](files/) | `com.metro.files` | [AGENTS.md](files/AGENTS.md) |
+| [news](news/) | `com.metro.news` | [AGENTS.md](news/AGENTS.md) |
 
 ## Scaffold a new app
 
