@@ -2,7 +2,7 @@ package com.metro.people.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.metro.ui.metroClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -133,7 +133,7 @@ private fun ActionRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (enabled) Modifier.metroClickable(onClick = onClick) else Modifier)
             .padding(vertical = 12.dp),
     ) {
         MetroText(

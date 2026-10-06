@@ -5,7 +5,7 @@
 
 ## Status
 
-Android project scaffolded. Implements WP8.1 People hub v1 per `references/guides/blueprint.md`.
+Android project scaffolded. Implements WP8.1 People hub v1 per `references/guides/blueprint.md`, plus read/write **VCF (vCard) contact import** into Android's real `ContactsContract`.
 
 ## App role
 
@@ -44,9 +44,52 @@ Authoritative spec: [`references/guides/blueprint.md`](references/guides/bluepri
 - Reference: `references/images/detail_dark_blue.jpg`
 - Supplementary: `references/guides/contact-detail.md`
 
+### 5. Import contacts (VCF)
+
+- Reached from the hub app-bar `…` menu (`import contacts`) or by opening a `.vcf` from
+  Metro Files / another app (`ACTION_VIEW`).
+- Pages: file picker → import preview (counts + browsable list) → progress → result.
+- Reference: no WP8.1 original (WP had no public VCF-URL UI); follows suite Metro patterns.
+
+## VCF contact import
+
+Imports `.vcf` / vCard files into **Android's real `ContactsContract`** so imported people are
+immediately visible to People, Metro Dialer, Metro Messaging, WhatsApp bindings, and any other
+contact-aware app. There is **no separate Metro-only contacts database**.
+
+Pipeline: `.vcf` → `VCardParser` → `List<ImportContact>` → `ContactDuplicateDetector` (preview) →
+`ContactWriter` (`ContactsContract`) → existing `ContactsRepository`.
+
+- **Versions:** vCard 2.1, 3.0, and 4.0 (as supported by the parser).
+- **Parser:** [`ez-vcard`](https://github.com/mangstadt/ez-vcard) `0.12.2` (BSD / "FreeBSD"
+  license — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)). No regex-based parsing.
+- **File access:** Storage Access Framework (`ACTION_OPEN_DOCUMENT`). No storage permissions; the
+  importer reads the provider `content://` URI through `ContentResolver` (never a filesystem path).
+  The picker also includes a wildcard MIME entry so files misreported as `application/octet-stream`
+  / `text/plain` can still be chosen; content is validated by the parser.
+- **Field mapping:** `FN`/`N` → `StructuredName`; `TEL` → `Phone`; `EMAIL` → `Email`; `ADR` →
+  `StructuredPostal`; `ORG`/`TITLE` → `Organization`; `BDAY` → `Event` (`TYPE_BIRTHDAY`); `NOTE` →
+  `Note`; `URL` → `Website`; base64 `PHOTO` → `Photo`. Multiple values and `home`/`work`/`mobile`/
+  `fax`/`pager`/`other` labels are preserved; unknown labels use Android custom labels.
+- **Write architecture:** one `RawContacts` row per person plus typed `Data` rows, applied with
+  bounded `ContentProviderOperation` batches (~50 contacts). A failing batch falls back to
+  per-contact batches, so one bad card cannot lose an entire import; results are reported per
+  contact.
+- **Destination account:** device-local contacts (`ACCOUNT_NAME`/`ACCOUNT_TYPE` = `null`). The
+  writer is structured so an account picker could be added later (out of scope).
+- **Duplicate policy:** phone (normalized, tolerant of `+49 170 1234567` / `0170 1234567`) and email
+  (case-insensitive) are the primary signals; a matching display name alone is a *possible*
+  duplicate. `NEW` and `POSSIBLE_DUPLICATE` are imported; `EXACT_DUPLICATE` is skipped by default.
+  No automatic destructive merging.
+- **Permissions:** `READ_CONTACTS` gates normal browsing. `WRITE_CONTACTS` is requested **only** when
+  an import begins; denial shows a Metro error and imports nothing (no partial import).
+- **Safety limits:** 8 MB input cap, 5,000-contact cap, per-field/URL caps, 10 KB text fields, 2 MB
+  decoded photo cap. A bad photo or field is skipped with a warning; it never aborts the import.
+- **Privacy:** contact data is never logged, never uploaded, and no network access is needed.
+
 ## System functions and contracts
 
-- Use `ContactsContract` for local contacts in v1
+- Use `ContactsContract` for local contacts (read + VCF import write); no Metro-only contacts store
 - Define sorting, grouping, and display-name fallback rules explicitly
 - Social integration is part of scope language but should be treated as stubbed or informational until a real backend exists
 - Keep avatar loading/fallbacks simple and deterministic
@@ -62,6 +105,8 @@ Authoritative spec: [`references/guides/blueprint.md`](references/guides/bluepri
 ## Data and state model
 
 - `PersonSummary`, `PersonDetail`, `ContactMethod`, `PeopleFilter`
+- Import: `ImportContact` (+ `ImportPhone`/`ImportEmail`/`ImportAddress`), `ImportPreview`,
+  `ImportResult`, `ImportUiState`
 - Track selected filter, permission state, loaded contacts, and section loading state
 
 ## Primary implementation order

@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Requested only when the user explicitly starts a contact import. -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
 
     <queries>
@@ -36,6 +38,16 @@
                     android:scheme="metro"
                     android:host="people"
                     android:pathPrefix="/contact" />
+            </intent-filter>
+            <!-- Open a .vcf / vCard handed over by Metro Files or any other app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="text/vcard" />
+                <data android:mimeType="text/x-vcard" />
+                <data android:mimeType="text/directory" />
+                <data android:mimeType="application/vcard" />
             </intent-filter>
         </activity>
 

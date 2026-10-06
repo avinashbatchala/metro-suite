@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Brown;Alice;;Ms.;
+FN:Alice Brown
+TEL;TYPE=CELL:+49 170 1234567
+EMAIL;TYPE=WORK:alice.brown@example.com
+ORG:Example Corp;Engineering
+TITLE:Engineer
+END:VCARD

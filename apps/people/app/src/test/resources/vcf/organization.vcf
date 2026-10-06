@@ -1,0 +1,8 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Kevin Lopez
+N:Lopez;Kevin;;;
+ORG:Acme Widgets;Research and Development
+TITLE:Senior Analyst
+URL:https://acme.example.com/kevin
+END:VCARD

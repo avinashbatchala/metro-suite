@@ -1,0 +1,10 @@
+BEGIN:VCARD
+VERSION:4.0
+FN:Bob Jones
+N:Jones;Bob;;;
+TEL;TYPE=mobile:+44 20 7946 0958
+EMAIL:bob.jones@example.com
+BDAY:1985-05-04
+URL:https://example.com/bob
+NOTE:Met at the conference
+END:VCARD

@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Henry Ives
+N:Ives;Henry;;;
+EMAIL;TYPE=HOME:henry.ives@home.example.com
+EMAIL;TYPE=WORK:henry.ives@work.example.com
+END:VCARD

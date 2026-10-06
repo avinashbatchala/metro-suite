@@ -1,0 +1,17 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Peter Quinn
+N:Quinn;Peter;;;
+TEL;TYPE=CELL:+1 555 0400
+NOTE:This note is folded
+  onto a second physical line.
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Rachel Reed
+N:Reed;Rachel;;;
+EMAIL:rachel.reed@example.com
+END:VCARD

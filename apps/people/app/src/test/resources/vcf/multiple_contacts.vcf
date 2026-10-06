@@ -1,0 +1,18 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Carla Diaz
+N:Diaz;Carla;;;
+TEL;TYPE=CELL:+1 555 0111
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:David Evans
+N:Evans;David;;;
+EMAIL: david.evans@example.com
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Erin Fisher
+N:Fisher;Erin;;;
+TEL;TYPE=HOME:+1 555 0133
+END:VCARD

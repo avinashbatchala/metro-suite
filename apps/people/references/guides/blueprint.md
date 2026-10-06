@@ -147,6 +147,25 @@ Target: **Windows Phone 8.1 GDR2+** People hub on a portrait phone (768×1280 / 
 - **No READ_CONTACTS:** Full-page explanation + action to grant permission. No crash, no empty list masquerading as success.
 - **No contacts after grant:** Prompt to add account or create contact.
 
+### Page 13 — Import contacts (VCF)
+
+- **Entry:** Hub app-bar `…` overflow item `import contacts`, or an inbound `ACTION_VIEW` of a
+  `.vcf` / vCard from Metro Files or another app.
+- **Flow:** file picker (`ACTION_OPEN_DOCUMENT`) → preview → progress → result → hub.
+- **Layout (preview):** Full-page surface. Small-caps `IMPORT CONTACTS` header, back circle at top.
+  Large `contacts found` / `new` / `already on this phone` / `possible duplicates` counts (label
+  left, large number right). Optional subtle secondary line when fields were skipped. Flush-left
+  `import` button. Below, a scrollable list grouped by letter; each row shows the name and either a
+  phone/email (new) or `already on this phone` / `possible duplicate`.
+- **Layout (progress):** `importing contacts` + `done of total` large type + Metro loading dots.
+- **Layout (result):** `CONTACTS IMPORTED` header; `N contacts added`, `N already existed`,
+  `N possible duplicates added`, and `N couldn't be imported` (accent) when non-zero; `done` and
+  `view people` buttons.
+- **Errors:** Metro error page with a plain explanation (write permission denied, unreadable/empty
+  file, not a vCard, too many contacts). No Material dialog/spinner/FAB.
+- **Background:** Black.
+- **Write target:** Android `ContactsContract` device-local contacts (no Metro-only database).
+
 ## Images
 
 | Image | Page | Notes |

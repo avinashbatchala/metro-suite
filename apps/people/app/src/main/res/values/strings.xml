@@ -34,4 +34,34 @@
     <string name="added_to_speed_dial">added to speed dial</string>
     <string name="pinned_to_start">pinned to start</string>
     <string name="speed_dial_needs_phone">Contact has no phone number</string>
+
+    <string name="import_contacts">import contacts</string>
+    <string name="import_parsing">reading file…</string>
+    <string name="import_contacts_found">contacts found</string>
+    <string name="import_new">new</string>
+    <string name="import_already">already on this phone</string>
+    <string name="import_possible">possible duplicates</string>
+    <string name="import_warning_count">%1$d contacts contain fields that can\'t be imported</string>
+    <string name="import_action">import</string>
+    <string name="import_cancel">cancel</string>
+    <string name="import_importing">importing contacts</string>
+    <string name="import_progress">%1$d of %2$d</string>
+    <string name="import_done_title">contacts imported</string>
+    <string name="import_added">%1$d contacts added</string>
+    <string name="import_existing">%1$d already existed</string>
+    <string name="import_possible_added">%1$d possible duplicates added</string>
+    <string name="import_failed">%1$d couldn\'t be imported</string>
+    <string name="import_done">done</string>
+    <string name="import_view_people">view people</string>
+    <string name="import_no_name">(No name)</string>
+    <string name="import_duplicate_exact">already on this phone</string>
+    <string name="import_duplicate_possible">possible duplicate</string>
+    <string name="import_error_title">can\'t import contacts</string>
+    <string name="import_error_write">People needs permission to save contacts. Allow access and try again.</string>
+    <string name="import_error_read">People needs access to your contacts to avoid duplicates.</string>
+    <string name="import_error_unreadable">That file couldn\'t be opened.</string>
+    <string name="import_error_empty">That file is empty.</string>
+    <string name="import_error_not_vcard">That file isn\'t a vCard (.vcf) file.</string>
+    <string name="import_error_too_many">That file has too many contacts to import.</string>
+    <string name="import_error_generic">Something went wrong while importing contacts.</string>
 </resources>

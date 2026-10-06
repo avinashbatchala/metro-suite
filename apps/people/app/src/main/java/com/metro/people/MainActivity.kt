@@ -2,6 +2,7 @@ package com.metro.people
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,15 +36,37 @@ class MainActivity : ComponentActivity() {
         permissionResult?.invoke(granted)
     }
 
+    private val requestWriteContacts = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        writePermissionResult?.invoke(granted)
+    }
+
+    private val pickVcf = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        runCatching {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        peopleState?.onVcfPicked(uri) ?: run { pendingVcfUri = uri }
+    }
+
     private var permissionResult: ((Boolean) -> Unit)? = null
+    private var writePermissionResult: ((Boolean) -> Unit)? = null
     private var peopleState: PeopleState? = null
     private var onDeepLink: ((Intent) -> Unit)? = null
+    private var pendingVcfUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MetroSplash.install(this)
         super.onCreate(savedInstanceState)
         MetroActivities.applyLaunchTransition(this)
         enableEdgeToEdge()
+        pendingVcfUri = extractVCardUri(intent)
         setContent {
             val context = LocalContext.current
             val state = remember { PeopleState(context).also { peopleState = it } }
@@ -55,11 +78,18 @@ class MainActivity : ComponentActivity() {
             val observePeopleState = generation
 
             DisposableEffect(Unit) {
+                state.requestWriteContactsPermission = {
+                    writePermissionResult = { granted -> state.onWritePermissionResult(granted) }
+                    requestWriteContacts.launch(Manifest.permission.WRITE_CONTACTS)
+                }
                 onDeepLink = { deepIntent ->
                     latestDeepLink = deepIntent
                     deepLinkTick++
                 }
-                onDispose { onDeepLink = null }
+                onDispose {
+                    state.requestWriteContactsPermission = null
+                    onDeepLink = null
+                }
             }
 
             DisposableEffect(this@MainActivity) {
@@ -87,6 +117,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(Unit) {
+                pendingVcfUri?.let { uri ->
+                    pendingVcfUri = null
+                    state.onVcfPicked(uri)
+                }
+            }
+
             MetroSystemTheme {
                 MetroAppPivotShell(
                     modifier = Modifier.fillMaxSize(),
@@ -99,6 +136,7 @@ class MainActivity : ComponentActivity() {
                         state.hasContactsPermission -> {
                             PeopleShell(
                                 state = state,
+                                onImportContacts = { pickVcf.launch(VCARD_PICK_MIME_TYPES) },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -122,6 +160,43 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val vcfUri = extractVCardUri(intent)
+        if (vcfUri != null) {
+            peopleState?.onVcfPicked(vcfUri) ?: run { pendingVcfUri = vcfUri }
+            return
+        }
         onDeepLink?.invoke(intent) ?: peopleState?.openDeepLink(intent.data)
+    }
+
+    /** Returns a content/file URI when the intent is an inbound vCard/vcf view request. */
+    private fun extractVCardUri(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val data = intent.data ?: return null
+        val mime = intent.type?.lowercase()
+        val looksLikeVCard = mime in VCARD_MIME_TYPES ||
+            data.lastPathSegment?.endsWith(".vcf", ignoreCase = true) == true
+        return if (looksLikeVCard) data else null
+    }
+
+    private companion object {
+        /**
+         * Includes a wildcard entry so files whose MIME type is misreported (octet-stream /
+         * text/plain) can still be chosen; the parser validates the actual content.
+         */
+        val VCARD_PICK_MIME_TYPES = arrayOf(
+            "text/vcard",
+            "text/x-vcard",
+            "text/directory",
+            "text/plain",
+            "application/octet-stream",
+            "*/*",
+        )
+
+        val VCARD_MIME_TYPES = setOf(
+            "text/vcard",
+            "text/x-vcard",
+            "text/directory",
+            "application/vcard",
+        )
     }
 }

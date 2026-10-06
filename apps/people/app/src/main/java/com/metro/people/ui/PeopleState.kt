@@ -11,6 +11,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.metro.people.R
@@ -21,19 +22,43 @@ import com.metro.people.data.PeopleFilter
 import com.metro.people.data.PersonDetail
 import com.metro.people.data.PersonSummary
 import com.metro.people.data.WhatsAppLink
+import com.metro.people.data.import.ContactImportRepository
+import com.metro.people.data.import.ImportError
+import com.metro.people.data.import.ImportPreview
+import com.metro.people.data.import.ImportResult
+import com.metro.people.data.import.ParseResult
+import com.metro.people.data.import.toImportError
 import com.metro.people.tiles.PeopleTileLogic
 import com.metro.system.MetroIntents
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class PeopleRoute {
     data object Hub : PeopleRoute()
     data object Filter : PeopleRoute()
     data object Accounts : PeopleRoute()
     data class Detail(val contactId: Long) : PeopleRoute()
+    data object Import : PeopleRoute()
+}
+
+/** Distinct phases of the VCF import subpage. */
+sealed interface ImportUiState {
+    data object Idle : ImportUiState
+    data object Parsing : ImportUiState
+    data class Preview(val preview: ImportPreview) : ImportUiState
+    data class Importing(val done: Int, val total: Int) : ImportUiState
+    data class Done(val result: ImportResult) : ImportUiState
+    data class Error(val error: ImportError) : ImportUiState
 }
 
 class PeopleState(context: Context) {
     private val repository = ContactsRepository(context)
+    private val importRepository = ContactImportRepository(context)
     internal val appContext = context.applicationContext
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** Bumped on every mutation so Compose recomposes. */
     var generation by mutableIntStateOf(0)
@@ -44,6 +69,9 @@ class PeopleState(context: Context) {
     }
 
     var hasContactsPermission: Boolean = false
+        private set
+
+    var hasWriteContactsPermission: Boolean = false
         private set
 
     /** False until the first [refreshPermission] completes — avoids flashing the permission gate. */
@@ -71,6 +99,16 @@ class PeopleState(context: Context) {
     var selectedDetail: PersonDetail? = null
         private set
 
+    // ---- Import ------------------------------------------------------------
+
+    var importState by mutableStateOf<ImportUiState>(ImportUiState.Idle)
+        private set
+
+    /** Set by the Activity so [PeopleState] can request WRITE_CONTACTS at import time only. */
+    var requestWriteContactsPermission: (() -> Unit)? = null
+
+    private var pendingImportUri: Uri? = null
+
     val accountOptions: List<AccountOption> = repository.accountOptions()
 
     private var knownAccounts: Set<String> = emptySet()
@@ -94,13 +132,20 @@ class PeopleState(context: Context) {
             context,
             Manifest.permission.READ_CONTACTS,
         ) == PackageManager.PERMISSION_GRANTED
+        hasWriteContactsPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_CONTACTS,
+        ) == PackageManager.PERMISSION_GRANTED
         permissionsChecked = true
         notifyChanged()
     }
 
     fun onPermissionResult(granted: Boolean) {
         hasContactsPermission = granted
-        if (granted) reloadContacts()
+        if (granted) {
+            reloadContacts()
+            resumePendingImport()
+        }
         notifyChanged()
     }
 
@@ -127,6 +172,10 @@ class PeopleState(context: Context) {
     }
 
     fun closeOverlay() {
+        if (route == PeopleRoute.Import) {
+            importState = ImportUiState.Idle
+            pendingImportUri = null
+        }
         route = PeopleRoute.Hub
         jumpListVisible = false
         notifyChanged()
@@ -161,6 +210,98 @@ class PeopleState(context: Context) {
         filter = newFilter
         notifyChanged()
     }
+
+    // ---- Import actions ----------------------------------------------------
+
+    /** Entry point from the picker result or an incoming ACTION_VIEW intent. */
+    fun onVcfPicked(uri: Uri) {
+        pendingImportUri = uri
+        dismissSearch()
+        resumePendingImport()
+    }
+
+    fun onWritePermissionResult(granted: Boolean) {
+        hasWriteContactsPermission = granted
+        if (granted) {
+            resumePendingImport()
+        } else {
+            route = PeopleRoute.Import
+            importState = ImportUiState.Error(ImportError.WRITE_PERMISSION_DENIED)
+            notifyChanged()
+        }
+    }
+
+    private fun resumePendingImport() {
+        if (pendingImportUri == null) return
+        if (!hasContactsPermission) return
+        if (!hasWriteContactsPermission) {
+            requestWriteContactsPermission?.invoke()
+            return
+        }
+        beginImport(pendingImportUri!!)
+    }
+
+    private fun beginImport(uri: Uri) {
+        importState = ImportUiState.Parsing
+        route = PeopleRoute.Import
+        notifyChanged()
+        scope.launch {
+            val fileName = withContext(Dispatchers.IO) { importRepository.displayName(uri) }
+            val parsed = withContext(Dispatchers.IO) { importRepository.parse(uri) }
+            importState = when (parsed) {
+                is ParseResult.Failure -> ImportUiState.Error(parsed.reason.toImportError())
+                is ParseResult.Success -> {
+                    val preview = withContext(Dispatchers.IO) {
+                        importRepository.buildPreview(parsed.contacts, parsed.warningCount, fileName)
+                    }
+                    ImportUiState.Preview(preview)
+                }
+            }
+            notifyChanged()
+        }
+    }
+
+    fun confirmImport() {
+        val current = importState
+        if (current !is ImportUiState.Preview) return
+        val importable = current.preview.importable
+        importState = ImportUiState.Importing(0, importable.size)
+        notifyChanged()
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                importRepository.import(importable, current.preview.exactCount) { done, total ->
+                    scope.launch {
+                        if (importState is ImportUiState.Importing) {
+                            importState = ImportUiState.Importing(done, total)
+                            notifyChanged()
+                        }
+                    }
+                }
+            }
+            pendingImportUri = null
+            importState = ImportUiState.Done(result)
+            reloadContacts()
+            com.metro.people.tiles.PeopleTileRefresh.request(appContext)
+            notifyChanged()
+        }
+    }
+
+    fun finishImport() {
+        importState = ImportUiState.Idle
+        pendingImportUri = null
+        route = PeopleRoute.Hub
+        reloadContacts()
+        notifyChanged()
+    }
+
+    fun cancelImport() {
+        importState = ImportUiState.Idle
+        pendingImportUri = null
+        route = PeopleRoute.Hub
+        notifyChanged()
+    }
+
+    // ---- Existing actions --------------------------------------------------
 
     fun callContact(person: PersonSummary) {
         val number = person.defaultPhone ?: return

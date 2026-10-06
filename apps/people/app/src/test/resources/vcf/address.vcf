@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Irene Jenkins
+N:Jenkins;Irene;;;
+ADR;TYPE=HOME:;;123 Maple Street;Springfield;IL;62704;United States
+ADR;TYPE=WORK:;;500 Work Plaza;Chicago;IL;60601;United States
+END:VCARD

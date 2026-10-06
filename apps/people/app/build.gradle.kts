@@ -53,6 +53,11 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // vCard (RFC 6350 / RFC 2426 / vCard 2.1) parsing. ez-vcard is a mature,
+    // standards-aware library (BSD "FreeBSD" license, see THIRD_PARTY_NOTICES.md).
+    implementation("com.googlecode.ez-vcard:ez-vcard:0.12.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")

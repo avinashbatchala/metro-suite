@@ -32,6 +32,7 @@ import com.metro.ui.LocalMetroSubpageExit
 import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarDefaults
 import com.metro.ui.MetroAppBarIcon
+import com.metro.ui.MetroAppBarMenuItem
 import com.metro.ui.MetroAppTitle
 import com.metro.ui.MetroColors
 import com.metro.ui.MetroJumpList
@@ -50,6 +51,7 @@ private val SearchFieldBottomSpacing = 8.dp
 @Composable
 fun PeopleShell(
     state: PeopleState,
+    onImportContacts: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val generation = state.generation
@@ -158,6 +160,11 @@ fun PeopleShell(
                             )
                         }
                     }
+                    PeopleRoute.Import -> ImportScreen(
+                        state = state,
+                        onBack = { onBack() },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                     PeopleRoute.Hub -> Unit
                 }
             },
@@ -172,6 +179,12 @@ fun PeopleShell(
                     label = "search",
                     onClick = state::openSearch,
                     contentDescription = stringResource(R.string.search_contacts),
+                ),
+            ),
+            menuItems = listOf(
+                MetroAppBarMenuItem(
+                    text = stringResource(R.string.import_contacts),
+                    onClick = onImportContacts,
                 ),
             ),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -240,5 +253,6 @@ private fun subpageLoadKey(route: PeopleRoute): Any = when (route) {
     PeopleRoute.Filter -> "Filter"
     PeopleRoute.Accounts -> "Accounts"
     is PeopleRoute.Detail -> "Detail:${route.contactId}"
+    PeopleRoute.Import -> "Import"
     PeopleRoute.Hub -> "Hub"
 }
