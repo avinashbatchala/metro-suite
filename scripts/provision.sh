@@ -182,8 +182,14 @@ grant com.metro.launcher android.permission.POST_NOTIFICATIONS
 # --- battery exemption ------------------------------------------------------
 echo "==> battery exemption (Doze whitelist)"
 for pkg in "${SHELL_APPS[@]}"; do
-  if is_installed "com.metro.$pkg"; then
-    sh cmd deviceidle whitelist "+com.metro.$pkg" >/dev/null 2>&1 && ok "battery: $pkg" || warn "battery failed: $pkg"
+  p="com.metro.$pkg"
+  if is_installed "$p"; then
+    if sh cmd deviceidle whitelist "+$p" >/dev/null 2>&1 \
+      || sh dumpsys deviceidle whitelist "+$p" >/dev/null 2>&1; then
+      ok "battery: $pkg"
+    else
+      warn "battery failed: $pkg"
+    fi
   fi
 done
 
