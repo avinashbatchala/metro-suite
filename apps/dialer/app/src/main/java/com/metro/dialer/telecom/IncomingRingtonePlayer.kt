@@ -24,8 +24,6 @@ object IncomingRingtonePlayer {
     private var player: MediaPlayer? = null
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
-    private var previousMode: Int = AudioManager.MODE_NORMAL
-    private var previousSpeaker: Boolean = false
 
     fun start(context: Context) {
         if (player?.isPlaying == true) return
@@ -39,12 +37,9 @@ object IncomingRingtonePlayer {
             RingtoneManager.TYPE_RINGTONE,
         ) ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
+        // Android audio policy owns ringer mode / DND. Do not ring when silenced.
         if (am.ringerMode == AudioManager.RINGER_MODE_SILENT) return
         if (am.getStreamVolume(AudioManager.STREAM_RING) <= 0) return
-
-        previousMode = am.mode
-        @Suppress("DEPRECATION")
-        previousSpeaker = am.isSpeakerphoneOn
 
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
@@ -52,10 +47,6 @@ object IncomingRingtonePlayer {
             .build()
 
         requestFocus(am, attrs)
-
-        am.mode = AudioManager.MODE_RINGTONE
-        @Suppress("DEPRECATION")
-        am.isSpeakerphoneOn = true
 
         try {
             val mediaPlayer = MediaPlayer().apply {
@@ -120,9 +111,6 @@ object IncomingRingtonePlayer {
             am.abandonAudioFocus(null)
         }
         focusRequest = null
-        am.mode = previousMode
-        @Suppress("DEPRECATION")
-        am.isSpeakerphoneOn = previousSpeaker
         audioManager = null
     }
 }

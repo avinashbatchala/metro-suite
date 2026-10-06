@@ -21,7 +21,6 @@ import com.metro.ui.metroNavBarPadding
 
 @Composable
 fun PermissionScreen(
-    hasCallLogPermission: Boolean,
     hasCallPhonePermission: Boolean,
     isDefaultDialer: Boolean,
     onRequestPermissions: () -> Unit,
@@ -29,7 +28,7 @@ fun PermissionScreen(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val needsPermissions = !hasCallLogPermission || !hasCallPhonePermission
+    val needsPermissions = !hasCallPhonePermission
     val needsDefaultDialer = !isDefaultDialer
 
     Column(
@@ -49,11 +48,6 @@ fun PermissionScreen(
         )
 
         if (needsPermissions) {
-            MetroText(
-                text = stringResource(R.string.permission_call_log_body),
-                style = MetroTextStyle.Body,
-                modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp),
-            )
             MetroText(
                 text = stringResource(R.string.permission_call_phone_body),
                 style = MetroTextStyle.Body,

@@ -1,9 +1,7 @@
 package com.metro.dialer.ui
 
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,7 +18,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -31,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -43,10 +43,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.metro.dialer.R
-import com.metro.dialer.data.ActiveCall
-import com.metro.dialer.data.ContactsLookup
 import com.metro.dialer.data.DialerCallLogic
+import com.metro.dialer.telecom.MetroCallEndpoint
 import com.metro.dialer.telecom.MetroCallSession
+import com.metro.dialer.telecom.MetroCallSessionState
+import com.metro.dialer.telecom.MetroCallState
+import com.metro.dialer.telecom.MetroTelecomCall
+import com.metro.ui.MetroColors
+import com.metro.ui.MetroMessageDialog
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
@@ -54,7 +58,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-// Match the dialer keypad: light-gray tiles on dark-gray spacing.
 private val InCallSectionBackground = Color(0xFF141414)
 private val InCallTileBackground = Color(0xFF252525)
 private val InCallTileDisabled = Color(0xFF5A5A5A)
@@ -64,162 +67,145 @@ private val InCallKeyHeight = 64.dp
 
 @Composable
 fun InCallScreen(
-    call: ActiveCall,
-    onEndCall: () -> Unit,
-    onConnected: () -> Unit,
+    session: MetroCallSessionState,
+    onEndCall: (String) -> Unit,
+    onHold: (String, Boolean) -> Unit,
+    onSwap: () -> Unit,
+    onMerge: () -> Unit,
+    onSplit: (String) -> Unit,
+    onAnswerCall: (String) -> Unit,
+    onAddCall: () -> Unit,
+    onSelectEndpoint: (MetroCallEndpoint) -> Unit,
+    onToggleMute: () -> Unit,
+    onMinimize: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val contactsLookup = remember(context) { ContactsLookup(context) }
-    var elapsedSeconds by remember(call.startedAtMillis) { mutableLongStateOf(0L) }
-    var connected by remember(call.phoneNumber) { mutableStateOf(call.connected) }
-    var photo by remember(call.phoneNumber) { mutableStateOf<ImageBitmap?>(null) }
-    var showKeypad by remember { mutableStateOf(false) }
-    var dtmfDigits by remember(call.phoneNumber) { mutableStateOf("") }
-
-    val muted by MetroCallSession.muted
-    val speakerOn by MetroCallSession.speakerOn
-    val bluetoothOn by MetroCallSession.bluetoothOn
-    val onHold by MetroCallSession.onHold
-    val bluetoothAvailable by MetroCallSession.bluetoothAvailable
-
-    BackHandler {
-        when {
-            showKeypad -> showKeypad = false
-            else -> onEndCall()
-        }
+    val primary = session.primaryCall ?: return
+    val active = session.activeCall
+    val heldCalls = session.heldCalls
+    val incomingWaiting = session.calls.firstOrNull {
+        it.isIncomingRinging && it.id != primary.id
     }
 
-    LaunchedEffect(call.phoneNumber) {
+    var showKeypad by remember(primary.id) { mutableStateOf(false) }
+    var dtmfDigits by remember(primary.id) { mutableStateOf("") }
+    var showEndpointChooser by remember { mutableStateOf(false) }
+    var photo by remember(primary.id) { mutableStateOf<ImageBitmap?>(null) }
+
+    val audio = session.audio
+
+    // Back hides the keypad first, otherwise minimizes to the return-to-call notification.
+    // It never ends the call.
+    androidx.activity.compose.BackHandler(enabled = showKeypad) { showKeypad = false }
+    androidx.activity.compose.BackHandler(enabled = !showKeypad) { onMinimize() }
+
+    DisposableEffect(primary.id) {
+        onDispose { }
+    }
+
+    LaunchedEffect(primary.photoUri, primary.phoneNumber) {
+        val uri = primary.photoUri
         photo = withContext(Dispatchers.IO) {
-            contactsLookup.loadContactPhoto(call.phoneNumber)?.asImageBitmap()
+            if (uri != null) {
+                com.metro.dialer.data.ContactsLookup(context).loadContactPhotoByUri(uri)?.asImageBitmap()
+            } else {
+                null
+            }
         }
     }
 
-    LaunchedEffect(call.phoneNumber) {
-        if (!call.connected) {
-            delay(1500)
-            connected = true
-            onConnected()
-        }
-    }
-
-    LaunchedEffect(call.connected) {
-        if (call.connected) connected = true
-    }
-
-    LaunchedEffect(connected) {
-        if (!connected) return@LaunchedEffect
-        while (true) {
-            delay(1000)
-            elapsedSeconds = ((System.currentTimeMillis() - call.startedAtMillis) / 1000L)
-                .coerceAtLeast(0L)
-        }
-    }
-
-    val statusText = when {
-        onHold -> stringResource(R.string.on_hold)
-        connected -> DialerCallLogic.formatDuration(elapsedSeconds.toInt())
-        else -> stringResource(R.string.dialling)
-    }
+    val statusText = callStatusText(primary)
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
         ) {
-            val currentPhoto = photo
-            if (currentPhoto != null) {
-                Image(
-                    bitmap = currentPhoto,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = 0.55f),
-                                0.3f to Color.Transparent,
-                                0.75f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.75f),
-                            ),
-                        ),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MetroTheme.colors.accent.copy(alpha = 0.35f),
-                                    Color(0xFF1A2A1A),
-                                    Color.Black,
-                                ),
-                            ),
-                        ),
-                )
-            }
-
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(start = 12.dp, top = 16.dp, bottom = 16.dp),
+                    .fillMaxWidth()
+                    .height(280.dp),
             ) {
-                Row(
+                val currentPhoto = photo
+                if (currentPhoto != null) {
+                    Image(
+                        bitmap = currentPhoto,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(end = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(start = 12.dp, top = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.Bottom,
                 ) {
                     MetroText(
                         text = statusText,
                         style = MetroTextStyle.ListItemSubtitle,
                         color = Color.White,
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
                     MetroText(
-                        text = stringResource(R.string.carrier_unknown),
-                        style = MetroTextStyle.ListItemSubtitle,
-                        color = Color.White.copy(alpha = 0.85f),
+                        text = primary.primaryLabel,
+                        style = MetroTextStyle.PivotTab,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                }
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                MetroText(
-                    text = call.displayName,
-                    style = MetroTextStyle.PivotTab,
-                    color = Color.White,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                )
-
-                MetroText(
-                    text = if (showKeypad && dtmfDigits.isNotEmpty()) {
-                        dtmfDigits
-                    } else {
-                        stringResource(
-                            R.string.mobile_label,
-                            DialerCallLogic.formatDisplayNumber(call.phoneNumber),
+                    val subtitle = buildString {
+                        primary.phoneLabel?.let { append(it).append("  ") }
+                        if (showKeypad && dtmfDigits.isNotEmpty()) {
+                            append(dtmfDigits)
+                        } else {
+                            append(DialerCallLogic.formatDisplayNumber(primary.phoneNumber.orEmpty()))
+                        }
+                    }
+                    if (subtitle.isNotBlank()) {
+                        MetroText(
+                            text = subtitle,
+                            style = MetroTextStyle.ListItemTitle,
+                            color = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.padding(top = 4.dp),
                         )
+                    }
+                }
+            }
+
+            incomingWaiting?.let { waiting ->
+                WaitingCallRow(
+                    call = waiting,
+                    onAnswer = {
+                        active?.let { onHold(it.id, true) }
+                        onAnswerCall(waiting.id)
                     },
-                    style = MetroTextStyle.ListItemTitle,
-                    color = Color.White.copy(alpha = 0.9f),
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier.padding(top = 8.dp),
+                    onIgnore = { onEndCall(waiting.id) },
+                )
+            }
+
+            heldCalls.firstOrNull()?.let { held ->
+                HeldCallRow(
+                    call = held,
+                    canMerge = held.canMerge && active?.canMerge == true,
+                    onSwap = onSwap,
+                    onMerge = onMerge,
+                )
+            }
+
+            if (session.conferenceCallId != null && session.conferenceChildren.isNotEmpty()) {
+                ConferenceSection(
+                    participants = session.conferenceChildren,
+                    onSplit = onSplit,
+                    onDisconnect = { childId -> onEndCall(childId) },
                 )
             }
         }
@@ -236,7 +222,7 @@ fun InCallScreen(
                 InCallDtmfKeypad(
                     onDigit = { digit ->
                         dtmfDigits += digit
-                        MetroCallSession.playDtmf(digit)
+                        MetroCallSession.playDtmf(digit, primary.id)
                     },
                 )
                 Row(
@@ -244,11 +230,11 @@ fun InCallScreen(
                     horizontalArrangement = Arrangement.spacedBy(InCallTileGap),
                 ) {
                     EndCallTile(
-                        onEndCall = onEndCall,
+                        onEndCall = { onEndCall(primary.id) },
                         modifier = Modifier.weight(2f),
                     )
                     InCallControlTile(
-                        label = stringResource(R.string.hide),
+                        label = stringResource(R.string.hide_keypad),
                         icon = InCallIcon.Keypad,
                         enabled = true,
                         active = true,
@@ -263,28 +249,33 @@ fun InCallScreen(
                             label = stringResource(R.string.speaker),
                             icon = InCallIcon.Speaker,
                             enabled = true,
-                            active = speakerOn,
+                            active = audio.currentEndpoint?.type ==
+                                com.metro.dialer.telecom.MetroCallEndpointType.SPEAKER,
                             onClick = {
-                                MetroCallSession.setSpeaker(context, !speakerOn)
+                                val speaker = audio.availableEndpoints.firstOrNull {
+                                    it.type == com.metro.dialer.telecom.MetroCallEndpointType.SPEAKER
+                                }
+                                val earpiece = audio.availableEndpoints.firstOrNull {
+                                    it.type == com.metro.dialer.telecom.MetroCallEndpointType.EARPIECE
+                                }
+                                val isSpeaker = audio.currentEndpoint?.type ==
+                                    com.metro.dialer.telecom.MetroCallEndpointType.SPEAKER
+                                (if (isSpeaker) earpiece else speaker)?.let(onSelectEndpoint)
                             },
                         ),
                         InCallControl(
-                            label = stringResource(R.string.mute),
+                            label = stringResource(if (audio.muted) R.string.unmute else R.string.mute),
                             icon = InCallIcon.Mute,
                             enabled = true,
-                            active = muted,
-                            onClick = {
-                                MetroCallSession.setMuted(context, !muted)
-                            },
+                            active = audio.muted,
+                            onClick = onToggleMute,
                         ),
                         InCallControl(
-                            label = stringResource(R.string.bluetooth),
-                            icon = InCallIcon.Bluetooth,
-                            enabled = bluetoothAvailable,
-                            active = bluetoothOn,
-                            onClick = {
-                                MetroCallSession.setBluetooth(context, !bluetoothOn)
-                            },
+                            label = stringResource(R.string.audio),
+                            icon = InCallIcon.Audio,
+                            enabled = audio.hasMultipleEndpoints,
+                            active = audio.hasMultipleEndpoints,
+                            onClick = { showEndpointChooser = true },
                         ),
                     ),
                 )
@@ -293,49 +284,253 @@ fun InCallScreen(
                         InCallControl(
                             label = stringResource(R.string.hold),
                             icon = InCallIcon.Hold,
-                            enabled = connected,
-                            active = onHold,
-                            onClick = {
-                                MetroCallSession.setOnHold(!onHold)
-                            },
+                            enabled = primary.canHold && (active != null || primary.state == MetroCallState.HOLDING),
+                            active = primary.state == MetroCallState.HOLDING,
+                            onClick = { onHold(primary.id, primary.state != MetroCallState.HOLDING) },
                         ),
                         InCallControl(
-                            label = stringResource(R.string.video),
-                            icon = InCallIcon.Video,
+                            label = stringResource(R.string.keypad),
+                            icon = InCallIcon.Keypad,
                             enabled = true,
                             active = false,
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.video_stub),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            },
+                            onClick = { showKeypad = true },
                         ),
                         InCallControl(
                             label = stringResource(R.string.add_call),
                             icon = InCallIcon.AddCall,
-                            enabled = false,
+                            enabled = session.canAddCall,
                             active = false,
-                            onClick = {},
+                            onClick = onAddCall,
                         ),
                     ),
                 )
-                Row(
+                EndCallTile(
+                    onEndCall = { onEndCall(primary.id) },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(InCallTileGap),
+                )
+            }
+        }
+    }
+
+    if (showEndpointChooser) {
+        AudioEndpointChooser(
+            endpoints = audio.availableEndpoints,
+            currentId = audio.currentEndpoint?.id,
+            onSelect = {
+                showEndpointChooser = false
+                onSelectEndpoint(it)
+            },
+            onDismiss = { showEndpointChooser = false },
+        )
+    }
+}
+
+@Composable
+private fun callStatusText(call: MetroTelecomCall): String = when (call.state) {
+    MetroCallState.ACTIVE -> {
+        val connectTime = call.connectTimeMillis
+        if (connectTime != null) {
+            ElapsedTime(connectTime)
+        } else {
+            stringResource(R.string.active_call)
+        }
+    }
+    MetroCallState.HOLDING -> stringResource(R.string.on_hold)
+    MetroCallState.DIALING, MetroCallState.CONNECTING -> stringResource(R.string.dialling)
+    MetroCallState.RINGING -> stringResource(R.string.ringing)
+    MetroCallState.DISCONNECTING, MetroCallState.DISCONNECTED -> stringResource(R.string.call_ended)
+    else -> stringResource(R.string.calling)
+}
+
+@Composable
+private fun ElapsedTime(connectTimeMillis: Long): String {
+    var elapsed by remember(connectTimeMillis) { mutableLongStateOf(0L) }
+    LaunchedEffect(connectTimeMillis) {
+        while (true) {
+            elapsed = ((System.currentTimeMillis() - connectTimeMillis) / 1000L).coerceAtLeast(0L)
+            delay(1000)
+        }
+    }
+    return DialerCallLogic.formatDuration(elapsed.toInt())
+}
+
+@Composable
+private fun WaitingCallRow(
+    call: MetroTelecomCall,
+    onAnswer: () -> Unit,
+    onIgnore: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MetroTheme.colors.secondarySurface)
+            .padding(12.dp),
+    ) {
+        MetroText(
+            text = stringResource(R.string.incoming_call_label),
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText,
+        )
+        MetroText(text = call.primaryLabel, style = MetroTextStyle.ListItemTitle)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(InCallTileGap),
+        ) {
+            InCallControlTile(
+                label = stringResource(R.string.answer),
+                icon = InCallIcon.Answer,
+                enabled = true,
+                active = false,
+                onClick = onAnswer,
+                modifier = Modifier.weight(1f),
+            )
+            InCallControlTile(
+                label = stringResource(R.string.ignore),
+                icon = InCallIcon.End,
+                enabled = true,
+                active = false,
+                onClick = onIgnore,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeldCallRow(
+    call: MetroTelecomCall,
+    canMerge: Boolean,
+    onSwap: () -> Unit,
+    onMerge: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MetroTheme.colors.secondarySurface)
+            .padding(12.dp),
+    ) {
+        MetroText(
+            text = stringResource(R.string.on_hold),
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText,
+        )
+        MetroText(text = call.primaryLabel, style = MetroTextStyle.ListItemTitle)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(InCallTileGap),
+        ) {
+            InCallControlTile(
+                label = stringResource(R.string.swap),
+                icon = InCallIcon.Swap,
+                enabled = true,
+                active = false,
+                onClick = onSwap,
+                modifier = Modifier.weight(1f),
+            )
+            if (canMerge) {
+                InCallControlTile(
+                    label = stringResource(R.string.merge),
+                    icon = InCallIcon.AddCall,
+                    enabled = true,
+                    active = false,
+                    onClick = onMerge,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConferenceSection(
+    participants: List<MetroTelecomCall>,
+    onSplit: (String) -> Unit,
+    onDisconnect: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MetroTheme.colors.secondarySurface)
+            .padding(12.dp),
+    ) {
+        MetroText(
+            text = stringResource(R.string.conference),
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText,
+        )
+        participants.forEach { participant ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText(
+                    text = participant.primaryLabel,
+                    style = MetroTextStyle.ListItemTitle,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                MetroText(
+                    text = stringResource(R.string.private_call),
+                    style = MetroTextStyle.ListItemSubtitle,
+                    color = MetroTheme.colors.accent,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onSplit(participant.id) },
+                        )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+                MetroText(
+                    text = stringResource(R.string.end_call),
+                    style = MetroTextStyle.ListItemSubtitle,
+                    color = MetroColors.AccentRed,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onDisconnect(participant.id) },
+                        )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioEndpointChooser(    endpoints: List<MetroCallEndpoint>,
+    currentId: String?,
+    onSelect: (MetroCallEndpoint) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    MetroMessageDialog(
+        title = stringResource(R.string.audio),
+        onDismissRequest = onDismiss,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            endpoints.forEach { endpoint ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(endpoint) }
+                        .padding(vertical = 14.dp),
                 ) {
-                    EndCallTile(
-                        onEndCall = onEndCall,
-                        modifier = Modifier.weight(2f),
-                    )
-                    InCallControlTile(
-                        label = stringResource(R.string.keypad),
-                        icon = InCallIcon.Keypad,
-                        enabled = true,
-                        active = false,
-                        onClick = { showKeypad = true },
-                        modifier = Modifier.weight(1f),
+                    MetroText(
+                        text = endpoint.label,
+                        style = MetroTextStyle.ListItemTitle,
+                        color = if (endpoint.id == currentId) {
+                            MetroTheme.colors.accent
+                        } else {
+                            MetroTheme.colors.primaryText
+                        },
                     )
                 }
             }
@@ -346,11 +541,13 @@ fun InCallScreen(
 private enum class InCallIcon {
     Speaker,
     Mute,
-    Bluetooth,
+    Audio,
     Hold,
-    Video,
-    AddCall,
     Keypad,
+    AddCall,
+    Answer,
+    End,
+    Swap,
 }
 
 private data class InCallControl(
@@ -399,10 +596,7 @@ private fun InCallControlTile(
         active || isPressed -> MetroTheme.colors.accent
         else -> InCallTileBackground
     }
-    val contentColor = when {
-        !enabled -> InCallTileDisabled
-        else -> Color.White
-    }
+    val contentColor = if (!enabled) InCallTileDisabled else Color.White
     Box(
         modifier = modifier
             .height(InCallTileHeight)
@@ -596,16 +790,34 @@ private fun InCallControlIcon(
                 drawLine(color, Offset(0.36f * w, 0.88f * h), Offset(0.64f * w, 0.88f * h), sw)
                 drawLine(color, Offset(0.12f * w, 0.08f * h), Offset(0.88f * w, 0.92f * h), sw)
             }
-            InCallIcon.Bluetooth -> {
+            InCallIcon.Audio -> {
                 val path = Path().apply {
-                    moveTo(0.26f * w, 0.30f * h)
-                    lineTo(0.74f * w, 0.70f * h)
-                    lineTo(0.50f * w, 0.92f * h)
-                    lineTo(0.50f * w, 0.08f * h)
-                    lineTo(0.74f * w, 0.30f * h)
-                    lineTo(0.26f * w, 0.70f * h)
+                    moveTo(0.10f * w, 0.5f * h)
+                    lineTo(0.34f * w, 0.5f * h)
+                    lineTo(0.54f * w, 0.24f * h)
+                    lineTo(0.54f * w, 0.76f * h)
+                    lineTo(0.34f * w, 0.5f * h)
+                    close()
                 }
-                drawPath(path, color, style = stroke)
+                drawPath(path, color)
+                drawArc(
+                    color = color,
+                    startAngle = -55f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(0.54f * w, 0.28f * h),
+                    size = Size(0.30f * w, 0.44f * h),
+                    style = stroke,
+                )
+                drawArc(
+                    color = color,
+                    startAngle = -55f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(0.62f * w, 0.16f * h),
+                    size = Size(0.42f * w, 0.68f * h),
+                    style = stroke,
+                )
             }
             InCallIcon.Hold -> {
                 drawRect(
@@ -619,26 +831,6 @@ private fun InCallControlIcon(
                     size = Size(0.12f * w, 0.60f * h),
                 )
             }
-            InCallIcon.Video -> {
-                drawRect(
-                    color = color,
-                    topLeft = Offset(0.12f * w, 0.32f * h),
-                    size = Size(0.46f * w, 0.36f * h),
-                )
-                val lens = Path().apply {
-                    moveTo(0.60f * w, 0.44f * h)
-                    lineTo(0.86f * w, 0.30f * h)
-                    lineTo(0.86f * w, 0.70f * h)
-                    lineTo(0.60f * w, 0.56f * h)
-                    close()
-                }
-                drawPath(lens, color)
-            }
-            InCallIcon.AddCall -> {
-                val plus = sw * 1.4f
-                drawLine(color, Offset(0.5f * w, 0.22f * h), Offset(0.5f * w, 0.78f * h), plus)
-                drawLine(color, Offset(0.22f * w, 0.5f * h), Offset(0.78f * w, 0.5f * h), plus)
-            }
             InCallIcon.Keypad -> {
                 val xs = listOf(0.28f, 0.5f, 0.72f)
                 val ys = listOf(0.22f, 0.5f, 0.78f)
@@ -648,6 +840,43 @@ private fun InCallControlIcon(
                         drawCircle(color, radius, Offset(fx * w, fy * h))
                     }
                 }
+            }
+            InCallIcon.AddCall -> {
+                val plus = sw * 1.4f
+                drawLine(color, Offset(0.5f * w, 0.22f * h), Offset(0.5f * w, 0.78f * h), plus)
+                drawLine(color, Offset(0.22f * w, 0.5f * h), Offset(0.78f * w, 0.5f * h), plus)
+            }
+            InCallIcon.Answer -> {
+                val path = Path().apply {
+                    moveTo(0.10f * w, 0.52f * h)
+                    quadraticBezierTo(0.5f * w, 0.06f * h, 0.90f * w, 0.52f * h)
+                    quadraticBezierTo(0.72f * w, 0.56f * h, 0.62f * w, 0.46f * h)
+                    lineTo(0.62f * w, 0.30f * h)
+                    lineTo(0.38f * w, 0.30f * h)
+                    lineTo(0.38f * w, 0.46f * h)
+                    quadraticBezierTo(0.28f * w, 0.56f * h, 0.10f * w, 0.52f * h)
+                    close()
+                }
+                drawPath(path, color, style = stroke)
+            }
+            InCallIcon.End -> {
+                val path = Path().apply {
+                    moveTo(0.10f * w, 0.48f * h)
+                    quadraticBezierTo(0.5f * w, 0.94f * h, 0.90f * w, 0.48f * h)
+                    quadraticBezierTo(0.72f * w, 0.44f * h, 0.62f * w, 0.54f * h)
+                    lineTo(0.62f * w, 0.70f * h)
+                    lineTo(0.38f * w, 0.70f * h)
+                    lineTo(0.38f * w, 0.54f * h)
+                    quadraticBezierTo(0.28f * w, 0.44f * h, 0.10f * w, 0.48f * h)
+                    close()
+                }
+                drawPath(path, color, style = stroke)
+            }
+            InCallIcon.Swap -> {
+                drawLine(color, Offset(0.16f * w, 0.34f * h), Offset(0.84f * w, 0.34f * h), sw)
+                drawLine(color, Offset(0.72f * w, 0.20f * h), Offset(0.86f * w, 0.34f * h), sw)
+                drawLine(color, Offset(0.16f * w, 0.66f * h), Offset(0.84f * w, 0.66f * h), sw)
+                drawLine(color, Offset(0.28f * w, 0.52f * h), Offset(0.14f * w, 0.66f * h), sw)
             }
         }
     }

@@ -1,59 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Phone</string>
-    <string name="permission_call_log_title">Call history access</string>
-    <string name="permission_call_log_body">Phone needs access to your call history to show recent calls.</string>
-    <string name="permission_call_phone_body">Phone also needs permission to place and manage calls.</string>
-    <string name="grant_call_log">allow access</string>
-    <string name="grant_permissions">allow access</string>
+
+    <!-- Setup -->
     <string name="setup_title">setup</string>
+    <string name="permission_call_phone_body">Phone needs permission to place and manage calls.</string>
+    <string name="grant_permissions">allow access</string>
+    <string name="allow_access">allow access</string>
     <string name="default_dialer_body">Set Phone as your default dialer to place calls and show the in-call screen.</string>
     <string name="set_default_dialer">set as default phone app</string>
     <string name="continue_without_default">continue without setting default</string>
+
+    <!-- Pivots -->
+    <string name="pivot_history">history</string>
+    <string name="pivot_speed_dial">speed dial</string>
+    <string name="pivot_voicemail">voicemail</string>
+
+    <!-- History -->
     <string name="history_empty">No recent calls.</string>
     <string name="history_permission_denied">Call history unavailable without permission.</string>
-    <string name="speed_dial_empty">Pin contacts from call history to speed dial.</string>
     <string name="search_history">search call history</string>
+    <string name="details">details</string>
+    <string name="delete">delete</string>
+    <string name="block_number">block number</string>
+    <string name="add_to_speed_dial">add to speed dial</string>
+    <string name="select_calls">select calls</string>
+    <string name="select_all">select all</string>
+    <string name="delete_failed">Could not delete call history.</string>
+    <string name="block_unavailable">Blocking is not available on this device.</string>
+
+    <!-- Call types -->
+    <string name="incoming">incoming</string>
+    <string name="outgoing">outgoing</string>
+    <string name="missed">missed</string>
+    <string name="rejected">rejected</string>
+    <string name="blocked">blocked</string>
+    <string name="voicemail">voicemail</string>
+    <string name="answered_elsewhere">answered elsewhere</string>
+    <string name="unknown">unknown</string>
+    <string name="declined">declined</string>
+
+    <!-- Speed dial -->
+    <string name="speed_dial_empty">Tap + to add a contact to speed dial.</string>
+    <string name="speed_dial_unavailable">number unavailable</string>
+    <string name="remove_from_speed_dial">remove from speed dial</string>
+    <string name="open_contact">open contact</string>
+    <string name="pin_to_start">pin to start</string>
+    <string name="pin_needs_contact">Save as a contact to pin to Start</string>
+    <string name="add">add</string>
+    <string name="no_contacts">No contacts.</string>
+
+    <!-- Dial pad / save -->
+    <string name="call">call</string>
+    <string name="save">save</string>
+    <string name="save_number_title">Save this number</string>
+    <string name="new_contact">new contact</string>
+    <string name="add_to_existing">add to existing</string>
+    <string name="save_contact_empty">Enter a number to save</string>
+    <string name="dial_pad">dial pad</string>
+
+    <!-- Incoming -->
+    <string name="incoming_call_label">INCOMING CALL</string>
+    <string name="answer">answer</string>
+    <string name="ignore">ignore</string>
+    <string name="text_reply">text reply</string>
+    <string name="type_message">type a message…</string>
+    <string name="send">send</string>
+    <string name="slide_up_to_show">slide up to show options</string>
+
+    <!-- In-call -->
     <string name="calling">calling…</string>
     <string name="dialling">dialling…</string>
-    <string name="carrier_unknown">carrier</string>
-    <string name="mobile_label">Mobile: %1$s</string>
+    <string name="ringing">ringing…</string>
+    <string name="active_call">active call</string>
+    <string name="call_ended">call ended</string>
+    <string name="on_hold">on hold</string>
     <string name="speaker">speaker</string>
     <string name="mute">mute</string>
-    <string name="bluetooth">bluetooth</string>
+    <string name="unmute">unmute</string>
+    <string name="audio">audio</string>
     <string name="hold">hold</string>
-    <string name="video">video</string>
-    <string name="add_call">add call</string>
     <string name="keypad">keypad</string>
-    <string name="hide">hide</string>
-    <string name="on_hold">on hold</string>
-    <string name="video_stub">Video calling not available in v1</string>
-    <string name="call">call</string>
-    <string name="message">message</string>
-    <string name="messaging_unavailable">Messaging app is not installed</string>
-    <string name="save">save</string>
+    <string name="hide_keypad">hide</string>
+    <string name="add_call">add call</string>
     <string name="end_call">end call</string>
+    <string name="swap">swap</string>
+    <string name="merge">merge</string>
+    <string name="conference">conference</string>
+    <string name="private_call">private</string>
+
+    <!-- Shared actions -->
+    <string name="message">message</string>
+    <string name="messaging_unavailable">Messaging isn\'t available.</string>
+    <string name="people">people</string>
+    <string name="people_unavailable">People isn\'t installed.</string>
+    <string name="search">search</string>
+    <string name="settings">settings</string>
+    <string name="cancel">cancel</string>
+    <string name="ok">ok</string>
+    <string name="back">back</string>
+
+    <!-- SIM / carrier -->
+    <string name="call_using">call using</string>
+    <string name="carrier_handoff_body">Opens the Android/carrier call settings.</string>
+
+    <!-- Voicemail -->
+    <string name="call_voicemail">call voicemail</string>
+    <string name="voicemail_unavailable">Voicemail isn\'t set up.</string>
+    <string name="voicemail_unavailable_body">Voicemail isn\'t set up on this device.</string>
+    <string name="voicemail_settings">voicemail settings</string>
+    <string name="voicemail_settings_body">Carrier-managed voicemail options.</string>
+
+    <!-- Settings -->
+    <string name="phone">phone</string>
+    <string name="edit_replies">edit replies</string>
+    <string name="reply_hint">reply %1$d</string>
+    <string name="call_forwarding">call forwarding</string>
+    <string name="call_waiting">call waiting</string>
+    <string name="metrosuite_extensions">MetroSuite</string>
+    <string name="smart_dial">smart dial</string>
+    <string name="smart_dial_body">Suggest contacts as you type. Not part of stock WP8.1.</string>
+
+    <!-- Notifications -->
     <string name="active_call_notification_label">Phone</string>
     <string name="active_call_channel_name">Active call</string>
     <string name="active_call_channel_description">Shows while a call is in progress</string>
     <string name="incoming_call_channel_name">Incoming call</string>
     <string name="incoming_call_channel_description">Shows the incoming call screen when the phone is locked</string>
-    <string name="incoming_call_label">INCOMING CALL</string>
-    <string name="answer">answer</string>
-    <string name="ignore">ignore</string>
-    <string name="text_reply">text reply</string>
-    <string name="incoming">incoming</string>
-    <string name="outgoing">outgoing</string>
-    <string name="missed">missed</string>
-    <string name="declined">declined</string>
-    <string name="add_speed_dial">added to speed dial</string>
-    <string name="add_to_speed_dial">add to speed dial</string>
-    <string name="pin_to_start">pin to start</string>
-    <string name="pinned_to_start">pinned to start</string>
-    <string name="remove_from_speed_dial">remove from speed dial</string>
-    <string name="pin_needs_contact">Save as a contact to pin to Start</string>
-    <string name="people_unavailable">People app is not installed</string>
-    <string name="save_contact_empty">Enter a number to save</string>
-    <string name="settings_stub">Settings not available in v1</string>
-    <string name="block_stub">Block number not available in v1</string>
 </resources>

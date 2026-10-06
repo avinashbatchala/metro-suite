@@ -1,12 +1,10 @@
 # Dial pad & in-call
 
-Supplementary guide for keypad and active call surfaces. Authoritative layout: [`blueprint.md`](blueprint.md).
+Supplementary guide. Authoritative layout: [`blueprint.md`](blueprint.md).
 
 ## Keypad layout (WP 8.1)
 
-WP 8.1 moved **call** and **save** from the bottom app bar into the tile grid — do not put call/save in the app bar on the dial pad page.
-
-### Grid structure
+WP 8.1 moved **call** and **save** from the bottom app bar into the tile grid.
 
 ```
 [ 1   ] [ 2   ] [ 3   ]
@@ -16,40 +14,46 @@ WP 8.1 moved **call** and **save** from the bottom app bar into the tile grid �
 [ 7   ] [ 8   ] [ 9   ]
         PQRS  TUV  WXYZ
 [  *  ] [ 0 + ] [  #  ]
-[ call (accent) ] [ save (border) ]
+[ call (accent) ] [ save ]
 ```
 
-- Tiles are **square**, separated by 4dp gaps.
-- Digit: 36sp Light centred; letter hints: 10sp grey below digit.
-- `0` tile shows small `+` hint; long-press inserts `+`.
+- Tiles are **square**, separated by ~6dp gaps; no rounded corners.
+- Digit: 36sp centred/left; letter hints: 13sp grey.
+- `0` shows a small `+` hint; long-press inserts `+`.
 - **Call** tile: accent background, white `call` label.
-- **Save** tile: 2dp white border, white `save` label — opens add-contact flow (stub in v1).
+- **Save** tile: dark tile with save glyph + `save` label — opens the Save-number flow.
 
-### T9 / autocomplete
+### Smart dial / T9 (MetroSuite extension)
 
-As digits are entered, show up to **3 matching contacts** above the grid:
-
-- Match against contact name (T9 mapping) and number prefix.
-- Row: name (24sp) + number (grey 16sp).
-- Tap suggestion: populate number field; second tap or explicit call button places call.
+- Off by default to match stock WP8.1. Enable in Phone Settings → smart dial.
+- When enabled, matching contacts (T9 name prefixes + number prefixes) appear above the grid; tap
+  fills the field, tap again calls.
 
 Reference: `images/dialpad_dark_blue.jpg`.
 
 ## In-call screen
 
-WP 8.1 enlarged the outgoing/in-call UI:
+- Full-bleed contact photo when available.
+- Status line: `dialling…` / `ringing…` / live `m:ss` timer / `on hold` / `call ended`.
+- **End call** is a large accent control at the bottom of the grid.
+- Controls: `speaker`, `mute`, `audio` (endpoint chooser when multiple endpoints exist), `hold`,
+  `keypad`, `add call` (only when `InCallService.canAddCall()`), `end call`.
+- No enabled video stub.
 
-- Photo or blank avatar upper-left/center.
-- Name/number dominates vertical space.
-- **End call** is a large red circular control at the bottom — not a border button.
-- **Video** button appeared in 8.1 for Skype/VOIP handoff — stub disabled in v1.
+### DTMF keypad
 
-During outgoing ring, status reads `calling…`. After connect (or simulated connect in harness), show elapsed timer `mm:ss`.
+- Digits call `Call.playDtmfTone()` so the remote party receives the tone; the local tone is
+  restrained.
+
+### Multi-call
+
+- Waiting call row: `answer` (holds current) / `ignore`.
+- Held call row: `swap`, and `merge` when both calls are conferenceable.
+
+### End-call behavior
+
+- End is explicit (End-call control or notification action). **System Back does not end a call** —
+  it navigates (e.g. hides the keypad) or minimises to the return-to-call notification.
+- On real Telecom disconnect the timer stops; no user action is required.
 
 Reference: `images/in_call_dark_blue.png`.
-
-## End-call behavior
-
-- Terminate telephony session (`TelecomManager` / `ACTION_CALL` lifecycle stub acceptable in v1 emulator).
-- Pop route stack to dial pad or history depending on entry point.
-- System Back during ring ≡ End call.

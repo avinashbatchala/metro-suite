@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -22,92 +23,109 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.metro.dialer.telecom.MetroTelecomBridge
 import com.metro.dialer.telecom.MetroTelecomSetup
+import com.metro.dialer.ui.DialerRoute
 import com.metro.dialer.ui.DialerShell
-import com.metro.dialer.ui.DialerState
+import com.metro.dialer.ui.DialerViewModel
 import com.metro.dialer.ui.PermissionScreen
 import com.metro.ui.MetroActivities
-import com.metro.ui.MetroSplash
 import com.metro.ui.MetroAppPivotShell
 import com.metro.ui.MetroLoadingScreen
+import com.metro.ui.MetroSplash
 import com.metro.ui.MetroSystemTheme
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: DialerViewModel by viewModels()
     private val dialNavigationSignal = mutableStateOf(0)
 
     private val requestPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { results ->
-        permissionResult?.invoke(
-            results[Manifest.permission.READ_CALL_LOG] == true,
-            results[Manifest.permission.READ_CONTACTS] == true,
-            results[Manifest.permission.CALL_PHONE] == true,
+        viewModel.onPermissionResult(
+            callLogGranted = results[Manifest.permission.READ_CALL_LOG] == true,
+            contactsGranted = results[Manifest.permission.READ_CONTACTS] == true,
+            callPhoneGranted = results[Manifest.permission.CALL_PHONE] == true,
         )
     }
+
+    private val requestFeaturePermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        viewModel.refreshAfterPermissions()
+    }
+
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* best effort */ }
 
     private val requestDefaultDialer = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { /* role result handled on next resume */ }
 
-    private var permissionResult: ((Boolean, Boolean, Boolean) -> Unit)? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         MetroSplash.install(this)
         super.onCreate(savedInstanceState)
         MetroActivities.applyLaunchTransition(this)
-        MetroTelecomSetup.registerPhoneAccount(this)
-        dialNavigationSignal.value++
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
-            val state = remember { DialerState(context) }
             var permissionTick by remember { mutableStateOf(0) }
             var skippedDefaultDialer by remember { mutableStateOf(false) }
             val pendingDialNavigation by dialNavigationSignal
 
             DisposableEffect(this@MainActivity) {
                 val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_RESUME) {
-                        permissionTick++
-                    }
+                    if (event == Lifecycle.Event.ON_RESUME) permissionTick++
                 }
                 lifecycle.addObserver(observer)
                 onDispose { lifecycle.removeObserver(observer) }
             }
 
-            DisposableEffect(permissionTick) {
-                state.refreshPermissions(context)
-                if (state.hasCallLogPermission) {
-                    state.reloadCallLog()
-                }
-                // People (and others) may have added entries via AddSpeedDialReceiver while
-                // this process stayed alive — reload so the pivot updates without a restart.
-                state.reloadSpeedDial()
-                onDispose { }
+            LaunchedEffect(permissionTick) {
+                viewModel.refreshPermissions()
+                viewModel.reloadSpeedDial()
+                viewModel.reloadContacts()
+                viewModel.reloadHistory()
             }
 
             val isDefaultDialer = MetroTelecomBridge.isDefaultDialer(context)
-            val needsPermissions = !state.hasCallLogPermission || !state.hasCallPhonePermission
-            val needsSetup = needsPermissions ||
-                (!isDefaultDialer && !skippedDefaultDialer)
+            val needsCallPhone = !viewModel.hasCallPhonePermission
+            val needsSetup = needsCallPhone || (!isDefaultDialer && !skippedDefaultDialer)
+            var notificationsRequested by remember { mutableStateOf(false) }
+
+            // Notifications are requested only once the core phone role is in place — not lumped
+            // into the call-permission request.
+            LaunchedEffect(needsSetup, permissionTick) {
+                if (needsSetup || notificationsRequested) return@LaunchedEffect
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+                val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (!granted) {
+                    notificationsRequested = true
+                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
 
             LaunchedEffect(pendingDialNavigation) {
                 if (pendingDialNavigation == 0) return@LaunchedEffect
                 val dialIntent = intent ?: return@LaunchedEffect
                 when (dialIntent.action) {
+                    ACTION_ADD_CALL -> {
+                        viewModel.openDialPad()
+                        setIntent(Intent(Intent.ACTION_MAIN))
+                    }
                     Intent.ACTION_CALL -> {
                         val uri = dialIntent.data ?: return@LaunchedEffect
                         MetroTelecomBridge.handleCallIntent(context, uri)
                         setIntent(Intent(Intent.ACTION_MAIN))
-                        if (MetroTelecomBridge.isDefaultDialer(context)) {
-                            MetroActivities.finishWithExitTransition(this@MainActivity)
-                        }
                     }
                     else -> {
-                        val uri = dialIntent.dialUriOrNull()
+                        val uri = dialIntent.data?.takeIf { it.scheme == "tel" }
                         if (uri != null) {
-                            state.handleDialIntent(uri)
+                            viewModel.handleDialIntent(uri)
                         } else if (dialIntent.action == Intent.ACTION_DIAL) {
-                            state.openDialPad()
+                            viewModel.openDialPad()
                         }
                     }
                 }
@@ -119,32 +137,21 @@ class MainActivity : ComponentActivity() {
                     onExit = { MetroActivities.finishWithExitTransition(this@MainActivity) },
                 ) {
                     when {
-                        !state.permissionsChecked -> {
+                        !viewModel.permissionsChecked -> {
                             MetroLoadingScreen(modifier = Modifier.fillMaxSize())
                         }
                         needsSetup -> {
                             PermissionScreen(
-                                hasCallLogPermission = state.hasCallLogPermission,
-                                hasCallPhonePermission = state.hasCallPhonePermission,
+                                hasCallPhonePermission = viewModel.hasCallPhonePermission,
                                 isDefaultDialer = isDefaultDialer,
                                 onRequestPermissions = {
-                                    permissionResult = { callLog, contacts, callPhone ->
-                                        state.onPermissionResult(callLog, contacts, callPhone)
-                                    }
-                                    val permissions = buildList {
-                                        add(Manifest.permission.READ_CALL_LOG)
-                                        add(Manifest.permission.READ_CONTACTS)
-                                        add(Manifest.permission.CALL_PHONE)
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            add(Manifest.permission.POST_NOTIFICATIONS)
-                                        }
-                                    }
-                                    requestPermissions.launch(permissions.toTypedArray())
+                                    requestPermissions.launch(
+                                        arrayOf(Manifest.permission.CALL_PHONE),
+                                    )
                                 },
                                 onRequestDefaultDialer = {
-                                    MetroTelecomSetup.createDefaultDialerRequestIntent(context)?.let { roleIntent ->
-                                        requestDefaultDialer.launch(roleIntent)
-                                    }
+                                    MetroTelecomSetup.createDefaultDialerRequestIntent(context)
+                                        ?.let { requestDefaultDialer.launch(it) }
                                 },
                                 onContinue = { skippedDefaultDialer = true },
                                 modifier = Modifier.fillMaxSize(),
@@ -152,7 +159,10 @@ class MainActivity : ComponentActivity() {
                         }
                         else -> {
                             DialerShell(
-                                state = state,
+                                state = viewModel,
+                                onRequestPermissions = { permissions ->
+                                    requestFeaturePermissions.launch(permissions)
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -168,5 +178,7 @@ class MainActivity : ComponentActivity() {
         dialNavigationSignal.value++
     }
 
-    private fun Intent?.dialUriOrNull(): Uri? = this?.data?.takeIf { it.scheme == "tel" }
+    companion object {
+        const val ACTION_ADD_CALL = "com.metro.dialer.action.ADD_CALL"
+    }
 }

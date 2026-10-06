@@ -1,17 +1,17 @@
 package com.metro.dialer.data
 
-import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
-import android.net.Uri
 import android.provider.CallLog
-import android.provider.ContactsContract
 
+/**
+ * Read access to the platform call log. No contact resolution here (the ViewModel enriches entries
+ * from a single contacts-cache query) and no threading decisions.
+ */
 class CallLogRepository(
     private val context: Context,
 ) {
     fun loadRecentCalls(limit: Int = 200): List<CallEntry> {
-        val resolver = context.contentResolver
         val projection = arrayOf(
             CallLog.Calls._ID,
             CallLog.Calls.NUMBER,
@@ -19,58 +19,65 @@ class CallLogRepository(
             CallLog.Calls.TYPE,
             CallLog.Calls.DATE,
             CallLog.Calls.DURATION,
+            CallLog.Calls.NUMBER_PRESENTATION,
         )
-        val sort = "${CallLog.Calls.DATE} DESC"
-        val cursor = resolver.query(
+        val cursor = context.contentResolver.query(
             CallLog.Calls.CONTENT_URI,
             projection,
             null,
             null,
-            sort,
+            "${CallLog.Calls.DATE} DESC",
         ) ?: return emptyList()
 
         cursor.use {
             val entries = mutableListOf<CallEntry>()
             while (cursor.moveToNext() && entries.size < limit) {
-                entries.add(cursor.toCallEntry(resolver))
+                entries.add(cursor.toCallEntry())
             }
             return entries
         }
     }
 
-    private fun Cursor.toCallEntry(resolver: ContentResolver): CallEntry {
+    private fun Cursor.toCallEntry(): CallEntry {
         val id = getLong(getColumnIndexOrThrow(CallLog.Calls._ID))
-        val number = getString(getColumnIndexOrThrow(CallLog.Calls.NUMBER)) ?: ""
+        val rawNumber = getString(getColumnIndexOrThrow(CallLog.Calls.NUMBER)).orEmpty()
         val cachedName = getString(getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME))
         val type = getInt(getColumnIndexOrThrow(CallLog.Calls.TYPE))
         val date = getLong(getColumnIndexOrThrow(CallLog.Calls.DATE))
         val duration = getInt(getColumnIndexOrThrow(CallLog.Calls.DURATION))
-        val normalized = DialerCallLogic.normalizeNumber(number)
-        val resolvedName = cachedName?.takeIf { it.isNotBlank() }
-            ?: lookupContactName(resolver, normalized)
+        val presentation = getInt(getColumnIndexOrThrow(CallLog.Calls.NUMBER_PRESENTATION))
+
+        val trimmed = rawNumber.trim()
+        val isPrivate = presentation == CallLog.Calls.PRESENTATION_RESTRICTED ||
+            presentation == CallLog.Calls.PRESENTATION_PAYPHONE
+        val isUnknown = presentation == CallLog.Calls.PRESENTATION_UNKNOWN ||
+            (trimmed.isEmpty() && !isPrivate) ||
+            trimmed == "-1" || trimmed == "-2" || trimmed == "-3"
+
         return CallEntry(
             id = id,
-            phoneNumber = number,
-            normalizedNumber = normalized,
+            phoneNumber = if (isPrivate || isUnknown) "" else trimmed,
+            normalizedNumber = DialerCallLogic.normalizeNumber(trimmed),
             type = DialerCallLogic.mapCallType(type),
             timestamp = date,
             durationSeconds = duration,
-            contactName = resolvedName,
+            contactName = cachedName?.takeIf { it.isNotBlank() },
+            presentation = presentation,
+            isPrivate = isPrivate,
+            isUnknown = isUnknown,
         )
     }
 
-    private fun lookupContactName(resolver: ContentResolver, normalized: String): String? {
-        if (normalized.isBlank()) return null
-        val uri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            Uri.encode(normalized),
-        )
-        val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
-        resolver.query(uri, projection, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                return cursor.getString(0)
-            }
-        }
-        return null
+    /** Delete exact call-log rows by id. Returns true when the provider accepted the delete. */
+    fun deleteCalls(ids: Collection<Long>): Boolean {
+        if (ids.isEmpty()) return true
+        val selection = ids.joinToString(" OR ") { "${CallLog.Calls._ID}=?" }
+        return runCatching {
+            context.contentResolver.delete(
+                CallLog.Calls.CONTENT_URI,
+                "($selection)",
+                ids.map { it.toString() }.toTypedArray(),
+            )
+        }.isSuccess
     }
 }

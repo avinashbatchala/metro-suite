@@ -47,7 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metro.dialer.R
-import com.metro.dialer.data.CallDirection
+import com.metro.dialer.data.CallType
 import com.metro.dialer.data.CallGroup
 import com.metro.dialer.data.DialerCallLogic
 import com.metro.dialer.telecom.DialPadTonePlayer
@@ -105,6 +105,7 @@ fun CallDetailScreen(
     onBack: () -> Unit,
     onCall: () -> Unit,
     onMessage: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
@@ -152,17 +153,22 @@ fun CallDetailScreen(
             ) {
                 group.calls.forEach { call ->
                     val directionLabel = when (call.type) {
-                        CallDirection.Incoming -> stringResource(R.string.incoming)
-                        CallDirection.Outgoing -> stringResource(R.string.outgoing)
-                        CallDirection.Missed -> stringResource(R.string.missed)
+                        CallType.INCOMING -> stringResource(R.string.incoming)
+                        CallType.OUTGOING -> stringResource(R.string.outgoing)
+                        CallType.MISSED -> stringResource(R.string.missed)
+                        CallType.REJECTED -> stringResource(R.string.rejected)
+                        CallType.BLOCKED -> stringResource(R.string.blocked)
+                        CallType.VOICEMAIL -> stringResource(R.string.voicemail)
+                        CallType.ANSWERED_EXTERNALLY -> stringResource(R.string.answered_elsewhere)
+                        CallType.UNKNOWN -> stringResource(R.string.unknown)
                     }
                     val durationLabel = when {
-                        call.type == CallDirection.Missed -> stringResource(R.string.missed)
+                        call.type.isMissedFamily -> stringResource(R.string.missed)
                         call.durationSeconds > 0 -> DialerCallLogic.formatDuration(call.durationSeconds)
                         else -> stringResource(R.string.declined)
                     }
-                    val titleColor = when (call.type) {
-                        CallDirection.Missed -> MetroColors.AccentRed
+                    val titleColor = when {
+                        call.type.isMissedFamily -> MetroColors.AccentRed
                         else -> MetroTheme.colors.primaryText
                     }
                     Column(
@@ -203,12 +209,16 @@ fun CallDetailScreen(
                     label = stringResource(R.string.message),
                     onClick = onMessage,
                 ),
+                MetroAppBarIcon(
+                    type = MetroSystemIconType.Delete,
+                    label = stringResource(R.string.delete),
+                    onClick = onDelete,
+                ),
             ),
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
-
 @Composable
 fun DialPadPane(
     suggestions: List<com.metro.dialer.data.ContactSuggestion>,
@@ -620,5 +630,51 @@ private fun SaveActionKey(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+    }
+}
+
+@Composable
+fun DialPadSubpage(
+    state: DialerViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onBack)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .metroNavBarPadding()
+            .background(Color.Black),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = MetroAppBarDefaults.BarHeight),
+        ) {
+            DialNumberField(
+                dialString = state.dialString,
+                onDelete = state::deleteDialChar,
+            )
+            DialPadPane(
+                suggestions = state.t9Suggestions,
+                onAppend = state::appendDialChar,
+                onLongPressZero = { state.appendDialChar('+') },
+                onSuggestionClick = state::selectSuggestion,
+                onCall = { state.placeCall(state.dialString) },
+                onSave = state::openSaveContact,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        MetroAppBar(
+            icons = listOf(
+                MetroAppBarIcon(
+                    type = MetroSystemIconType.People,
+                    label = stringResource(R.string.people),
+                    onClick = state::launchPeople,
+                ),
+            ),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }

@@ -1,12 +1,9 @@
 package com.metro.dialer
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,21 +12,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
-import com.metro.dialer.data.DialerCallLogic
-import com.metro.system.MetroLockscreen
+import com.metro.dialer.data.PhonePreferences
+import com.metro.dialer.telecom.ActiveCallNotifier
 import com.metro.dialer.telecom.IncomingCallNotifier
+import com.metro.dialer.telecom.MetroCallEndpoint
+import com.metro.dialer.telecom.MetroCallEndpointType
 import com.metro.dialer.telecom.MetroCallSession
 import com.metro.dialer.telecom.ProximityScreenController
 import com.metro.dialer.ui.InCallScreen
 import com.metro.dialer.ui.IncomingCallScreen
+import com.metro.system.MetroLockscreen
 import com.metro.ui.MetroStatusBarFullscreenEffect
 import com.metro.ui.MetroSystemTheme
 
 class InCallActivity : ComponentActivity() {
     private val proximityScreen by lazy { ProximityScreenController(this) }
     private var proximityWanted = false
+    private lateinit var phonePreferences: PhonePreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        phonePreferences = PhonePreferences(this)
         MetroLockscreen.requestSuppress(this, true)
         super.onCreate(savedInstanceState)
         enableShowWhenLocked()
@@ -41,58 +43,73 @@ class InCallActivity : ComponentActivity() {
             return
         }
 
-        MetroCallSession.setOnCallEndedListener {
+        val lockedAtLaunch = IncomingCallNotifier.needsFullScreenIntent(this)
+
+        MetroCallSession.setOnSessionEndedListener {
             runOnUiThread { finish() }
         }
 
         setContent {
-            val call by MetroCallSession.activeCall
-            val speakerOn by MetroCallSession.speakerOn
-            val bluetoothOn by MetroCallSession.bluetoothOn
+            val session by MetroCallSession.state
+            val context = this
 
-            LaunchedEffect(call) {
-                if (call == null) finish()
+            LaunchedEffect(session.isEmpty) {
+                if (session.isEmpty) finish()
             }
 
-            LaunchedEffect(call, speakerOn, bluetoothOn) {
-                val active = call
-                proximityWanted = active != null &&
-                    !DialerCallLogic.isIncomingRinging(active) &&
-                    !speakerOn &&
-                    !bluetoothOn
+            val ringing = session.ringingCall
+            val primaryActive = session.primaryCall?.state?.isConnected == true
+            val endpoint = session.audio.currentEndpoint
+            val privateAudio = endpoint?.type == MetroCallEndpointType.EARPIECE ||
+                endpoint == null
+
+            LaunchedEffect(primaryActive, endpoint?.type, ringing?.id) {
+                proximityWanted = primaryActive && privateAudio && ringing == null
                 syncProximityScreen()
             }
 
             MetroSystemTheme {
-                MetroStatusBarFullscreenEffect(active = call != null)
-                call?.let { activeCall ->
-                    if (DialerCallLogic.isIncomingRinging(activeCall)) {
-                        IncomingCallScreen(
-                            call = activeCall,
-                            onAnswer = MetroCallSession::answerCall,
-                            onIgnore = {
-                                MetroCallSession.rejectCall()
-                                finish()
-                            },
-                            onTextReply = {
-                                val number = activeCall.phoneNumber
-                                MetroCallSession.rejectCall()
-                                launchTextReply(number)
-                                finish()
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        InCallScreen(
-                            call = activeCall,
-                            onEndCall = {
-                                MetroCallSession.endCall(this@InCallActivity)
-                                finish()
-                            },
-                            onConnected = MetroCallSession::markConnected,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                MetroStatusBarFullscreenEffect(active = !session.isEmpty)
+                if (ringing != null) {
+                    IncomingCallScreen(
+                        call = ringing,
+                        textReplies = phonePreferences.textReplies(),
+                        textReplyEnabled = phonePreferences.textReplyEnabled,
+                        lockedReveal = lockedAtLaunch,
+                        onAnswer = { MetroCallSession.answer(ringing.id) },
+                        onIgnore = { MetroCallSession.reject(ringing.id) },
+                        onTextReply = { message -> MetroCallSession.reject(ringing.id, message) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    InCallScreen(
+                        session = session,
+                        onEndCall = { callId -> MetroCallSession.end(callId, context) },
+                        onHold = { callId, held -> MetroCallSession.hold(callId, held) },
+                        onSwap = { MetroCallSession.swap() },
+                        onMerge = { MetroCallSession.merge() },
+                        onSplit = { callId -> MetroCallSession.splitCall(callId) },
+                        onAnswerCall = { callId -> MetroCallSession.answer(callId) },
+                        onAddCall = {
+                            startActivity(
+                                Intent(context, MainActivity::class.java).apply {
+                                    addFlags(
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                                    )
+                                    action = "com.metro.dialer.action.ADD_CALL"
+                                },
+                            )
+                        },
+                        onSelectEndpoint = { endpointValue: MetroCallEndpoint ->
+                            MetroCallSession.selectAudioEndpoint(endpointValue)
+                        },
+                        onToggleMute = {
+                            MetroCallSession.setMuted(!MetroCallSession.state.value.audio.muted)
+                        },
+                        onMinimize = { finish() },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }
@@ -100,10 +117,13 @@ class InCallActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (!MetroCallSession.hasActiveCall()) {
+            finish()
+            return
+        }
         MetroLockscreen.requestSuppress(this, true)
-        // Metro incoming / in-call UI is visible — dismiss Android notification chrome.
         IncomingCallNotifier.stop(this)
-        MetroCallSession.hideMinimizedNotification(this)
+        ActiveCallNotifier.stop(this)
     }
 
     override fun onResume() {
@@ -117,31 +137,24 @@ class InCallActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // Start / Home minimizes an answered/outgoing call to the Metro green banner.
-        // While still ringing on a locked/off screen, keep the FSI notification for wake-up.
-        val call = MetroCallSession.activeCall.value
-        if (call != null && !isFinishing) {
-            if (DialerCallLogic.isIncomingRinging(call)) {
+        val session = MetroCallSession.currentState()
+        if (!session.isEmpty && !isFinishing) {
+            val ringing = session.ringingCall
+            if (ringing != null && IncomingCallNotifier.needsFullScreenIntent(this)) {
                 MetroLockscreen.requestSuppress(this, true)
-                if (IncomingCallNotifier.needsFullScreenIntent(this)) {
-                    IncomingCallNotifier.show(this, call)
-                }
+                IncomingCallNotifier.show(this, ringing)
             } else {
                 MetroLockscreen.requestSuppress(this, false)
-                MetroCallSession.showMinimizedNotification(this)
+                session.primaryCall?.let { ActiveCallNotifier.start(this, it) }
             }
         }
         super.onStop()
     }
 
     override fun onDestroy() {
-        val call = MetroCallSession.activeCall.value
-        if (call == null || !DialerCallLogic.isIncomingRinging(call)) {
-            MetroLockscreen.requestSuppress(this, false)
-        }
         proximityWanted = false
         proximityScreen.setEnabled(false)
-        MetroCallSession.setOnCallEndedListener(null)
+        MetroCallSession.setOnSessionEndedListener(null)
         super.onDestroy()
     }
 
@@ -160,18 +173,6 @@ class InCallActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             )
-        }
-    }
-
-    private fun launchTextReply(phoneNumber: String) {
-        if (phoneNumber.isBlank()) return
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phoneNumber")).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        try {
-            startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(this, R.string.messaging_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
 }

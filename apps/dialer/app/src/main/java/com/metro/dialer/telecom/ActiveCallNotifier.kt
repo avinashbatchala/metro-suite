@@ -7,74 +7,46 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.metro.dialer.InCallActivity
 import com.metro.dialer.R
-import com.metro.dialer.data.ActiveCall
-import com.metro.dialer.data.DialerCallLogic
 import com.metro.system.MetroPreferences
 
 /**
- * Posts the ongoing active-call notification used when the in-call UI is backgrounded.
+ * Ongoing active-call notification shown while the in-call UI is backgrounded.
  *
- * Content is intentionally minimal (name + status/timer) so the Metro green return-to-call
- * banner can present it in WP8.1 form without Material CallStyle chrome.
+ * Uses the platform chronometer (stable connected timestamp) rather than re-posting the
+ * notification every second. The Metro notifications overlay reads this notification to present
+ * the green return-to-call strip.
  */
 object ActiveCallNotifier {
     const val NOTIFICATION_ID = 0xC411
     const val NOTIFICATION_TAG = "active_call"
     private const val CHANNEL_ID = "metro_active_call"
 
-    private val handler = Handler(Looper.getMainLooper())
-    private var ticking = false
-
-    private val tickRunnable = object : Runnable {
-        override fun run() {
-            val call = MetroCallSession.activeCall.value
-            if (call == null) {
-                ticking = false
-                return
-            }
-            val context = appContext ?: return
-            post(context, call)
-            handler.postDelayed(this, 1_000L)
-        }
-    }
-
-    @Volatile
-    private var appContext: Context? = null
-
-    fun start(context: Context, call: ActiveCall) {
-        appContext = context.applicationContext
-        ensureChannel(context.applicationContext)
-        post(context.applicationContext, call)
-        if (!ticking) {
-            ticking = true
-            handler.postDelayed(tickRunnable, 1_000L)
-        }
-    }
-
-    fun update(context: Context, call: ActiveCall) {
-        appContext = context.applicationContext
+    fun start(context: Context, call: MetroTelecomCall) {
         ensureChannel(context.applicationContext)
         post(context.applicationContext, call)
     }
+
+    fun update(context: Context, call: MetroTelecomCall) = start(context, call)
 
     fun stop(context: Context) {
-        ticking = false
-        handler.removeCallbacks(tickRunnable)
         NotificationManagerCompat.from(context.applicationContext)
             .cancel(NOTIFICATION_TAG, NOTIFICATION_ID)
-        appContext = null
     }
 
-    private fun post(context: Context, call: ActiveCall) {
+    fun postFromSession(context: Context, session: MetroCallSessionState) {
+        val call = session.primaryCall ?: return
+        start(context, call)
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun post(context: Context, call: MetroTelecomCall) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
@@ -90,22 +62,28 @@ object ActiveCallNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val statusText = if (call.connected) {
-            val elapsed = ((System.currentTimeMillis() - call.startedAtMillis) / 1000L)
-                .coerceAtLeast(0L)
-                .toInt()
-            DialerCallLogic.formatDuration(elapsed)
-        } else {
-            context.getString(R.string.calling)
+        val connected = call.state.isConnected
+        val statusText = when (call.state) {
+            MetroCallState.ACTIVE, MetroCallState.HOLDING -> {
+                if (call.state == MetroCallState.HOLDING) {
+                    context.getString(R.string.on_hold)
+                } else {
+                    context.getString(R.string.active_call)
+                }
+            }
+            MetroCallState.DIALING, MetroCallState.CONNECTING ->
+                context.getString(R.string.dialling)
+            MetroCallState.RINGING -> context.getString(R.string.calling)
+            else -> context.getString(R.string.active_call)
         }
 
         val accent = runCatching {
-            android.graphics.Color.parseColor(MetroPreferences(context).accentColorHex)
+            MetroPreferences(context).accentColor.toArgb()
         }.getOrDefault(0xFF1BA1E2.toInt())
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_phone)
-            .setContentTitle(call.displayName)
+            .setContentTitle(call.primaryLabel)
             .setContentText(statusText)
             .setSubText(context.getString(R.string.active_call_notification_label))
             .setOngoing(true)
@@ -121,20 +99,26 @@ object ActiveCallNotifier {
                 endIntent,
             )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
+
+        val connectTime = call.connectTimeMillis
+        if (connected && connectTime != null) {
+            builder
+                .setUsesChronometer(true)
+                .setWhen(connectTime)
+                .setShowWhen(true)
+                .setChronometerCountDown(false)
+        }
 
         runCatching {
-            manager.notify(NOTIFICATION_TAG, NOTIFICATION_ID, notification)
+            manager.notify(NOTIFICATION_TAG, NOTIFICATION_ID, builder.build())
         }
     }
 
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        // Drop the temporary quiet channel from an earlier heads-up fix.
         manager.deleteNotificationChannel("metro_active_call_quiet")
-        val existing = manager.getNotificationChannel(CHANNEL_ID)
-        if (existing != null) return
+        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,

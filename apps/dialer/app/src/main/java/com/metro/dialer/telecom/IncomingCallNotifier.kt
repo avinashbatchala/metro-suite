@@ -1,7 +1,6 @@
 package com.metro.dialer.telecom
 
 import android.app.KeyguardManager
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,11 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.metro.dialer.InCallActivity
 import com.metro.dialer.R
-import com.metro.dialer.data.ActiveCall
 import com.metro.system.MetroPreferences
 
 /**
@@ -28,7 +27,8 @@ object IncomingCallNotifier {
     const val NOTIFICATION_TAG = "incoming_call"
     private const val CHANNEL_ID = "metro_incoming_call"
 
-    fun show(context: Context, call: ActiveCall) {
+    @android.annotation.SuppressLint("MissingPermission")
+    fun show(context: Context, call: MetroTelecomCall) {
         val appContext = context.applicationContext
         ensureChannel(appContext)
         val manager = NotificationManagerCompat.from(appContext)
@@ -44,12 +44,12 @@ object IncomingCallNotifier {
         )
 
         val accent = runCatching {
-            android.graphics.Color.parseColor(MetroPreferences(appContext).accentColorHex)
+            MetroPreferences(appContext).accentColor.toArgb()
         }.getOrDefault(0xFF1BA1E2.toInt())
 
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_phone)
-            .setContentTitle(call.displayName)
+            .setContentTitle(call.primaryLabel)
             .setContentText(appContext.getString(R.string.incoming_call_label))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)
@@ -83,8 +83,7 @@ object IncomingCallNotifier {
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        val existing = manager.getNotificationChannel(CHANNEL_ID)
-        if (existing != null) return
+        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -93,7 +92,7 @@ object IncomingCallNotifier {
             ).apply {
                 description = context.getString(R.string.incoming_call_channel_description)
                 setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 enableVibration(true)
             },
         )

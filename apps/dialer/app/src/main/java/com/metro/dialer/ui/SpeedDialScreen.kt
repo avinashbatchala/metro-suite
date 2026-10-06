@@ -1,9 +1,5 @@
 package com.metro.dialer.ui
 
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,44 +28,35 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.metro.dialer.R
-import com.metro.dialer.data.ContactsLookup
+import com.metro.dialer.data.DialerCallLogic
 import com.metro.dialer.data.SpeedDialEntry
-import com.metro.ui.MetroContextMenuActiveShift
 import com.metro.ui.MetroContextMenuClearOnDismiss
-import com.metro.ui.MetroContextMenuDimmedAlpha
 import com.metro.ui.MetroContextMenuItem
 import com.metro.ui.MetroContextMenuPopup
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
-import com.metro.ui.MetroTransitions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Mutable holder so layout callbacks can update without triggering recomposition. */
 private class SpeedDialRectRef {
     var value: Rect = Rect.Zero
 }
 
 @Composable
 fun SpeedDialScreen(
-    entries: List<SpeedDialEntry>,
-    onCall: (SpeedDialEntry) -> Unit,
-    onPinToStart: (SpeedDialEntry) -> Unit,
-    canPinToStart: (SpeedDialEntry) -> Boolean,
-    onRemove: (SpeedDialEntry) -> Unit,
+    state: DialerViewModel,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    if (entries.isEmpty()) {
+    if (state.speedDialEntries.isEmpty()) {
         EmptyPane(
             message = stringResource(R.string.speed_dial_empty),
             modifier = modifier,
@@ -76,80 +64,78 @@ fun SpeedDialScreen(
         return
     }
 
-    var contextMenuEntry by remember { mutableStateOf<SpeedDialEntry?>(null) }
-    var contextMenuAnchor by remember { mutableStateOf(Rect.Zero) }
-    var contextMenuRoot by remember { mutableStateOf(Rect.Zero) }
-    val contextMenuVisible = remember { MutableTransitionState(false) }
-    val popupRootBounds = remember { SpeedDialRectRef() }
-    val contextMenuFocusTransition =
-        updateTransition(contextMenuVisible, label = "speedDialContextMenuFocus")
-    val contextMenuFocusFraction by contextMenuFocusTransition.animateFloat(
-        transitionSpec = { tween(MetroTransitions.AppBarSlideMs) },
-        label = "focusFraction",
-    ) { visible -> if (visible) 1f else 0f }
+    var menuEntry by remember { mutableStateOf<SpeedDialEntry?>(null) }
+    var menuAnchor by remember { mutableStateOf(Rect.Zero) }
+    var menuRoot by remember { mutableStateOf(Rect.Zero) }
+    val rootRef = remember { SpeedDialRectRef() }
+    val menuVisible = remember { androidx.compose.animation.core.MutableTransitionState(false) }
 
-    val openContextMenu: (SpeedDialEntry, Rect) -> Unit = { entry, bounds ->
-        contextMenuAnchor = bounds
-        contextMenuRoot = popupRootBounds.value
-        contextMenuEntry = entry
-        contextMenuVisible.targetState = true
+    val openMenu: (SpeedDialEntry, Rect) -> Unit = { entry, bounds ->
+        menuAnchor = bounds
+        menuRoot = rootRef.value
+        menuEntry = entry
+        menuVisible.targetState = true
     }
-    val dismissContextMenu: () -> Unit = {
-        contextMenuVisible.targetState = false
-    }
-    MetroContextMenuClearOnDismiss(contextMenuVisible) {
-        contextMenuEntry = null
-    }
+    val dismissMenu: () -> Unit = { menuVisible.targetState = false }
+    MetroContextMenuClearOnDismiss(menuVisible) { menuEntry = null }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .onGloballyPositioned { coordinates ->
-                popupRootBounds.value = coordinates.boundsInWindow()
-            },
+            .onGloballyPositioned { rootRef.value = it.boundsInWindow() },
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
                 .padding(horizontal = 12.dp),
         ) {
-            items(entries, key = { it.id }) { entry ->
+            items(state.speedDialEntries, key = { it.id }) { entry ->
                 SpeedDialRow(
                     entry = entry,
-                    contextMenuTarget = contextMenuEntry?.id == entry.id,
-                    contextMenuFocusFraction = contextMenuFocusFraction,
-                    onCall = { onCall(entry) },
-                    onLongPress = { bounds -> openContextMenu(entry, bounds) },
+                    contact = state.contactFor(entry.phoneNumber),
+                    onCall = {
+                        if (entry.phoneNumber.isNotBlank()) {
+                            state.placeCall(entry.phoneNumber, entry.displayName)
+                        } else {
+                            state.openContact(entry)
+                        }
+                    },
+                    onLongPress = { bounds -> openMenu(entry, bounds) },
                 )
             }
         }
 
-        contextMenuEntry?.let { entry ->
-            val pinLabel = stringResource(R.string.pin_to_start)
-            val removeLabel = stringResource(R.string.remove_from_speed_dial)
+        menuEntry?.let { entry ->
             MetroContextMenuPopup(
-                visibleState = contextMenuVisible,
-                anchorBounds = contextMenuAnchor,
-                rootBounds = contextMenuRoot,
+                visibleState = menuVisible,
+                anchorBounds = menuAnchor,
+                rootBounds = menuRoot,
                 items = listOf(
                     MetroContextMenuItem(
-                        label = pinLabel,
-                        enabled = canPinToStart(entry),
+                        label = stringResource(R.string.open_contact),
                         onClick = {
-                            onPinToStart(entry)
-                            dismissContextMenu()
+                            state.openContact(entry)
+                            dismissMenu()
                         },
                     ),
                     MetroContextMenuItem(
-                        label = removeLabel,
+                        label = stringResource(R.string.pin_to_start),
                         onClick = {
-                            onRemove(entry)
-                            dismissContextMenu()
+                            state.pinToStart(entry)
+                            dismissMenu()
+                        },
+                    ),
+                    MetroContextMenuItem(
+                        label = stringResource(R.string.remove_from_speed_dial),
+                        onClick = {
+                            state.removeSpeedDial(entry)
+                            dismissMenu()
                         },
                     ),
                 ),
-                onDismissRequest = dismissContextMenu,
+                onDismissRequest = dismissMenu,
             )
         }
     }
@@ -159,35 +145,21 @@ fun SpeedDialScreen(
 @Composable
 private fun SpeedDialRow(
     entry: SpeedDialEntry,
-    contextMenuTarget: Boolean,
-    contextMenuFocusFraction: Float,
+    contact: com.metro.dialer.data.ContactSuggestion?,
     onCall: () -> Unit,
     onLongPress: (Rect) -> Unit,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
     val rowBounds = remember(entry.id) { SpeedDialRectRef() }
-    val density = LocalDensity.current
-    val activeShiftPx = with(density) { MetroContextMenuActiveShift.toPx() }
-    val dimmed = contextMenuFocusFraction > 0f && !contextMenuTarget
-    val nudge = if (contextMenuTarget) contextMenuFocusFraction * activeShiftPx else 0f
+    val displayName = contact?.displayName ?: entry.displayName
+    val subtitle = entry.phoneNumber.ifBlank { stringResource(R.string.speed_dial_unavailable) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 76.dp)
-            .graphicsLayer {
-                alpha = if (dimmed) {
-                    1f - contextMenuFocusFraction * (1f - MetroContextMenuDimmedAlpha)
-                } else {
-                    1f
-                }
-                translationX = -nudge
-            }
-            .onGloballyPositioned { coordinates ->
-                rowBounds.value = coordinates.boundsInWindow()
-            }
+            .onGloballyPositioned { rowBounds.value = it.boundsInWindow() }
             .combinedClickable(
-                interactionSource = interactionSource,
+                interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onCall,
                 onLongClick = { onLongPress(rowBounds.value) },
@@ -196,16 +168,14 @@ private fun SpeedDialRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SpeedDialAvatar(
-            name = entry.displayName,
-            phoneNumber = entry.phoneNumber,
+            name = displayName,
+            photoUri = contact?.photoUri,
+            number = entry.phoneNumber,
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
+            MetroText(text = displayName, style = MetroTextStyle.ListItemTitle)
             MetroText(
-                text = entry.displayName,
-                style = MetroTextStyle.ListItemTitle,
-            )
-            MetroText(
-                text = entry.phoneNumber,
+                text = subtitle,
                 style = MetroTextStyle.ListItemSubtitle,
                 color = MetroTheme.colors.secondaryText,
             )
@@ -216,19 +186,23 @@ private fun SpeedDialRow(
 @Composable
 private fun SpeedDialAvatar(
     name: String,
-    phoneNumber: String,
+    photoUri: android.net.Uri?,
+    number: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val contactsLookup = remember(context) { ContactsLookup(context) }
-    var photo by remember(phoneNumber) { mutableStateOf<ImageBitmap?>(null) }
-
-    LaunchedEffect(phoneNumber) {
+    var photo by remember(photoUri, number) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(photoUri, number) {
         photo = withContext(Dispatchers.IO) {
-            contactsLookup.loadContactPhoto(phoneNumber)?.asImageBitmap()
+            val lookup = com.metro.dialer.data.ContactsLookup(context)
+            val bitmap = if (photoUri != null) {
+                lookup.loadContactPhotoByUri(photoUri)
+            } else {
+                lookup.loadContactPhoto(number)
+            }
+            bitmap?.asImageBitmap()
         }
     }
-
     val initial = name.firstOrNull()?.uppercaseChar()?.toString() ?: "#"
     Box(
         modifier = modifier
@@ -236,10 +210,10 @@ private fun SpeedDialAvatar(
             .background(MetroTheme.colors.accent),
         contentAlignment = Alignment.Center,
     ) {
-        val currentPhoto = photo
-        if (currentPhoto != null) {
+        val current = photo
+        if (current != null) {
             Image(
-                bitmap = currentPhoto,
+                bitmap = current,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

@@ -1,18 +1,21 @@
 # Phone hub — history & speed dial
 
-Supplementary guide for pivot panes. Authoritative layout: [`blueprint.md`](blueprint.md).
+Supplementary guide. Authoritative layout: [`blueprint.md`](blueprint.md).
 
 ## History pane
 
-WP 8.1 Phone opens to **history**, not the dial pad. The list is the primary surface for returning missed calls and redialing.
+WP 8.1 Phone opens to **history**.
 
 ### Grouping rules
 
-1. Group consecutive log entries by **normalized phone number** (strip spaces, dashes; keep leading `+`).
-2. If `READ_CONTACTS` resolves a name, show name as primary label; number moves to detail view only.
-3. Sort groups by **most recent call timestamp** descending.
-4. Within a group, retain individual `CallEntry` rows for the number view (Page 2).
-5. Display `(n)` on the primary label when `n > 1`.
+1. Group calls by **caller identity** (contact lookup key, else normalized number) **and local
+   calendar date**. Repeated calls from the same caller on the same day collapse to one row with
+   an `(n)` count; the same caller on another day is a separate row.
+2. Show the ContactsContract display name verbatim when resolved; the number otherwise.
+3. Sort groups by most recent call timestamp descending; render dated section headers
+   (`today`, `yesterday`, weekday, date).
+4. Keep individual `CallEntry` rows for the Call-detail page.
+5. Never group private/unknown callers into a single lifetime record.
 
 ### Row semantics
 
@@ -20,30 +23,32 @@ WP 8.1 Phone opens to **history**, not the dial pad. The list is the primary sur
 |-----------|---------------|-----------------|
 | Incoming (answered) | White | `incoming · <relative time>` |
 | Outgoing | White | `outgoing · <relative time>` |
-| Missed | Red `#E51400` | `missed · <relative time>` |
+| Missed / rejected / blocked | Accent red `#E51400` | `missed` / `rejected` / `blocked` |
+| Voicemail / answered externally | White | type label + time |
 
-The right-side phone icon always initiates an outgoing call to that number — WP users expect one-tap redial.
+### Interactions (corrected)
 
-### Search/filter
+- Tap the name/number → **call**.
+- Tap the right-side contact icon → contact card (known) or Save flow (unknown). It does **not**
+  call.
+- Long press → `details`, `delete`, `block number`, `add to speed dial`.
 
-Tapping search narrows the visible groups by substring match on name or number. Clearing search restores full list. No separate search results page in v1.
+### Search / select
+
+- Search filters the visible groups by name/number substring.
+- Overflow `select calls` enters multi-select (delete / select all / cancel).
 
 ## Speed dial pane
 
-Introduced in WP 8.1 after heavy user demand. Not available on WP 8.0.
-
-- Contacts are **explicitly pinned** — not auto-generated from frequent calls.
-- Add via long-press on history row → `add to speed dial`.
-- Order is user-controlled (long-press → move up/down — optional in v1; append-only acceptable).
-- Tapping a speed-dial row places a call immediately (same as history callback).
+- Contacts are **explicitly added** via `+` in the app bar (or People's `add to speed dial`).
+- Entries are stored by durable contact identity (lookup key / data id) plus a number fallback, so
+  renames, photo changes and label changes render automatically.
+- Tap → call. Long press → `open contact`, `pin to start`, `remove from speed dial`.
 
 ## Bottom app bar icons
 
-| Icon | Action |
-|------|--------|
-| Dial pad (grid/keypad glyph) | Open Page 3 |
-| People (address book) | Launch People app |
-| Search | Toggle in-app history filter |
-| … | Settings stub, blocked calls stub |
-
-App bar is **minimized** (icons only) on hub panes per WP 8.1 Phone.
+| Pane | Icons | Overflow |
+|------|-------|----------|
+| History | dial pad, people, search | select calls, settings |
+| Speed dial | add, people | settings |
+| Voicemail | — | settings |

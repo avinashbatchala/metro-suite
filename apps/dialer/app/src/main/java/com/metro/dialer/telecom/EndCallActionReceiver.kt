@@ -8,7 +8,7 @@ import android.content.Intent
 class EndCallActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_END) return
-        MetroCallSession.endCall(context)
+        MetroCallSession.endAll(context)
     }
 
     companion object {

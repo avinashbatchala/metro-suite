@@ -1,29 +1,27 @@
 package com.metro.dialer.telecom
 
 import android.app.role.RoleManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.telecom.PhoneAccount
-import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 
+/**
+ * Default-dialer role acquisition.
+ *
+ * Metro deliberately does **not** register its own cellular [android.telecom.PhoneAccount] or
+ * [android.telecom.ConnectionService]: Android Telecom owns real cellular calling. The only setup
+ * Metro needs for cellular is the [RoleManager.ROLE_DIALER] role plus an [android.telecom.InCallService].
+ */
 object MetroTelecomSetup {
-    private const val PHONE_ACCOUNT_ID = "metro_phone"
 
-    fun phoneAccountHandle(context: Context): PhoneAccountHandle {
-        val componentName = ComponentName(context, MetroConnectionService::class.java)
-        return PhoneAccountHandle(componentName, PHONE_ACCOUNT_ID)
-    }
-
-    fun registerPhoneAccount(context: Context) {
-        val telecomManager = context.getSystemService(TelecomManager::class.java) ?: return
-        val handle = phoneAccountHandle(context)
-        val phoneAccount = PhoneAccount.builder(handle, context.getString(com.metro.dialer.R.string.app_name))
-            .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
-            .build()
-        telecomManager.registerPhoneAccount(phoneAccount)
+    fun holdsDialerRole(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+            return roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
+                roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        }
+        return MetroTelecomBridge.isDefaultDialer(context)
     }
 
     fun createDefaultDialerRequestIntent(context: Context): Intent? {
