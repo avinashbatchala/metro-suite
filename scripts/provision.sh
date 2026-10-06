@@ -43,15 +43,29 @@ warn() { echo "  warn $*"; }
 # --- args -------------------------------------------------------------------
 IMMERSIVE="status"   # status | none | status-nav
 RESTORE=0
+DISABLE_DEFAULTS=1   # disable GrapheneOS/AOSP apps that a Metro app replaces
+KEEP_FILES=0         # keep Android DocumentsUI (SAF picker for other apps)
 for arg in "$@"; do
   case "$arg" in
-    --no-immersive) IMMERSIVE="none" ;;
-    --status-nav)   IMMERSIVE="status-nav" ;;
-    --restore)      RESTORE=1 ;;
+    --no-immersive)    IMMERSIVE="none" ;;
+    --status-nav)      IMMERSIVE="status-nav" ;;
+    --restore)         RESTORE=1 ;;
+    --no-disable-defaults) DISABLE_DEFAULTS=0 ;;
+    --keep-files)      KEEP_FILES=1 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+# Metro app  ->  the GrapheneOS/AOSP app it replaces (disabled for the user).
+DEFAULT_REPLACEMENTS=(
+  "com.metro.dialer:com.android.dialer"
+  "com.metro.messaging:com.android.messaging"
+  "com.metro.people:com.android.contacts"
+  "com.metro.photos:com.android.gallery3d"
+  "com.metro.calculator:com.android.calculator2"
+  "com.metro.files:com.android.documentsui"
+)
 
 # --- suite components -------------------------------------------------------
 SHELL_APPS=(launcher statusbar navbar volume notifications lockscreen)
@@ -108,6 +122,10 @@ if [[ "$RESTORE" -eq 1 ]]; then
     sh cmd notification disallow_listener "$comp" >/dev/null 2>&1 || true
   done
   ok "notification listeners removed"
+  for pair in "${DEFAULT_REPLACEMENTS[@]}"; do
+    sh pm enable --user 0 "${pair##*:}" >/dev/null 2>&1 || true
+  done
+  ok "GrapheneOS default apps re-enabled"
   # Optional: leave appops/perms in place (harmless); the wizard can re-provision.
   echo "==> restore done. Reboot or re-run provision to re-enable the shell."
   exit 0
@@ -247,6 +265,42 @@ if [[ -z "$POLICY" ]]; then
 else
   sh settings put global policy_control "$POLICY" >/dev/null 2>&1 \
     && ok "policy_control: $POLICY" || warn "policy_control failed"
+fi
+
+# --- replace GrapheneOS default apps ---------------------------------------
+if [[ "$DISABLE_DEFAULTS" -eq 1 ]]; then
+  echo "==> replacing GrapheneOS default apps with Metro apps"
+  # Role-based: the Metro app must become the role holder before the stock app is disabled,
+  # otherwise telephony/SMS would break.
+  replace_with_role() {
+    local role="$1" metro="$2" stock="$3"
+    if is_installed "$metro" && is_installed "$stock"; then
+      sh cmd role add-role-holder --user 0 "$role" "$metro" >/dev/null 2>&1 || true
+      if sh cmd role get-role-holders --user 0 "$role" 2>/dev/null | grep -q "$metro"; then
+        sh pm disable-user --user 0 "$stock" >/dev/null 2>&1 \
+          && ok "replaced $stock -> $metro ($role)" \
+          || warn "disable failed: $stock"
+      else
+        warn "leaving $stock enabled (could not make $metro the ${role##*.} holder)"
+      fi
+    fi
+  }
+  replace_with_role "android.app.role.DIALER" "com.metro.dialer" "com.android.dialer"
+  replace_with_role "android.app.role.SMS" "com.metro.messaging" "com.android.messaging"
+
+  for pair in "${DEFAULT_REPLACEMENTS[@]}"; do
+    metro="${pair%%:*}"; stock="${pair##*:}"
+    [[ "$metro" == "com.metro.dialer" || "$metro" == "com.metro.messaging" ]] && continue
+    [[ "$metro" == "com.metro.files" && "$KEEP_FILES" -eq 1 ]] && continue
+    if is_installed "$metro" && is_installed "$stock"; then
+      sh pm disable-user --user 0 "$stock" >/dev/null 2>&1 \
+        && ok "disabled $stock (using $metro)" \
+        || warn "disable failed: $stock"
+    fi
+  done
+  echo "    (re-enable with: ./scripts/provision.sh --restore)"
+else
+  echo "==> keeping GrapheneOS default apps (--no-disable-defaults)"
 fi
 
 echo ""
