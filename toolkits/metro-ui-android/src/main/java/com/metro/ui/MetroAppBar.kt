@@ -92,6 +92,12 @@ class MetroAppBarIcon(
     val contentDescription: String = label,
     val enabled: Boolean = true,
     /**
+     * When true, the icon renders in the persistent "filled" state (inverted glyph on a solid
+     * circle) — used to mark a toggled/active action (e.g. Calendar's agenda view). The press
+     * state matches this look. Default false = standard rest outline.
+     */
+    val selected: Boolean = false,
+    /**
      * When true (default), the app bar draws the rest-state circular outline. Set false only when
      * [icon] already paints its own circle (e.g. a custom glyph that matches [MetroSystemIcon]).
      * The filled press circle is always drawn by the app bar.
@@ -117,11 +123,13 @@ fun MetroAppBarIcon(
     onClick: () -> Unit,
     contentDescription: String = label,
     enabled: Boolean = true,
+    selected: Boolean = false,
 ): MetroAppBarIcon = MetroAppBarIcon(
     label = label,
     onClick = onClick,
     contentDescription = contentDescription,
     enabled = enabled,
+    selected = selected,
     icon = { color ->
         MetroSystemIcon(
             type = type,
@@ -399,8 +407,10 @@ private fun AppBarIconButton(
     }
     val active = pressed && item.enabled
     // Standard affordance: a circular outline at rest that fills on press; the glyph then inverts
-    // to the chrome color so it reads on the filled circle.
-    val glyphColor = if (active) MetroTheme.colors.background else baseColor
+    // to the chrome color so it reads on the filled circle. A [MetroAppBarIcon.selected] action
+    // holds that filled/inverted look persistently.
+    val filled = active || (item.selected && item.enabled)
+    val glyphColor = if (filled) MetroTheme.colors.background else baseColor
     val buttonHeightPx = with(LocalDensity.current) { MetroAppBarDefaults.TouchTarget.toPx() }
     val offsetAnim = remember { Animatable(0f) }
     val opacityAnim = remember { Animatable(1f) }
@@ -444,7 +454,7 @@ private fun AppBarIconButton(
                     .size(MetroAppBarDefaults.IconCircleSize)
                     .then(
                         when {
-                            active -> Modifier.background(baseColor, CircleShape)
+                            filled -> Modifier.background(baseColor, CircleShape)
                             item.showRestOutline -> Modifier.border(
                                 MetroAppBarDefaults.IconCircleBorder,
                                 baseColor,

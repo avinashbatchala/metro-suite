@@ -67,6 +67,8 @@ enum class MetroSystemIconType {
     More,
     SwitchView,
     Refresh,
+    /** Bulleted list rows — Calendar agenda / list view. */
+    List,
     /** Filled folder — music directories / file pickers. */
     Folder,
 
@@ -204,6 +206,7 @@ fun DrawScope.drawMetroSystemIconGlyph(
         MetroSystemIconType.More -> drawMoreGlyph(color, glyphStroke)
         MetroSystemIconType.SwitchView -> drawRefreshGlyph(color)
         MetroSystemIconType.Refresh -> drawRefreshGlyph(color)
+        MetroSystemIconType.List -> drawListGlyph(color, glyphStroke)
         MetroSystemIconType.Folder -> drawFolderGlyph(color)
         MetroSystemIconType.Phone -> drawViewportPath(phoneHandsetPath, color, 0.72f)
         MetroSystemIconType.Message -> drawViewportPath(messagingBubblePath, color, 0.66f)
@@ -553,6 +556,38 @@ private fun DrawScope.drawMoreGlyph(color: Color, stroke: Stroke) {
     drawCircle(color, r, Offset(cx - spacing, cy))
     drawCircle(color, r, Offset(cx, cy))
     drawCircle(color, r, Offset(cx + spacing, cy))
+}
+
+/**
+ * Bulleted list — three rows, each a small filled square marker followed by a rule.
+ * WP8.1 Calendar agenda / list-view affordance.
+ */
+private fun DrawScope.drawListGlyph(color: Color, stroke: Stroke) {
+    val insetX = size.width * 0.16f
+    val insetY = size.height * 0.2f
+    val left = insetX
+    val right = size.width - insetX
+    val top = insetY
+    val bottom = size.height - insetY
+    val rowStep = (bottom - top) / 2f
+    val marker = size.minDimension * 0.14f
+    val gap = size.width * 0.1f
+    val lineWidth = stroke.width * 0.85f
+    for (index in 0..2) {
+        val cy = top + rowStep * index
+        drawRect(
+            color = color,
+            topLeft = Offset(left, cy - marker / 2f),
+            size = Size(marker, marker),
+        )
+        drawLine(
+            color = color,
+            start = Offset(left + marker + gap, cy),
+            end = Offset(right, cy),
+            strokeWidth = lineWidth,
+            cap = StrokeCap.Butt,
+        )
+    }
 }
 
 /** Filled refresh / rotate — 512 viewBox path from the WP8.1 refresh reference SVG. */

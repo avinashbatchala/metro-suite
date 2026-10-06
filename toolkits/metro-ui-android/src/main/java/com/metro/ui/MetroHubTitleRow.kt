@@ -53,6 +53,76 @@ fun MetroHubTitleRow(
 }
 
 /**
+ * Pivot title row backed by a **large, lazily-titled** page range. Only titles within
+ * [windowRadius] of [selectedPage] are measured / composed, so page counts in the thousands
+ * stay cheap (Calendar day / week / month / year pivots).
+ *
+ * The active title sits at the content margin; neighbours bleed past the screen edges and the
+ * row animates to follow [selectedPage].
+ */
+@Composable
+fun MetroPivotTitleWindow(
+    pageCount: Int,
+    selectedPage: Int,
+    titleFor: (Int) -> String,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    windowRadius: Int = 6,
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val textStyle = MetroTextStyle.PivotTab.toTextStyle(MetroTheme.fontFamily)
+    val spacingPx = remember(density) { with(density) { PivotTabSpacing.roundToPx() } }
+
+    val start = (selectedPage - windowRadius).coerceAtLeast(0)
+    val end = (selectedPage + windowRadius).coerceAtMost(pageCount - 1)
+    val pages = remember(start, end) { (start..end).toList() }
+    val titles = remember(pages, textStyle, textMeasurer) { pages.map(titleFor) }
+    val widthsPx = remember(titles, textStyle, textMeasurer) {
+        titles.map { textMeasurer.measure(it, style = textStyle).size.width }
+    }
+    val localSelected = (selectedPage - start).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    val targetOffsetPx = remember(widthsPx, localSelected, spacingPx) {
+        var offset = 0
+        for (index in 0 until localSelected) {
+            offset += widthsPx[index] + spacingPx
+        }
+        offset
+    }
+    val animatedOffsetPx by animateIntAsState(
+        targetValue = targetOffsetPx,
+        animationSpec = MetroTransitions.pivotTween(),
+        label = "pivotWindowOffset",
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clipToBounds(),
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(start = HubTitleStartInset)
+                .wrapContentWidth(unbounded = true, align = Alignment.Start)
+                .offset { IntOffset(-animatedOffsetPx, 0) },
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            pages.forEachIndexed { index, page ->
+                HubTitle(
+                    title = titles[index],
+                    style = MetroTextStyle.PivotTab,
+                    active = page == selectedPage,
+                    onClick = { onSelect(page) },
+                    modifier = Modifier.padding(
+                        end = if (index < pages.lastIndex) PivotTabSpacing else 0.dp,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/**
  * Titles laid out sequentially on one line and translated so the selected title sits at the
  * content margin. Neighbouring titles bleed past the screen edges instead of stacking on top of
  * each other, so a long title never overlaps the next one.
