@@ -3254,7 +3254,7 @@ class MusicService :
         playbackStats: PlaybackStats,
     ) {
         val mediaItem = eventTime.timeline.getWindow(eventTime.windowIndex, Timeline.Window()).mediaItem
-        val historyDurationMs = dataStore[HistoryDuration]?.times(1000f) ?: 30000f
+        val historyDurationMs = dataStore[HistoryDuration]?.times(1000f) ?: 1000f
 
         if (playbackStats.totalPlayTimeMs >= historyDurationMs &&
             !dataStore.get(PauseListenHistoryKey, false)

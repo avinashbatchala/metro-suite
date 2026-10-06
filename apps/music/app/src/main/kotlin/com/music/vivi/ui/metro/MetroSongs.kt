@@ -137,7 +137,9 @@ internal fun SongContextMenuHost(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
+    val database = com.music.vivi.LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
+    val addTo = rememberAddToState()
     val target = state.song
 
     Box(
@@ -154,6 +156,7 @@ internal fun SongContextMenuHost(
         val download by remember(target.id) { downloadUtil.getDownload(target.id) }
             .collectAsState(initial = null)
         val downloaded = target.song.isDownloaded || download?.state == Download.STATE_COMPLETED
+        val inCollection = target.song.inLibrary != null
         MetroContextMenuPopup(
             visibleState = state.visibility,
             anchorBounds = state.anchorBounds,
@@ -165,6 +168,16 @@ internal fun SongContextMenuHost(
                 },
                 MetroContextMenuItem(label = "add to queue") {
                     playerConnection?.addToQueue(listOf(target.toMediaItem()))
+                    state.dismiss()
+                },
+                MetroContextMenuItem(label = "add to…") {
+                    addTo.open(AddToTarget(title = target.title, songIds = listOf(target.id)))
+                    state.dismiss()
+                },
+                MetroContextMenuItem(
+                    label = if (inCollection) "remove from collection" else "add to collection",
+                ) {
+                    database.query { inLibrary(target.id, if (inCollection) null else java.time.LocalDateTime.now()) }
                     state.dismiss()
                 },
                 MetroContextMenuItem(
@@ -187,6 +200,8 @@ internal fun SongContextMenuHost(
             onDismissRequest = { state.dismiss() },
         )
     }
+
+    AddToHost(state = addTo, database = database)
 }
 
 /** Song row with download indicator and optional long-press context menu. */

@@ -31,23 +31,24 @@ first (`build-apks.sh`/`verify-app.sh` do this automatically for `vivimusic`):
 
 | Screen | Navigation pattern | Reference |
 |--------|-------------------|-----------|
-| Hub (panorama) | `MetroPanorama` — collection / get music / now playing / downloads | `references/guides/blueprint.md` |
-| Collection | `MetroPivot` songs / albums / artists / playlists | blueprint |
-| Now playing | Hub pane (not a route) | blueprint |
-| Search | Subpage | blueprint |
-| Queue | Subpage | blueprint |
-| Downloads | Subpage | blueprint |
-| Equalizer | Subpage | blueprint |
-| Recognition | Subpage | blueprint |
-| Settings | Subpage | blueprint |
+| Root (panorama) | `MetroPanorama` — recent plays / collection / get music / now playing | `references/guides/blueprint.md` |
+| Collection categories | Direct routes: artists / albums / songs / genres / playlists / radio (no pivot) | blueprint |
+| Now playing | Root pane (not a route); vertical art swipe, up-next, transport | blueprint |
+| Search | Subpage; one combined Collection + online selector | blueprint |
+| Queue / Downloads | Subpages | blueprint |
+| Equalizer / Recognition / Settings | Contextual (`…` / Settings), not panorama panes | blueprint |
 
 ## WP8.1 rules specific to this app
 
+- One root brand: a single large `music`. Do not prepend `MUSIC` to every screen.
+- No permanent view tabs / bottom navigation / Material chrome; context-sensitive app bars only.
+- Collection membership is explicit; caching online metadata must not add it to the Collection.
+- Keep the real in-app navigation stack (push/pop); preserve source context on Back.
 - Use `com.metro.ui.*` chrome only; `androidx.compose.material3.*` is banned (metro lint).
-- Flat `MetroTheme.colors.background`; never an album-art/gradient background.
-- App bar at bottom; no FAB.
-- Apply `Modifier.metroNavBarPadding()` on screen roots.
-- `MetroBorderButton` must not `fillMaxWidth()`; rows use `metroClickable`.
+- Flat `MetroTheme.colors.background`; never an album-art/gradient background (except historically
+  appropriate artist context).
+- App bar at bottom; no FAB; `Modifier.metroNavBarPadding()` on screen roots;
+  `MetroBorderButton` must not `fillMaxWidth()`.
 
 ## Engine (do not rewrite)
 

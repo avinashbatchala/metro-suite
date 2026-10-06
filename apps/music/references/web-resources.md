@@ -1,15 +1,20 @@
 # Music — web resources
 
-Supplementary links only. The authoritative spec is `guides/blueprint.md` plus the suite's
-design language (`scope.md`, `METRO-UX-LANGUAGE.md`) and the reference music app at
-`apps/music/`.
+Supplementary links and historical behavior notes. The authoritative spec is
+`guides/blueprint.md` plus the suite design language (`scope.md`, `METRO-UX-LANGUAGE.md`).
 
-## Suite design system
+## WP8.1 Music / Xbox Music (behavior authority)
 
-- Metro design language: `../../toolkits/metro-ui-android/METRO-UX-LANGUAGE.md`
-- Suite spec: `../../scope.md`
-- Reference music player UI: `../../apps/music/` (`ui/MusicShell.kt`, `ui/NowPlayingAndHub.kt`,
-  `ui/CollectionScreens.kt`, `ui/QueueScreen.kt`, `ui/MediaCircleSeekBar.kt`)
+- Microsoft Devices Blog — Windows Phone 8.1 Music/Xbox Music overview (2014): panorama root with
+  **recent plays / collection / get music / now playing**; collection categories
+  artists/albums/songs/genres/playlists/radio; vertical album-art swipe to change track on now
+  playing.
+- Lumia user guides (2014–2015): Collection membership, playlists, **keep playlist offline**,
+  downloads, radio, get music / store.
+- WP8.1 Update / Update 2: agenda-style recents, refined now playing with **Up next**; queue.
+- Equalizer: Lumia documentation pointed to **Settings → audio** for equalizer controls.
+
+Do **not** use Windows 10 Mobile / Groove Music references.
 
 ## Engine (vendored upstream)
 
@@ -18,7 +23,7 @@ design language (`scope.md`, `METRO-UX-LANGUAGE.md`) and the reference music app
 - NewPipe Extractor (stream extraction): https://github.com/TeamNewPipe/NewPipeExtractor
 - SponsorBlock API: https://wiki.sponsor.ajay.app/
 
-## WP8.1 music references
+## Suite design system
 
-- Windows Phone 8.1 Xbox Music design (list/pivot/now-playing patterns) — see suite
-  `references/` global assets and `apps/music/references/`.
+- Metro design language: `../../toolkits/metro-ui-android/METRO-UX-LANGUAGE.md`
+- Suite spec: `../../scope.md`

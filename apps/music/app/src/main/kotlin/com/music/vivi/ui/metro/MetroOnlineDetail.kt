@@ -80,6 +80,7 @@ internal fun OnlineAlbumDetailScreen(
     var loading by remember { mutableStateOf(true) }
     val albumRow by remember(browseId) { database.album(browseId) }.collectAsState(initial = null)
     val menu = remember { OnlineMenuState() }
+    val addTo = rememberAddToState()
 
     LaunchedEffect(browseId) {
         loading = true
@@ -96,7 +97,6 @@ internal fun OnlineAlbumDetailScreen(
                 .fillMaxSize()
                 .background(MetroTheme.colors.background),
         ) {
-            MetroAppTitle("MUSIC")
             val current = page
             if (current == null) {
                 if (loading) {
@@ -127,18 +127,24 @@ internal fun OnlineAlbumDetailScreen(
                     Spacer(modifier = Modifier.height(72.dp))
                 }
 
-                MetroAppBar(
-                    textButtons = listOf(
-                        MetroAppBarTextButton("play") {
-                            playerConnection?.playQueue(YouTubeAlbumRadio(current.album.playlistId))
-                        },
-                        MetroAppBarTextButton("shuffle") {
-                            playerConnection?.playQueue(YouTubeAlbumRadio(current.album.playlistId))
-                            playerConnection?.player?.shuffleModeEnabled = true
-                        },
-                    ),
+                MusicDetailAppBar(
+                    playerConnection = playerConnection,
+                    contextType = DetailPlayContext.Album,
+                    contextId = current.album.browseId,
+                    songIds = current.songs.map { it.id },
+                    downloadedIds = emptySet(),
+                    onPlay = { playerConnection?.playQueue(YouTubeAlbumRadio(current.album.playlistId)) },
+                    onDownloadAll = {
+                        current.songs.forEach { song -> startSongDownload(context, song.id, song.title) }
+                    },
+                    onRemoveDownloadAll = {
+                        current.songs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
+                    onCancelDownloads = {
+                        current.songs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
                     menuItems = listOf(
-                        MetroAppBarMenuItem("add to library") {
+                        MetroAppBarMenuItem("add to collection") {
                             database.query {
                                 insert(current)
                                 current.songs.forEach { song ->
@@ -148,11 +154,19 @@ internal fun OnlineAlbumDetailScreen(
                                 albumRow?.album?.let { update(it.copy(inLibrary = LocalDateTime.now())) }
                             }
                         },
+                        MetroAppBarMenuItem("add to playlist") {
+                            addTo.open(
+                                AddToTarget(
+                                    title = current.album.title,
+                                    songIds = current.songs.map { it.id },
+                                    persist = { db ->
+                                        db.query { current.songs.forEach { insert(it.toMediaMetadata()) } }
+                                    },
+                                ),
+                            )
+                        },
                         MetroAppBarMenuItem(if (liked) "unlike" else "like") {
                             database.query { albumRow?.album?.let { update(it.toggleLike()) } }
-                        },
-                        MetroAppBarMenuItem("download all") {
-                            current.songs.forEach { song -> startSongDownload(context, song.id, song.title) }
                         },
                         MetroAppBarMenuItem("view artist") {
                             current.album.artists?.firstOrNull()?.id?.let(onOpenArtist)
@@ -163,6 +177,7 @@ internal fun OnlineAlbumDetailScreen(
                 )
             }
         }
+        AddToHost(state = addTo, database = database)
     }
 }
 
@@ -197,7 +212,6 @@ internal fun OnlinePlaylistDetailScreen(
                 .fillMaxSize()
                 .background(MetroTheme.colors.background),
         ) {
-            MetroAppTitle("MUSIC")
             val current = page
             if (current == null) {
                 if (loading) LoadingBox() else MetroEmptyState("Playlist unavailable.")
@@ -224,40 +238,36 @@ internal fun OnlinePlaylistDetailScreen(
                     Spacer(modifier = Modifier.height(72.dp))
                 }
 
-                MetroAppBar(
-                    textButtons = listOf(
-                        MetroAppBarTextButton("play") {
-                            playerConnection?.playQueue(
-                                YouTubePlaylistQueue(
-                                    current.playlist.id,
-                                    current.playlist.title,
-                                    initialSongs = current.songs,
-                                ),
-                            )
-                        },
-                        MetroAppBarTextButton("shuffle") {
-                            current.playlist.shuffleEndpoint?.let { endpoint ->
-                                playerConnection?.playQueue(YouTubeQueue(endpoint))
-                            } ?: run {
-                                playerConnection?.playQueue(
-                                    YouTubePlaylistQueue(
-                                        current.playlist.id,
-                                        current.playlist.title,
-                                        initialSongs = current.songs.shuffled(),
-                                    ),
-                                )
-                            }
-                        },
-                    ),
+                MusicDetailAppBar(
+                    playerConnection = playerConnection,
+                    contextType = DetailPlayContext.Playlist,
+                    contextId = null,
+                    songIds = current.songs.map { it.id },
+                    downloadedIds = emptySet(),
+                    onPlay = {
+                        playerConnection?.playQueue(
+                            YouTubePlaylistQueue(
+                                current.playlist.id,
+                                current.playlist.title,
+                                initialSongs = current.songs,
+                            ),
+                        )
+                    },
+                    onDownloadAll = {
+                        current.songs.forEach { song -> startSongDownload(context, song.id, song.title) }
+                    },
+                    onRemoveDownloadAll = {
+                        current.songs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
+                    onCancelDownloads = {
+                        current.songs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
                     menuItems = listOf(
-                        MetroAppBarMenuItem("add to library") {
+                        MetroAppBarMenuItem("add to collection") {
                             addOnlinePlaylistToLibrary(database, current, markLiked = false)
                         },
                         MetroAppBarMenuItem(if (liked) "unlike" else "like") {
                             addOnlinePlaylistToLibrary(database, current, markLiked = true)
-                        },
-                        MetroAppBarMenuItem("download all") {
-                            current.songs.forEach { song -> startSongDownload(context, song.id, song.title) }
                         },
                         MetroAppBarMenuItem("start radio") {
                             current.playlist.radioEndpoint?.let { endpoint ->
@@ -346,7 +356,6 @@ internal fun OnlineArtistDetailScreen(
                 .fillMaxSize()
                 .background(MetroTheme.colors.background),
         ) {
-            MetroAppTitle("MUSIC")
             val current = page
             if (current == null) {
                 if (loading) LoadingBox() else MetroEmptyState("Artist unavailable.")
@@ -398,17 +407,26 @@ internal fun OnlineArtistDetailScreen(
                     item(key = "bottom") { Spacer(modifier = Modifier.height(72.dp)) }
                 }
 
-                MetroAppBar(
-                    textButtons = listOf(
-                        MetroAppBarTextButton("play") {
-                            current.artist.playEndpoint?.let { playerConnection?.playQueue(YouTubeQueue(it)) }
-                        },
-                        MetroAppBarTextButton("shuffle") {
-                            current.artist.shuffleEndpoint?.let { playerConnection?.playQueue(YouTubeQueue(it)) }
-                        },
-                    ),
+                MusicDetailAppBar(
+                    playerConnection = playerConnection,
+                    contextType = DetailPlayContext.Artist,
+                    contextId = current.artist.id,
+                    songIds = topSongs.map { it.id },
+                    downloadedIds = emptySet(),
+                    onPlay = {
+                        current.artist.playEndpoint?.let { playerConnection?.playQueue(YouTubeQueue(it)) }
+                    },
+                    onDownloadAll = {
+                        topSongs.forEach { song -> startSongDownload(context, song.id, song.title) }
+                    },
+                    onRemoveDownloadAll = {
+                        topSongs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
+                    onCancelDownloads = {
+                        topSongs.forEach { song -> removeSongDownload(context, song.id) }
+                    },
                     menuItems = listOf(
-                        MetroAppBarMenuItem("add to library") {
+                        MetroAppBarMenuItem("add to collection") {
                             database.query {
                                 insert(
                                     ArtistEntity(
@@ -436,9 +454,6 @@ internal fun OnlineArtistDetailScreen(
                                     )
                                 }
                             }
-                        },
-                        MetroAppBarMenuItem("download top songs") {
-                            topSongs.forEach { song -> startSongDownload(context, song.id, song.title) }
                         },
                         MetroAppBarMenuItem("start radio") {
                             current.artist.radioEndpoint?.let { playerConnection?.playQueue(YouTubeQueue(it)) }
