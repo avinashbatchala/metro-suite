@@ -7,6 +7,8 @@ import java.time.LocalDateTime
 typealias ClockFaceParts = MetroClockFaceParts
 
 object TimeFaceLogic {
-    fun parts(now: LocalDateTime = LocalDateTime.now()): ClockFaceParts =
-        MetroClockFace.parts(now)
+    fun parts(
+        now: LocalDateTime = LocalDateTime.now(),
+        use24Hour: Boolean = false,
+    ): ClockFaceParts = MetroClockFace.parts(now, use24Hour)
 }

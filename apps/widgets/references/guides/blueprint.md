@@ -25,17 +25,33 @@ Homescreen widget picker surface. Opens immediately on launch — no pivots, no 
   | Analog clock | 1×1 | Flat analog dial: 12 thick hour bars + thin minute ticks, rectangular hour/minute hands (no numerals, no second hand). Accent fill; no bottom title |
   | Torch | 1×1 | Flashlight glyph (`ic_widget_torch`); tap toggles camera LED. Accent fill when off, white fill + accent glyph when on. Dimmed when flash unavailable. No bottom title |
   | Lock | 1×1 | Suite padlock glyph (`MetroAppGlyphs.Lockscreen`). Tap locks the device via Metro lockscreen accessibility (`GLOBAL_ACTION_LOCK_SCREEN`). Opens Accessibility settings when the service is not enabled. Accent fill; no bottom title |
+  | World clock | 2×4 (wide) | Up to **three** city rows: city name (uppercase, left) + current local time (right), with a subtle `tomorrow` / `yesterday` when on a different calendar day. No analog faces, no weather, no cards. Ticks locally in the launcher. Tap opens the city-selection page; long-press pins |
 
 - **Tile chrome:** Square 0dp corners; no bottom titles on current faces. Content color from `MetroColors.tileContentColor` (Torch on-state uses white fill + accent content)
-- **Layout packing (v1 fixed):** Time at (0,0) 2×4; Battery at (0,2) 1×1; Notifier at (1,2) 2×2; Analog clock at (3,2) 1×1; Torch at (0,3) 1×1; Lock at (3,3) 1×1
+- **Layout packing (v1 fixed):** Time at (0,0) 2×4; Battery at (0,2) 1×1; Notifier at (1,2) 2×2; Analog clock at (3,2) 1×1; Torch at (0,3) 1×1; Lock at (3,3) 1×1; World clock at (0,4) 2×4
 - **Interactions:** Long-press any catalog tile pins it to Start (secondary tile at the catalog footprint). Tap: Notifier (opens the notifying app for the visible peek; opens notification-listener settings when access denied), Torch (toggles LED; requests `CAMERA` when needed), Lock (locks device or opens Accessibility settings). Display-only otherwise.
 - **Live updates:** Time (digital + analog) ticks every minute; Battery from `ACTION_BATTERY_CHANGED`; Notifier from `NotificationListenerService` (hold ~5s, flip 600ms — same as Start); Torch from `CameraManager` torch callbacks
+
+### Page 2 — World Clock configuration
+
+Reached by tapping the World clock catalog tile (full-page replacement of the catalog while open).
+
+- **Background:** black
+- **Header:** back circle + `choose cities` page header
+- **Hint:** `Select 1 to 3 cities for the World Clock tile.` (grey)
+- **Search:** `search cities` box; matches city name, country/region, IANA zone and aliases
+- **List:** alphabetical; each row = city name + country/region, trailing `MetroCheckBox`
+- **Interactions:** tap row or checkbox toggles the city. 1–3 cities, de-duplicated. Once three are
+  selected, unselected rows are disabled. Selection persists immediately and refreshes the pinned tile.
+- **No Material checkboxes** — use `MetroCheckBox` / `MetroListItem`.
 
 ## Images
 
 | Image | Page | Notes |
 |-------|------|-------|
 | `time_wide_dark_cobalt.png` | Time face | Wide digital clock reference (ignore weather / location / temp in capture) |
+| `world_clock_wide_dark_blue.png` | World clock face | 2×4 face with three city rows — see `known-gaps.md` until captured |
+| `world_clock_config_dark_blue.png` | City config | `choose cities` search + checkmarks — see `known-gaps.md` until captured |
 | `battery_1x1_dark_crimson.png` | Battery face | 1×1 vertical battery + digits |
 | `analog_clock_1x1_dark_crimson.png` | Analog clock face | 1×1 flat dial with hour bars + minute ticks + hands |
 | `torch_1x1_dark_crimson.png` | Torch face | 1×1 flashlight glyph — see `known-gaps.md` until captured |

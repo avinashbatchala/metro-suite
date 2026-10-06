@@ -5,7 +5,7 @@
 
 ## Status
 
-Implemented — Start-style 4-column widget catalog (Time, Battery, Notifier, Analog clock, Torch, Lock). Long-press pins to Start.
+Implemented — Start-style 4-column widget catalog (Time, Battery, Notifier, Analog clock, Torch, Lock, World clock). Long-press pins to Start; World clock opens a city-selection page on tap.
 
 ## App role
 
@@ -20,8 +20,26 @@ Catalog of custom homescreen widgets rendered as live tiles. Opens to a black St
    - Analog clock (1×1 flat dial)
    - Torch (1×1 LED flashlight toggle)
    - Lock (1×1 padlock — tap locks device)
+   - World clock (2×4 wide — up to 3 city rows, ticking locally)
+
+2. **World Clock configuration** — `choose cities`; search + Metro checkmarks, 1–3 cities
 
 See [`references/guides/blueprint.md`](references/guides/blueprint.md).
+
+## World Clock widget
+
+- **Catalog item:** `WorldClock` (`id = world_clock`, footprint 2×4 wide, grid row 4). Tap opens the
+  configuration page; long-press pins to Start.
+- **Cities:** shared offline catalog `MetroWorldClockCatalog` (`com.metro.system`) — IANA `ZoneId`
+  is the source of truth (DST automatic). Search matches city / country / zone / alias.
+- **Selection 1–3, de-duplicated:** pure rules in `WorldClockSelectionLogic`; persisted in
+  `WorldClockWidgetStore` (app-private `SharedPreferences` `widgets_world_clock`, `cities` CSV).
+  Invalid ids dropped; empty falls back to the catalog defaults (London / New York / Tokyo).
+- **Tile contract:** `MetroTileWidgetFace(kind = WORLD_CLOCK, worldClocks = [ …≤3 name+zoneId ])`.
+  The **launcher renders and ticks** the city times locally — Widgets does **not** push a per-minute
+  update. Tap the pinned tile is display-only; edit cities from the catalog.
+- **12/24-hour:** honors the device setting (`DateFormat.is24HourFormat`); `MetroClockFace.time`
+  and `MetroClockFace.parts` take a `use24Hour` flag (existing Time / Analog faces unaffected).
 
 ## System functions and contracts
 
@@ -33,6 +51,7 @@ See [`references/guides/blueprint.md`](references/guides/blueprint.md).
 - Lock: `MetroLockscreen.requestLock` → lockscreen a11y `GLOBAL_ACTION_LOCK_SCREEN`
 - Pin: long-press → `MetroIntents.requestPinTile` (`com.metro.widgets` + widget id + catalog size)
 - Start faces: `MetroTileWidgetFace` via `WidgetsTileProvider` (launcher renders); taps via `WidgetsTileActions.ACTION_TAP`
+- World clock: `MetroWorldClockCatalog` (shared), `WorldClockSelectionLogic` + `WorldClockWidgetStore`; face kind `WORLD_CLOCK` ticks locally in the launcher
 
 ## UI guardrails
 

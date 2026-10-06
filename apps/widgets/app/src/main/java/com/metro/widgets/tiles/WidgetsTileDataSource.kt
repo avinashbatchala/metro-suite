@@ -75,6 +75,19 @@ class WidgetsTileDataSource(context: Context) {
                 tapAction = WidgetsTileActions.ACTION_TAP,
             )
             WidgetKind.Notifier -> buildNotifierTile(kind, accentHex)
+            WidgetKind.WorldClock -> {
+                val cities = com.metro.widgets.data.WorldClockWidgetStore(appContext).resolvedCities()
+                MetroTileData(
+                    title = kind.title,
+                    backgroundColorHex = accentHex,
+                    widgetFace = MetroTileWidgetFace(
+                        kind = MetroTileWidgetFaceKind.WORLD_CLOCK,
+                        worldClocks = cities
+                            .take(MetroTileWidgetFace.MAX_WORLD_CLOCK_ENTRIES)
+                            .map { com.metro.system.MetroWorldClockFaceEntry(it.name, it.zoneId) },
+                    ),
+                )
+            }
         }
     }
 

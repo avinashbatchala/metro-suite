@@ -35,6 +35,10 @@ class WidgetLogicTest {
         assertEquals(false, WidgetKind.AnalogClock.showTitle)
         assertEquals(false, WidgetKind.Torch.showTitle)
         assertEquals(false, WidgetKind.Lock.showTitle)
+        assertEquals(WidgetTileSize.TwoByFour, WidgetKind.WorldClock.size)
+        assertEquals(0, WidgetKind.WorldClock.gridCol)
+        assertEquals(4, WidgetKind.WorldClock.gridRow)
+        assertEquals(false, WidgetKind.WorldClock.showTitle)
     }
 
     @Test
@@ -92,7 +96,19 @@ class WidgetLogicTest {
         assertEquals("1x1", WidgetPinLogic.pinSizeStorageValue(WidgetKind.Battery))
         assertEquals("1x1", WidgetPinLogic.pinSizeStorageValue(WidgetKind.Torch))
         assertEquals(WidgetKind.Lock, WidgetPinLogic.kindForTileId("lock"))
+        assertEquals(WidgetKind.WorldClock, WidgetPinLogic.kindForTileId("world_clock"))
+        assertEquals("world_clock", WidgetPinLogic.tileId(WidgetKind.WorldClock))
+        assertEquals("4x2", WidgetPinLogic.pinSizeStorageValue(WidgetKind.WorldClock))
         assertEquals(null, WidgetPinLogic.kindForTileId("unknown"))
+    }
+
+    @Test
+    fun timeFace_twentyFourHourOmitsPeriod() {
+        val morning = LocalDateTime.of(2024, 6, 15, 10, 46)
+        val parts = TimeFaceLogic.parts(morning, use24Hour = true)
+        assertEquals("10", parts.hour)
+        assertEquals("46", parts.minute)
+        assertEquals("", parts.period)
     }
 
     @Test

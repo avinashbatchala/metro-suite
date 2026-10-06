@@ -70,6 +70,14 @@ enum class WidgetKind(
         gridRow = 3,
         showTitle = false,
     ),
+    WorldClock(
+        id = "world_clock",
+        title = "world clock",
+        size = WidgetTileSize.TwoByFour,
+        gridCol = 0,
+        gridRow = 4,
+        showTitle = false,
+    ),
 }
 
 object WidgetCatalog {

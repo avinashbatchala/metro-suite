@@ -46,6 +46,7 @@ object WidgetsTileActions {
             WidgetKind.Time,
             WidgetKind.Battery,
             WidgetKind.AnalogClock,
+            WidgetKind.WorldClock,
             -> Unit
         }
     }

@@ -29,6 +29,7 @@ import java.time.LocalDateTime
 class WidgetsState(private val appContext: Context) {
     var clock by mutableStateOf(TimeFaceLogic.parts())
         private set
+    private var use24Hour by mutableStateOf(false)
     var battery by mutableStateOf(WidgetTelemetry.readBattery(appContext))
         private set
     var notifierAccessGranted by mutableStateOf(NotifierAccess.isEnabled(appContext))
@@ -40,7 +41,35 @@ class WidgetsState(private val appContext: Context) {
     var torchAvailable by mutableStateOf(false)
         private set
 
+    private val worldClockStore = com.metro.widgets.data.WorldClockWidgetStore(appContext)
+    var worldClockConfigOpen by mutableStateOf(false)
+        private set
+    var worldClockCities by mutableStateOf(worldClockStore.load())
+        private set
+
     private var started = false
+
+    fun openWorldClockConfig() {
+        worldClockCities = worldClockStore.load()
+        worldClockConfigOpen = true
+    }
+
+    fun closeWorldClockConfig() {
+        worldClockConfigOpen = false
+    }
+
+    fun isWorldClockCitySelected(cityId: String): Boolean = cityId in worldClockCities
+
+    fun canAddMoreWorldClockCities(): Boolean =
+        !com.metro.widgets.data.WorldClockSelectionLogic.isFull(worldClockCities)
+
+    fun toggleWorldClockCity(cityId: String) {
+        val updated = com.metro.widgets.data.WorldClockSelectionLogic.toggle(worldClockCities, cityId)
+        if (updated == worldClockCities) return
+        worldClockCities = updated
+        worldClockStore.save(updated)
+        MetroTileUpdates.requestUpdate(appContext, appContext.packageName, WidgetKind.WorldClock.id)
+    }
 
     private val torchListener: (Boolean) -> Unit = { on -> torchOn = on }
 
@@ -85,6 +114,7 @@ class WidgetsState(private val appContext: Context) {
     fun start() {
         if (started) return
         started = true
+        use24Hour = android.text.format.DateFormat.is24HourFormat(appContext)
         refreshClock()
         refreshNotifierAccess()
         battery = WidgetTelemetry.readBattery(appContext)
@@ -121,7 +151,7 @@ class WidgetsState(private val appContext: Context) {
     fun toggleTorch(): Boolean = WidgetTorchStore.toggle(appContext)
 
     fun refreshClock(now: LocalDateTime = LocalDateTime.now()) {
-        clock = TimeFaceLogic.parts(now)
+        clock = TimeFaceLogic.parts(now, use24Hour)
     }
 
     fun refreshNotifierAccess() {
