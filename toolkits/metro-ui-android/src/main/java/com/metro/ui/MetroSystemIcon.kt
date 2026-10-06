@@ -73,6 +73,10 @@ enum class MetroSystemIconType {
     CalendarView,
     /** Pencil — edit. */
     Edit,
+    /** Pushpin — pin to Start. */
+    Pin,
+    /** Crosshair/bullseye — current location. */
+    Target,
     /** Filled folder — music directories / file pickers. */
     Folder,
 
@@ -213,6 +217,8 @@ fun DrawScope.drawMetroSystemIconGlyph(
         MetroSystemIconType.List -> drawListGlyph(color, glyphStroke)
         MetroSystemIconType.CalendarView -> drawCalendarViewGlyph(color, glyphStroke)
         MetroSystemIconType.Edit -> drawEditGlyph(color)
+        MetroSystemIconType.Pin -> drawPinGlyph(color)
+        MetroSystemIconType.Target -> drawTargetGlyph(color, glyphStroke)
         MetroSystemIconType.Folder -> drawFolderGlyph(color)
         MetroSystemIconType.Phone -> drawViewportPath(phoneHandsetPath, color, 0.72f)
         MetroSystemIconType.Message -> drawViewportPath(messagingBubblePath, color, 0.66f)
@@ -595,6 +601,32 @@ private fun DrawScope.drawEditGlyph(color: Color) {
         }
         drawPath(tip, color)
     }
+}
+
+/** Pushpin — pin to Start. Round head above a short needle. */
+private fun DrawScope.drawPinGlyph(color: Color) {
+    val cx = size.width / 2f
+    val headR = size.minDimension * 0.16f
+    val headCy = size.height * 0.36f
+    drawCircle(color, headR, Offset(cx, headCy))
+    val top = Offset(cx, headCy + headR)
+    val bottom = Offset(cx, size.height * 0.88f)
+    drawLine(color, top, bottom, strokeWidth = size.minDimension * 0.08f, cap = StrokeCap.Butt)
+}
+
+/** Crosshair/bullseye — current location. */
+private fun DrawScope.drawTargetGlyph(color: Color, stroke: Stroke) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val r = size.minDimension * 0.38f
+    val w = stroke.width * 0.9f
+    drawCircle(color, r, Offset(cx, cy), style = Stroke(width = w))
+    drawCircle(color, r * 0.45f, Offset(cx, cy), style = Stroke(width = w))
+    val tick = size.minDimension * 0.1f
+    drawLine(color, Offset(cx, cy - r - tick), Offset(cx, cy - r + tick), w, cap = StrokeCap.Butt)
+    drawLine(color, Offset(cx, cy + r - tick), Offset(cx, cy + r + tick), w, cap = StrokeCap.Butt)
+    drawLine(color, Offset(cx - r - tick, cy), Offset(cx - r + tick, cy), w, cap = StrokeCap.Butt)
+    drawLine(color, Offset(cx + r - tick, cy), Offset(cx + r + tick, cy), w, cap = StrokeCap.Butt)
 }
 
 private fun DrawScope.drawMoreGlyph(color: Color, stroke: Stroke) {
