@@ -45,6 +45,7 @@ import com.metro.training.domain.analytics.ProgressMetric
 import com.metro.training.domain.analytics.ProgressRange
 import com.metro.training.domain.exercises.EquipmentType
 import com.metro.training.domain.exercises.ExerciseDefinition
+import com.metro.training.domain.exercises.ExerciseInstructions
 import com.metro.training.domain.exercises.ExerciseMechanic
 import com.metro.training.domain.exercises.LoadSemantics
 import com.metro.training.domain.exercises.LoadUnit
@@ -290,6 +291,20 @@ fun ExercisePickerScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             )
+            val muscles = listOf("all muscles") + MuscleGroup.values().map { it.name.lowercase().replace('_', ' ') }
+            MetroListPicker(
+                options = muscles,
+                selectedOptionIndex = viewModel.pickerMuscle?.let { MuscleGroup.values().indexOf(it) + 1 } ?: 0,
+                onSelectOption = { viewModel.choosePickerMuscle(if (it == 0) null else MuscleGroup.values()[it - 1]) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            )
+            val equipment = listOf("all equipment") + EquipmentType.values().map { it.name.lowercase().replace('_', ' ') }
+            MetroListPicker(
+                options = equipment,
+                selectedOptionIndex = viewModel.pickerEquipment?.let { EquipmentType.values().indexOf(it) + 1 } ?: 0,
+                onSelectOption = { viewModel.choosePickerEquipment(if (it == 0) null else EquipmentType.values()[it - 1]) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 8.dp),
+            )
             LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                 items(viewModel.filteredExercises, key = { it.id }) { exercise ->
                     Column(
@@ -444,6 +459,24 @@ fun ExerciseDetailScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             ExerciseImageHeader(progress.exercise.name, progress.exercise.id)
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                 MetadataBlock(progress.exercise)
+
+                ExerciseInstructions.forExercise(progress.exercise.id)?.let { info ->
+                    SectionLabel("how to")
+                    MetroText(
+                        text = listOf(info.level, info.category, info.force)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" · "),
+                        style = MetroTextStyle.ListItemSubtitle,
+                        color = MetroTheme.colors.secondaryText,
+                    )
+                    info.instructions.forEachIndexed { index, step ->
+                        MetroText(
+                            text = "${index + 1}.  $step",
+                            style = MetroTextStyle.ListItemSubtitle,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
 
                 SectionLabel("progress")
                 MetroSegmentedRow(

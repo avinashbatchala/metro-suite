@@ -120,6 +120,10 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         private set
     var pickerForWorkout by mutableStateOf(false)
         private set
+    var pickerMuscle by mutableStateOf<MuscleGroup?>(null)
+        private set
+    var pickerEquipment by mutableStateOf<com.metro.training.domain.exercises.EquipmentType?>(null)
+        private set
 
     var customDraft by mutableStateOf<CustomExerciseDraft?>(null)
         private set
@@ -170,6 +174,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             val query = pickerQuery.trim().lowercase()
             return exercises
                 .filter { pickerCategory == PickerCategory.All || !it.builtIn }
+                .filter { pickerMuscle == null || pickerMuscle!! in it.primaryMuscles }
+                .filter { pickerEquipment == null || it.equipment == pickerEquipment }
                 .filter { query.isEmpty() || it.name.lowercase().contains(query) }
         }
 
@@ -380,9 +386,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     fun openExercisePicker(forWorkout: Boolean = false) {
         pickerQuery = ""
         pickerCategory = PickerCategory.All
+        pickerMuscle = null
+        pickerEquipment = null
         pickerForWorkout = forWorkout
         route = TrainingRoute.ExercisePicker
     }
+
+    fun choosePickerMuscle(muscle: MuscleGroup?) { pickerMuscle = muscle }
+    fun choosePickerEquipment(equipment: com.metro.training.domain.exercises.EquipmentType?) { pickerEquipment = equipment }
 
     fun pickExercise(exercise: ExerciseDefinition) {
         if (pickerForWorkout) {
