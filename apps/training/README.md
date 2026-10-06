@@ -81,6 +81,23 @@ Progression logic is pure Kotlin with **no Android dependencies** and is extensi
 - **Animations** — set-complete accent flash, PR celebration, timestamp-based rest bar, staggered
   list entry.
 
+## Revamp status (Hevy/MacroFactor-inspired)
+
+- **Phase 1 — logging** ✅ set types (normal/warm-up/failure/drop/backoff/myorep), previous-values
+  column, focused inline set editor, per-side/partials/myoreps, set + exercise + workout notes,
+  exercise menu (note/replace/reorder/superset/history/remove), start-empty-workout, header stats,
+  ongoing rest notification.
+- **Phase 2 — library** ✅ bundled instructions/cues + muscle/equipment filters.
+- **Phase 3 — routines** 🔶 pending (folders, inline editor polish).
+- **Phase 4 — history/PRs** ✅ personal records on exercise detail, richer workout summary; 🔶
+  calendar view pending.
+- **Phase 5 — progress** ✅ weekly sets + volume trend + per-exercise charts; 🔶 distribution chart
+  pending.
+- **Phase 6 — equipment/program** 🔶 plate + warm-up calculators done; gym-profile settings UI and
+  equipment-aware generation pending.
+- **Phase 7 — data** ✅ JSON/CSV export + JSON/Hevy-CSV import (SAF).
+- **Phase 8 — fidelity** 🔶 goldens/device pass pending.
+
 ## Screen inventory
 
 Authoritative spec: [`references/guides/blueprint.md`](references/guides/blueprint.md)
