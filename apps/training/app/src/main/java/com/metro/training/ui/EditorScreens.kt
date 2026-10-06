@@ -478,6 +478,20 @@ fun ExerciseDetailScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
                     }
                 }
 
+                SectionLabel("personal records")
+                val bestLoad = progress.exposures.mapNotNull { ExerciseAnalytics.valueOf(it, ProgressMetric.TOP_SET_LOAD) }.maxOrNull()
+                val bestOneRm = progress.exposures.mapNotNull { ExerciseAnalytics.valueOf(it, ProgressMetric.ESTIMATED_1RM) }.maxOrNull()
+                val bestReps = progress.exposures.flatMap { it.sets }.filter { it.completed }.maxOfOrNull { it.repsCompleted }
+                val bestVolume = progress.exposures.mapNotNull { ExerciseAnalytics.valueOf(it, ProgressMetric.VOLUME_LOAD) }.maxOrNull()
+                listOfNotNull(
+                    bestLoad?.let { "heaviest set · ${viewModel.formatWeight(it)}" },
+                    bestOneRm?.let { "estimated 1RM · ${viewModel.formatWeight(it)}" },
+                    bestReps?.let { "most reps · $it" },
+                    bestVolume?.let { "best session volume · ${viewModel.formatWeight(it)}" },
+                ).forEach { line ->
+                    MetroText(text = line, style = MetroTextStyle.ListItemTitle, modifier = Modifier.padding(vertical = 4.dp))
+                }
+
                 SectionLabel("progress")
                 MetroSegmentedRow(
                     options = ProgressMetric.values().toList(),

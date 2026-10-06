@@ -675,9 +675,35 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setSupersetTag(workoutExerciseId: String, tag: String?) {
-        viewModelScope.launch {
+    fun setSupersetTag(workoutExerciseId: String, tag: String?) {        viewModelScope.launch {
             repo.setSupersetTag(workoutExerciseId, tag)
+            activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
+        }
+    }
+
+    // ---- equipment calculators ------------------------------------------
+
+    fun plateBreakdown(targetKg: Double): List<Double>? =
+        com.metro.training.domain.equipment.PlateMath.platesPerSide(
+            targetKg,
+            prefs.barWeightKg,
+            prefs.plateWeightsKg,
+        )
+
+    fun warmupSets(workingKg: Double): List<com.metro.training.domain.equipment.WarmupSet> =
+        com.metro.training.domain.equipment.WarmupCalculator.suggest(
+            workingKg,
+            prefs.barWeightKg,
+            prefs.equipmentIncrementKg,
+        )
+
+    fun addWarmupSets(workoutExerciseId: String) {
+        val workout = activeWorkout ?: return
+        val exercise = workout.exercises.firstOrNull { it.id == workoutExerciseId } ?: return
+        val working = exercise.sets.firstOrNull { it.setType.feedsProgression }?.load ?: return
+        val suggested = warmupSets(working)
+        viewModelScope.launch {
+            suggested.forEach { repo.addWarmupSet(workoutExerciseId, it.loadKg, it.reps) }
             activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
         }
     }
@@ -930,6 +956,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     val weightSuffix: String
         get() = if (weightUnit == com.metro.training.domain.exercises.LoadUnit.KG) "kg" else "lb"
+
+    val barWeightKg: Double get() = prefs.barWeightKg
 
     companion object {
         const val ONBOARDING_STEPS = 4

@@ -265,6 +265,7 @@ private fun ExerciseMenu(
 ) {
     var swapFor by remember { mutableStateOf<String?>(null) }
     var noteFor by remember { mutableStateOf<String?>(null) }
+    var plateFor by remember { mutableStateOf<String?>(null) }
 
     MetroContextMenuPopup(
         visibleState = visibleState,
@@ -272,6 +273,8 @@ private fun ExerciseMenu(
         rootBounds = rootBounds,
         items = buildList {
             add(MetroContextMenuItem("exercise note", onClick = { noteFor = exerciseId; visibleState.targetState = false }))
+            add(MetroContextMenuItem("add warm-up sets", onClick = { viewModel.addWarmupSets(exerciseId); visibleState.targetState = false }))
+            add(MetroContextMenuItem("plate calculator", onClick = { plateFor = exerciseId; visibleState.targetState = false }))
             add(MetroContextMenuItem("replace exercise", onClick = { swapFor = exerciseId; visibleState.targetState = false }))
             add(MetroContextMenuItem("move up", enabled = canMoveUp, onClick = { viewModel.moveExercise(exerciseId, -1); visibleState.targetState = false }))
             add(MetroContextMenuItem("move down", enabled = canMoveDown, onClick = { viewModel.moveExercise(exerciseId, 1); visibleState.targetState = false }))
@@ -309,6 +312,52 @@ private fun ExerciseMenu(
                 initial = we.note,
                 onSave = { text -> viewModel.setExerciseNote(it, text); noteFor = null },
                 onDismiss = { noteFor = null },
+            )
+        }
+    }
+    plateFor?.let { weId ->
+        val working = viewModel.activeWorkout?.exercises?.firstOrNull { it.id == weId }
+            ?.sets?.firstOrNull { it.setType.feedsProgression }?.load
+        PlateCalculatorDialog(
+            viewModel = viewModel,
+            initial = working ?: viewModel.barWeightKg,
+            onDismiss = { plateFor = null },
+        )
+    }
+}
+
+@Composable
+private fun PlateCalculatorDialog(
+    viewModel: TrainingViewModel,
+    initial: Double,
+    onDismiss: () -> Unit,
+) {
+    var target by remember { mutableStateOf(viewModel.weightNumber(initial)) }
+    val targetKg = viewModel.parseWeight(target)
+    val plates = targetKg?.let { viewModel.plateBreakdown(it) }
+    MetroMessageDialog(title = "plate calculator", onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            MetroTextBox(
+                value = target,
+                onValueChange = { target = it },
+                placeholder = "target (${viewModel.weightSuffix})",
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            MetroText(
+                text = "bar ${viewModel.formatWeight(viewModel.barWeightKg)}",
+                style = MetroTextStyle.ListItemSubtitle,
+                color = MetroTheme.colors.secondaryText,
+            )
+            MetroText(
+                text = when {
+                    targetKg == null -> "enter a target"
+                    plates == null -> "not achievable with your plates"
+                    plates.isEmpty() -> "bar only"
+                    else -> "per side: " + com.metro.training.domain.equipment.PlateMath.describe(plates)
+                },
+                style = MetroTextStyle.ListItemTitle,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
@@ -823,11 +872,32 @@ fun WorkoutSummaryScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
         ) {
             MetroAppTitle(title = "workout complete")
             MetroText(
-                text = "${formatDuration(workout.durationMillis)} · ${workout.completedExposureCount} work sets",
+                text = "${formatDuration(workout.durationMillis)} · ${workout.completedExposureCount} work sets · " +
+                    "${viewModel.formatWeight(workout.exercises.flatMap { it.sets }
+                        .filter { it.completed && it.load != null }
+                        .sumOf { (it.load ?: 0.0) * it.repsCompleted })} volume",
                 style = MetroTextStyle.ListItemSubtitle,
                 color = MetroTheme.colors.secondaryText,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
+            SectionLabel("exercises")
+            workout.exercises.forEach { exercise ->
+                MetroText(
+                    text = exercise.exerciseName,
+                    style = MetroTextStyle.ListItemTitle,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                )
+                MetroText(
+                    text = exercise.sets.filter { it.completed }.joinToString(" · ") { set ->
+                        val load = set.load?.let { "${viewModel.weightNumber(it)}×" } ?: ""
+                        "$load${set.repsCompleted}"
+                    }.ifBlank { "no completed sets" },
+                    style = MetroTextStyle.ListItemSubtitle,
+                    color = MetroTheme.colors.secondaryText,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                )
+                Divider()
+            }
             SectionLabel("next time")
             viewModel.summaryRecommendations.forEach { recommendation ->
                 Row(

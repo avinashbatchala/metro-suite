@@ -261,6 +261,26 @@ class TrainingRepository(
         dao.upsertSet(set.toEntity(set.exerciseSessionId))
     }
 
+    /** Insert a warm-up set with an explicit load (from the warm-up calculator). */
+    suspend fun addWarmupSet(workoutExerciseId: String, loadKg: Double, reps: Int) = withContext(io) {
+        val existing = dao.sets(workoutExerciseId)
+        dao.upsertSet(
+            WorkoutSetEntity(
+                id = UUID.randomUUID().toString(),
+                workoutExerciseId = workoutExerciseId,
+                setIndex = (existing.maxOfOrNull { it.setIndex } ?: 0) + 1,
+                setType = SetType.WARMUP.name,
+                load = loadKg,
+                repsCompleted = reps,
+                rir = null,
+                quality = com.metro.training.domain.workout.SetQuality.NORMAL.name,
+                completed = false,
+                prescribed = false,
+                timestamp = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     suspend fun deleteSet(id: String) = withContext(io) { dao.deleteSet(id) }
 
     /** Start a workout with no routine ("start empty workout"). */

@@ -25,6 +25,27 @@ class TrainingPreferences(context: Context) {
         get() = prefs.getInt(KEY_REST, 0)
         set(value) = prefs.edit().putInt(KEY_REST, value).apply()
 
+    // ---- gym profile (equipment) ----------------------------------------
+
+    var barWeightKg: Double
+        get() = prefs.getFloat(KEY_BAR, 20f).toDouble()
+        set(value) = prefs.edit().putFloat(KEY_BAR, value.toFloat()).apply()
+
+    /** Available plate denominations per side (kg). */
+    var plateWeightsKg: List<Double>
+        get() = (prefs.getString(KEY_PLATES, null) ?: DEFAULT_PLATES)
+            .split(',')
+            .mapNotNull { it.trim().toDoubleOrNull() }
+            .filter { it > 0.0 }
+            .ifEmpty { DEFAULT_PLATES.split(',').map { it.toDouble() } }
+        set(value) = prefs.edit()
+            .putString(KEY_PLATES, value.joinToString(",") { it.toString() })
+            .apply()
+
+    var equipmentIncrementKg: Double
+        get() = prefs.getFloat(KEY_INC, 2.5f).toDouble()
+        set(value) = prefs.edit().putFloat(KEY_INC, value.toFloat()).apply()
+
     var onboardingCompleted: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
@@ -60,6 +81,10 @@ class TrainingPreferences(context: Context) {
         private const val KEY_RIR = "rir_enabled"
         private const val KEY_HINTS = "smart_hints"
         private const val KEY_REST = "default_rest_seconds"
+        private const val KEY_BAR = "bar_weight_kg"
+        private const val KEY_PLATES = "plate_weights_kg"
+        private const val KEY_INC = "equipment_increment_kg"
+        private const val DEFAULT_PLATES = "25,20,15,10,5,2.5,1.25"
         private const val KEY_ONBOARDED = "onboarding_completed"
         private const val KEY_DAYS = "training_days"
         private const val KEY_REST_WORKOUT = "rest_workout_id"
