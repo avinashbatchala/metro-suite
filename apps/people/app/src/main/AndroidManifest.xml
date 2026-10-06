@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Signature-level suite contract: People may add Phone speed-dial entries. -->
+    <uses-permission android:name="com.metro.dialer.permission.INTERNAL" />
     <!-- Requested only when the user explicitly starts a contact import. -->
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />

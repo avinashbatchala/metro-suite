@@ -379,6 +379,7 @@ class PeopleState(context: Context) {
             context = appContext,
             displayName = person.displayName,
             phoneNumber = number,
+            contactId = person.id,
         )
     }
 
