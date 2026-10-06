@@ -24,7 +24,7 @@ source "$ROOT/scripts/lib/metro-common.sh"
 # Same tier order as verify-all.sh
 APP_ORDER=(
   launcher statusbar notifications navbar volume lockscreen
-  browser notes music weather
+  browser notes music weather vivimusic
   photos calendar mail messaging people dialer store settings calculator clock files hub widgets conversations
 )
 
@@ -163,7 +163,7 @@ fi
 # mavenLocal. Publish the toolkits first whenever one of them is in the build set.
 needs_maven_local=0
 for app in "${APPS[@]}"; do
-  if [[ "$app" == "keyboard" || "$app" == "weather" ]]; then
+  if [[ "$app" == "keyboard" || "$app" == "weather" || "$app" == "vivimusic" ]]; then
     needs_maven_local=1
     break
   fi
