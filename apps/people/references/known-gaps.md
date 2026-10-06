@@ -1,21 +1,31 @@
 # People — known reference gaps
 
-Items the blueprint requires but we do not yet have in `images/`.
+Target: **WP8.1 Update / Update 2 People Hub** (Lumia 640 era) — sections
+`contacts · what's new · rooms`.
+
+## Deferred / partial (documented)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Connect service model (Signal / WhatsApp) | Partial | WhatsApp actions still live on the contact **profile** (retained). The generic `ConnectedService` model + Signal detection on the contact card **Connect** pivot is a follow-up. |
+| Contact card Pivot `profile · connect · what's new · history` | Partial | The card shows native **profile** actions + a pin ApplicationBar; the Connect / What's New / History pivots are not yet split out. |
+| History (calls/SMS/mail) | Not implemented | Requires suite-owned sibling contracts (Dialer/Messaging/Mail) — not yet defined in `metro-system-sdk`. |
+| Rooms / Groups | Empty state only | The `rooms` section exists; Groups CRUD (ContactsContract.Groups / app-private store) is a follow-up. Microsoft Rooms cloud is discontinued and not faked. |
+| Me / own contact | Not implemented | Uses `ContactsContract.Profile` when permitted, else a designated contact — follow-up. |
+| Sort / display-name settings | Not implemented | Requires provider sort-key + StructuredName queries (no `substringAfterLast`). |
+| New / Edit / Delete / Link contact | Platform-intent interim | `+` opens the platform contact editor (`ACTION_INSERT`); Metro edit/delete/link UIs are follow-ups. |
+| LOOKUP_KEY identity | Not implemented | Tiles/deep links still use numeric contact ids; legacy links must keep working during migration. |
 
 ## Missing screenshots
 
 | File | What we need | Workaround |
 |------|--------------|------------|
-| `hub_dark_blue.jpg` | WP 8.1 **all** pane — Me row, Add account, showing chip, jump tile, contact list | Row styling: `apps/launcher/references/images/applist_dark_blue.png`. Layout: `guides/blueprint.md` Page 1 + `guides/people-hub.md`. |
-| `hub_whatsnew_dark_blue.jpg` | Hub-level **what's new** panorama pane (aggregated feed) | Per-contact feed: `detail_whatsnew_dark_blue.jpg`. Hub behavior: `guides/people-hub.md`. |
-
-## How to close gaps
-
-1. Capture from WP 8.1 GDR2+ device or emulator at **768×1280**.
-2. Save as `<screen>_dark_blue.jpg` per `references/README.md`.
-3. Update this file and the blueprint image table.
-4. Golden emulator screenshots still require human approval per `AGENTS.md`.
+| `hub_contacts_dark_blue.jpg` | WP8.1 **contacts** pane (Me row, showing filter, jump tile, contact list) | `people panorama.jpg` / `people.jpeg` + `guides/blueprint.md` |
+| `hub_whatsnew_dark_blue.jpg` | Hub-level **what's new** pane | `detail_whatsnew_dark_blue.jpg` + blueprint |
+| `rooms_dark_blue.jpg` | **rooms** / Groups section | blueprint § Rooms |
 
 ## Sourced externally (attribution)
 
-Images in `images/` were captured from [All About Windows Phone](https://allaboutwindowsphone.com/features/item/20748_Proving_theres_still_full_Face.php) (Steve Litchfield, 2015) — Lumia 640, WP 8.1. Community reference only; blueprint wins on conflict.
+`images/` captures are from [All About Windows Phone](https://allaboutwindowsphone.com/) (Steve
+Litchfield, Lumia 640, WP8.1) and Windows Central coverage — community reference; the corrected
+blueprint is authoritative on layout, and Windows 10 Mobile People is **not** used for geometry.

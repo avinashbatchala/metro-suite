@@ -64,4 +64,38 @@
     <string name="import_error_not_vcard">That file isn\'t a vCard (.vcf) file.</string>
     <string name="import_error_too_many">That file has too many contacts to import.</string>
     <string name="import_error_generic">Something went wrong while importing contacts.</string>
+
+    <!-- WP8.1 Hub sections -->
+    <string name="section_contacts">contacts</string>
+    <string name="section_whats_new">what\'s new</string>
+    <string name="section_rooms">rooms</string>
+    <string name="whats_new_empty">Nothing new right now.</string>
+    <string name="rooms_empty">No groups yet.</string>
+
+    <!-- People settings -->
+    <string name="settings">settings</string>
+    <string name="settings_people">people</string>
+    <string name="settings_add_contacts">add contacts</string>
+    <string name="settings_add_contacts_hint">Set up accounts and contact sources</string>
+    <string name="settings_filter">filter contact list</string>
+    <string name="settings_filter_hint">Pick which accounts you\'ll see</string>
+    <string name="settings_sort">sort list by</string>
+    <string name="settings_display">display names by</string>
+    <string name="sort_first_name">First name</string>
+    <string name="sort_last_name">Last name</string>
+    <string name="display_first_last">First Last</string>
+    <string name="display_last_first">Last First</string>
+
+    <!-- Contact profile pivots -->
+    <string name="profile">profile</string>
+    <string name="connect">connect</string>
+    <string name="history">history</string>
+    <string name="link">link</string>
+    <string name="edit">edit</string>
+    <string name="delete">delete</string>
+    <string name="new_contact">new</string>
+    <string name="add_account_unavailable">No account setup app is available</string>
+    <string name="contact_editor_unavailable">No contact editor is available</string>
+    <string name="save">save</string>
+    <string name="cancel">cancel</string>
 </resources>

@@ -34,14 +34,16 @@ fun ContactDetailScreen(
     onWhatsAppCall: () -> Unit,
     onWhatsAppText: () -> Unit,
     onEmail: (String) -> Unit,
+    onPin: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val summary = detail.summary
     val whatsApp = detail.whatsApp
     BackHandler(onBack = onBack)
 
+    androidx.compose.foundation.layout.Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .verticalScroll(rememberScrollState()),
@@ -119,7 +121,19 @@ fun ContactDetailScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(96.dp))
+    }
+    com.metro.ui.MetroAppBar(
+        icons = listOf(
+            com.metro.ui.MetroAppBarIcon(
+                type = com.metro.ui.MetroSystemIconType.Pin,
+                label = stringResource(R.string.pin_to_start),
+                contentDescription = stringResource(R.string.pin_to_start),
+                onClick = onPin,
+            ),
+        ),
+        modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+    )
     }
 }
 

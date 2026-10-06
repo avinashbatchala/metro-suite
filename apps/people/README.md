@@ -5,13 +5,17 @@
 
 ## Status
 
-Android project scaffolded. Implements WP8.1 People hub v1 per `references/guides/blueprint.md`, plus read/write **VCF (vCard) contact import** into Android's real `ContactsContract`.
+Android project scaffolded and being rebuilt around the mature **WP8.1 People Hub** per
+`references/guides/blueprint.md`: Hub sections `contacts · what's new · rooms`, WP8.1 contact-row
+interaction (avatar → card, name → call), People Settings, and Connect for external apps. Contacts
+are backed by Android's real `ContactsContract`; the read/write **VCF (vCard) importer** is retained.
 
 ## App role
 
-This app recreates the WP8.1 **People** hub: a contact-centered experience with broad overview sections, all-contacts browsing, and filtered navigation.
-
-The app should feel like a Metro hub, not a generic Android contacts manager. The social integration surface mentioned in project scope should be treated as a carefully bounded area, not an excuse to invent new network features.
+This app recreates the **WP8.1 People hub** (Lumia 640 era): a people-centric hub with
+`contacts / what's new / rooms`, where native communication lives in the contact **Profile**,
+external apps live in **Connect**, and social updates deep-link to their source apps. Not Windows
+10 Mobile People.
 
 ## Build gate
 
@@ -23,19 +27,26 @@ The app should feel like a Metro hub, not a generic Android contacts manager. Th
 
 Authoritative spec: [`references/guides/blueprint.md`](references/guides/blueprint.md)
 
-### 1. People hub · all (default)
+### 1. People hub · contacts (default)
 
-- Panorama landing pane: Me row, add account, contact list, jump list
-- Reference: `references/images/hub_dark_blue.jpg` (not yet sourced — see `references/known-gaps.md`)
+- Me row, showing-filter row, locale-aware jump list, contact list (avatar → card, name → call)
+- Reference: `references/images/people panorama.jpg`
 
 ### 2. People hub · what's new
 
-- Aggregated social feed pane; read-only in v1 with external deep-link stubs
-- Supplementary: `references/guides/people-hub.md`
+- Read-only resident feed (external deep links); private messages are never posted here
 
-### 3. Filter contacts
+### 3. People hub · rooms
 
-- Full-page filter (hide no-phone, per-account checkboxes)
+- Groups (ContactsContract.Groups / app-private store); Rooms cloud backend discontinued
+
+### 4. Contact card (Pivot)
+
+- `profile · connect · what's new · history`; ApplicationBar `pin · link · edit · …`
+
+### 5. Filter contacts
+
+- Hide-no-phone toggle + per-account checkboxes; save = check, cancel = X
 - Reference: `references/images/pivot_dark_blue.jpg`
 
 ### 4. Contact detail (pivot)

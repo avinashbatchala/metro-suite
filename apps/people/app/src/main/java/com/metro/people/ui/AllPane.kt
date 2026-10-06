@@ -54,6 +54,7 @@ import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroTransitions
+import com.metro.ui.metroClickable
 import com.metro.ui.metroStickyLetterHeader
 
 /** Mutable holder so layout callbacks can update without triggering recomposition. */
@@ -71,6 +72,7 @@ fun AllPane(
     onFilterClick: () -> Unit,
     onJumpClick: () -> Unit,
     onOpenDetail: (PersonSummary) -> Unit,
+    onCall: (PersonSummary) -> Unit,
     onAddToSpeedDial: (PersonSummary) -> Unit,
     onPinToStart: (PersonSummary) -> Unit,
     scrollToLetter: Char?,
@@ -178,6 +180,7 @@ fun AllPane(
                             contextMenuTarget = contextMenuPerson?.id == person.id,
                             contextMenuFocusFraction = contextMenuFocusFraction,
                             onOpenDetail = { onOpenDetail(person) },
+                            onCall = { onCall(person) },
                             onLongClick = { bounds -> openContextMenu(person, bounds) },
                         )
                     }
@@ -189,6 +192,7 @@ fun AllPane(
                         contextMenuTarget = contextMenuPerson?.id == person.id,
                         contextMenuFocusFraction = contextMenuFocusFraction,
                         onOpenDetail = { onOpenDetail(person) },
+                        onCall = { onCall(person) },
                         onLongClick = { bounds -> openContextMenu(person, bounds) },
                     )
                 }
@@ -233,12 +237,16 @@ private fun ContactRow(
     contextMenuTarget: Boolean,
     contextMenuFocusFraction: Float,
     onOpenDetail: () -> Unit,
+    onCall: () -> Unit,
     onLongClick: (Rect) -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val avatarBounds = remember(person.id) { RectRef() }
     val density = LocalDensity.current
     val activeShiftPx = with(density) { MetroContextMenuActiveShift.toPx() }
+    // WP8.1: tap the avatar → contact card; tap the name/row → call the primary number
+    // (falling back to the card when the contact has no callable number).
+    val rowClick = if (person.hasPhone && !person.defaultPhone.isNullOrBlank()) onCall else onOpenDetail
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,7 +262,7 @@ private fun ContactRow(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onOpenDetail,
+                onClick = rowClick,
                 onLongClick = { onLongClick(avatarBounds.value) },
             )
             .padding(vertical = 6.dp),
@@ -266,7 +274,8 @@ private fun ContactRow(
                 .size(48.dp)
                 .onGloballyPositioned { coordinates ->
                     avatarBounds.value = coordinates.boundsInWindow()
-                },
+                }
+                .metroClickable(onClick = onOpenDetail),
         )
         Column(
             modifier = Modifier
@@ -278,17 +287,6 @@ private fun ContactRow(
                 style = MetroTextStyle.ListItemTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Row(
-            modifier = Modifier.size(48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            MetroSystemIcon(
-                type = MetroSystemIconType.Forward,
-                iconSize = 40.dp,
-                color = MetroTheme.colors.primaryText,
             )
         }
     }

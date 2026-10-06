@@ -42,8 +42,9 @@ fun FilterScreen(
     var hideNoPhone by remember(initial) { mutableStateOf(initial.hideWithoutPhone) }
     var visible by remember(initial) { mutableStateOf(initial.visibleAccounts.ifEmpty { accounts }) }
 
+    androidx.compose.foundation.layout.Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .verticalScroll(rememberScrollState())
@@ -91,25 +92,25 @@ fun FilterScreen(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(32.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MetroCircleIconButton(
-                type = MetroSystemIconType.Add,
+        Spacer(modifier = Modifier.height(96.dp))
+    }
+    com.metro.ui.MetroAppBar(
+        icons = listOf(
+            com.metro.ui.MetroAppBarIcon(
+                type = MetroSystemIconType.Check,
+                label = stringResource(R.string.save),
+                contentDescription = stringResource(R.string.save),
                 onClick = { onSave(PeopleFilter(hideNoPhone, visible)) },
-                contentDescription = "save",
-            )
-            MetroCircleIconButton(
+            ),
+            com.metro.ui.MetroAppBarIcon(
                 type = MetroSystemIconType.Close,
+                label = stringResource(R.string.cancel),
+                contentDescription = stringResource(R.string.cancel),
                 onClick = onCancel,
-                modifier = Modifier.padding(start = 16.dp),
-                contentDescription = "cancel",
-            )
-        }
+            ),
+        ),
+        modifier = Modifier.align(Alignment.BottomCenter),
+    )
     }
 }
 

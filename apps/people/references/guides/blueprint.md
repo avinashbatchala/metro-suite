@@ -4,193 +4,168 @@
 
 Agents implement pages, layout, and interactions exactly as described here. Screenshots in `images/` are visual aids only — they do not override this file.
 
-Target: **Windows Phone 8.1 GDR2+** People hub on a portrait phone (768×1280 / xhdpi reference profile).
+Target: **Windows Phone 8.1 Update / Update 2** People hub (Lumia 640 era) on a portrait phone
+(768×1280 / xhdpi reference profile). The mature Hub contains three sections:
+`contacts · what's new · rooms` (Rooms also holds **Groups**). Do **not** use the WP7/WP8 huge
+Panorama `all` design, and do not use Windows 10 Mobile People styling.
 
 ## App shell
 
-- **Control model:** `MetroPanorama` for the hub landing (horizontal panes). This is a panorama app, not a pivot app at the top level.
-- **Theme:** Black background (`#000000`) on all People surfaces unless a contact photo provides a full-bleed header.
-- **Typography:** Noto Sans stand-in for Segoe WP. Contact names are large and left-aligned; section headers use sentence-case lowercase panorama titles (`all`, `what's new`).
-- **App bar:** Minimized (… overflow) on panorama panes. Standard round icon buttons on contact detail and filter screens.
-- **No Material:** No FAB, chips, rounded avatar cards, or bottom sheets.
+- **Control model:** `MetroPanorama` for the hub landing (horizontal sections
+  `contacts · what's new · rooms`). Use the compact WP8.1 Hub-section typography, not a 64sp
+  classic Panorama heading.
+- **Theme:** WP8.1 supports dark and light; use `MetroTheme` colors (no hard-coded `Color.Black`
+  where the system theme owns the surface). Contact photos may provide a full-bleed header.
+- **Typography:** suite Metro face. Contact names large and left-aligned; section headings compact.
+- **App bar:** round icon buttons on the contacts section (`+ new`, `search`) plus `…` overflow
+  (`settings`). Standard round icon buttons on subpages.
+- **No Material:** No FAB, chips, rounded avatar cards, bottom sheets, Material snackbars/dialogs.
 
 ## WP 8.1 deltas (vs WP 8.0)
 
 | WP 8.0 | WP 8.1 (build this) |
 |--------|---------------------|
-| Opens to What's new | Opens to **all** (contact list) |
+| Opens to What's new | Opens to **contacts** (contact list) |
 | Recent pane (last 8 people) | **Removed** — do not implement |
-| Together pane (Rooms / Groups) | **Removed** — do not implement |
+| Together pane | **Rooms** section, containing **Groups** — implement |
 | In-hub Facebook like/comment | **Read-only feed**; tap opens external app |
-| Tap contact row → profile | Tap contact **name** → **call**; separate icon → profile |
+| Tap contact row → profile | Tap contact **name/content** → **call**; avatar → contact card |
 | Built-in Facebook/Twitter sync | App-linked accounts via Add an account |
 
 ## Pages
 
-### Page 1 — People hub · all (default landing)
+### Page 1 — People hub · contacts (default landing)
 
 - **Layout:**
-  - Panorama pane title: lowercase `all` in large Light type (64sp class), flush left.
-  - Peek of next pane (`what's new`) visible on right edge (~40dp).
+  - Section title: lowercase `contacts`.
+  - Peek of the next section (`what's new`) on the right edge (~40dp).
   - Top of scrollable content (in order):
-    1. **Me row** — user's own square photo + display name. Tapping opens own profile (Me surface; may stub in v1).
-    2. **Add an account** row — launches account picker (`accounts_dark_blue.jpg`).
-    3. **Import SIM contacts** row — shown when SIM present; may stub in v1.
-    4. **Showing filter chip** — accent-colored label (e.g. `showing only contacts with phone numbers`). Tap opens filter contacts page.
-    5. **Alphabet jump tile** — small square accent tile with current letter or `#`. The active letter **sticks** at the top while that section's contacts scroll; the next letter pushes it up (`metroStickyLetterHeader`). Tap opens jump list overlay.
-    6. **Contact list** — grouped by first letter (or last name per settings). Each row:
-       - Square avatar (48dp), left.
-       - Display name, large (20sp SemiBold), left-aligned.
-       - **Profile icon** (small contact-card glyph) at row right — tap opens contact detail.
-       - **Row tap on name/primary area** — initiate call to default mobile number (WP 8.1 behavior).
-  - Rows separated by subtle 1px dividers at 20% white; no card elevation.
-- **Navigation:**
-  - Horizontal swipe → `what's new` pane.
-  - System Search key → in-app contact search overlay.
-  - … menu → Settings (sort/display name options, filter link, import SIM).
-  - `+` app bar icon → new contact form.
-- **Interactions:**
-  - Long-press contact row → context menu (pin to Start, link, delete) — implement pin + delete in v1; link optional.
-  - Scroll preserves position when returning from detail.
-- **Background:** Solid black.
+    1. **Me row** — user's own square photo + display name (`ContactsContract.Profile` or a
+       designated contact fallback).
+    2. **Showing filter row** — accent label (`showing only contacts with phone numbers`); tap opens
+       filter contacts.
+    3. **Alphabet jump tile** — sticky per section; tap opens jump list overlay.
+    4. **Contact list** — grouped by locale-aware sort key. Each row:
+       - Square avatar (48dp), left; **tap → contact card**.
+       - Display name; **tap name/content → call the primary/super-primary number** (falls back to
+         the contact card when no callable number exists).
+       - **No** large right-facing arrow.
+  - Thin low-contrast separators; no card elevation.
+- **Navigation:** horizontal swipe → `what's new` / `rooms`. App-bar `+` → new contact; `search` →
+  search; `…` → settings.
+- **Interactions:** long-press → context menu (pin / edit / delete / add to speed dial).
+- **Background:** theme surface.
 
 ### Page 2 — People hub · what's new
 
-- **Layout:**
-  - Panorama pane title: `what's new` (lowercase, large Light).
-  - Optional network filter chip at top: `showing Facebook` (accent text). Tap cycles connected networks.
-  - Vertical feed of social posts from aggregated accounts. Each item:
-    - Poster name + square avatar.
-    - Post text (wrap).
-    - Optional link preview card.
-    - Source + relative time in grey (`Facebook · 34 minutes ago`).
-    - Comment count badge (grey speech bubble) on right — display only in v1.
-  - Empty state when no accounts connected: centred message + link to Add an account.
-- **Navigation:** Swipe back to `all`. Tap post → deep-link stub (toast "Open in Facebook" / external intent placeholder).
-- **Interactions:** No inline like/comment in v1 (WP 8.1 app-first model).
-- **Background:** Black.
+- Section title `what's new`. Read-oriented feed (external-app deep links). No private
+  message content (Signal/WhatsApp messages are never social posts). Restrained empty state when
+  no source is connected; the section remains.
 
-### Page 3 — Filter contacts
+### Page 3 — People hub · rooms
 
-- **Layout:** Full-page settings surface (not a panorama pane).
-  - Header: `FILTER CONTACTS` (small caps, 20sp).
-  - **Hide contacts without phone numbers** — label + large On/Off state text + `MetroToggleSwitch` right.
-  - Helper text below toggle in grey.
-  - **show contacts from my** section — checkbox list per synced account (Outlook, Google, Facebook, etc.).
-  - Bottom app bar: check (save) and X (cancel) round buttons; … overflow right.
-- **Navigation:** Reached from `showing` chip or Settings → filter my contact list. Back restores previous list scroll.
-- **Interactions:** Toggle/check changes apply on check tap; cancel discards.
-- **Reference:** `images/pivot_dark_blue.jpg`
-- **Background:** Black.
+- Section title `rooms`. Hosts **Groups** (ContactsContract.Groups or an app-private group store
+  keyed by LOOKUP_KEY). Microsoft's Rooms cloud backend is discontinued and is **not** faked.
 
-### Page 4 — Jump list overlay
+### Contact card (Pivot)
 
-- **Layout:** Full-screen overlay via toolkit `MetroJumpList`: 4-column grid of `#`, `a`–`z`, and locale globe. Active letters (with contacts) use accent fill; inactive letters use dark gray. Glyphs are lowercase white.
-- **Navigation:** Opened from alphabet tile on `all` pane. Tap active letter → scroll list to section and dismiss. Tap inactive → no-op. Tap scrim or Back → dismiss.
-- **Background:** Translucent black scrim over the list.
+```text
+JOHN SMITH
+Google
 
-### Page 5 — Contact detail (pivot container)
+profile   connect   what's new   history
+```
 
-- **Layout:** Pivot page with header block:
-  - Contact name (sentence caps) + source label in grey (`Facebook`).
-  - Pivot headers: `profile` | `connect` | `what's new` | `history` (lowercase, large type; active white, inactive grey).
-- **Navigation:** Opened from profile icon on contact row (not from name tap). Back → `all` pane preserving scroll.
-- **Background:** Black.
+- **profile** — native capabilities: square photo, `call mobile`, `text`, `send email`,
+  `map address`, `view website`, notes. No Signal/WhatsApp entries here.
+- **connect** — external app services (Signal / WhatsApp) as large square service tiles; tap =
+  message, long-press = capability menu (message / voice / video).
+- **what's new** — the resident feed filtered to the contact.
+- **history** — communication history from safe suite contracts; empty state otherwise.
+- ApplicationBar: `pin · link · edit · …` (overflow: delete / share).
 
-### Page 6 — Contact detail · profile pivot
+### People Settings
 
-- **Layout:**
-  - Square profile photo (large, left or top-left).
-  - Latest social blurb beside/below photo (source + relative time).
-  - Action list (verb label grey, value accent blue):
-    - `call mobile` → number
-    - `text` → SMS intent
-    - `post to timeline` → external app stub
-    - `send email` → address
-  - App bar: pin, link, edit icons (round). … overflow.
-- **Reference:** `images/detail_dark_blue.jpg`
-- **Background:** Black.
+`add contacts`, `filter contact list`, `import contacts`, `sort list by`, `display names by`.
 
-### Page 7 — Contact detail · connect pivot
+### Filter contacts
 
-- **Layout:** Grid/list of linked app tiles (Facebook, Skype, etc.) with `add apps` entry point at bottom.
-- **Reference:** `images/detail_connect_dark_blue.jpg`
-- **Background:** Black.
+`Hide contacts without phone numbers` toggle + `show contacts from my` account checkboxes.
+ApplicationBar save = **check**, cancel = **X**. Search ignores the phone-number visibility filter.
 
-### Page 8 — Contact detail · what's new pivot
+### Jump list overlay
 
-- **Layout:** Per-contact social feed; same item template as hub what's new. Optional `showing <network>` filter chip.
-- **Reference:** `images/detail_whatsnew_dark_blue.jpg`
-- **Background:** Black.
+Toolkit `MetroJumpList`: `#`, locale sections, and an accent **globe**. Active letters (with
+contacts) use accent fill; inactive use dark grey. Tap → scroll to section + dismiss; scrim/Back →
+dismiss.
 
-### Page 9 — Contact detail · history pivot
+### Me / own contact
 
-- **Layout:** Chronological communication list (calls, texts). Group repeat calls with count badge `(3)` per WP 8.1 Phone parity.
-- **Data:** Pull from system call log / SMS where permitted; empty state if denied.
-- **Background:** Black.
+Use `ContactsContract.Profile` when permitted; otherwise a user-designated contact (store only its
+LOOKUP_KEY); otherwise a restrained setup row. Do not duplicate contact data or request profile
+permissions on startup.
 
-### Page 10 — Add account
+### New / edit contact
 
-- **Layout:** Full-page list of account providers (Exchange, Outlook.com, Google, iCloud, Facebook, Twitter, LinkedIn, …). Icon + name + optional subtitle per row.
-- **Navigation:** From `all` pane Add an account row or Settings.
-- **Reference:** `images/accounts_dark_blue.jpg`
-- **Background:** Black.
+Root `+` → new contact. If several writable destinations exist, choose account first (device-local
+is valid on Android). Edit is progressive (name, photo, phones, emails, addresses, company/title,
+birthday, website, notes, ringtone). Save through `ContactsContract`; WRITE_CONTACTS is requested
+only when editing/creating/saving. Never edit read-only connector raw contacts.
 
-### Page 11 — New / edit contact
+### Link contacts
 
-- **Layout:** Form with Name field visible; `+` expands hidden fields (last name, company, etc.). Account picker before save. Save icon in app bar.
-- **Data:** Write through `ContactsContract` to selected account.
-- **Background:** Black.
+`link` in the card ApplicationBar → suggest duplicates (`ContactsContract.AggregationExceptions`) →
+tap to link; manual search; unlink supported. Never duplicate records to simulate linking.
 
-### Page 12 — Permission / empty states
+### Delete contact
 
-- **No READ_CONTACTS:** Full-page explanation + action to grant permission. No crash, no empty list masquerading as success.
-- **No contacts after grant:** Prompt to add account or create contact.
+`… → delete` on writable cards only; conservative when only some raw contacts are writable.
 
-### Page 13 — Import contacts (VCF)
+### Import contacts (VCF — MetroSuite extension)
 
-- **Entry:** Hub app-bar `…` overflow item `import contacts`, or an inbound `ACTION_VIEW` of a
-  `.vcf` / vCard from Metro Files or another app.
-- **Flow:** file picker (`ACTION_OPEN_DOCUMENT`) → preview → progress → result → hub.
-- **Layout (preview):** Full-page surface. Small-caps `IMPORT CONTACTS` header, back circle at top.
-  Large `contacts found` / `new` / `already on this phone` / `possible duplicates` counts (label
-  left, large number right). Optional subtle secondary line when fields were skipped. Flush-left
-  `import` button. Below, a scrollable list grouped by letter; each row shows the name and either a
-  phone/email (new) or `already on this phone` / `possible duplicate`.
-- **Layout (progress):** `importing contacts` + `done of total` large type + Metro loading dots.
-- **Layout (result):** `CONTACTS IMPORTED` header; `N contacts added`, `N already existed`,
-  `N possible duplicates added`, and `N couldn't be imported` (accent) when non-zero; `done` and
-  `view people` buttons.
-- **Errors:** Metro error page with a plain explanation (write permission denied, unreadable/empty
-  file, not a vCard, too many contacts). No Material dialog/spinner/FAB.
-- **Background:** Black.
-- **Write target:** Android `ContactsContract` device-local contacts (no Metro-only database).
+Entry: `settings → add contacts → import contacts`, plus inbound `ACTION_VIEW` of a `.vcf`. Existing
+flow preserved (picker → preview → progress → result). Writes to device-local `ContactsContract`.
+Imported rich fields (addresses, organization, title, birthday, notes, websites, photos, multiple
+phones/emails) must surface in the Profile card.
+
+### Rooms / Groups
+
+`rooms` hosts **Groups** (ContactsContract.Groups / app-private group store keyed by LOOKUP_KEY).
+Create/rename/add/remove members/delete/pin/send message/send email. Microsoft's Rooms cloud backend
+is discontinued and is **not** faked.
+
+### Live tile
+
+People Start tile = animated contact-photo mosaic with accent fallback cells (launcher-owned).
+Contact secondary tiles: photo front, accent+identity fallback, deep-link to the exact contact.
+Group tiles use a member-photo mosaic. Prefer LOOKUP_KEY identity; keep legacy numeric deep links
+working.
 
 ## Images
 
 | Image | Page | Notes |
 |-------|------|-------|
-| `hub_dark_blue.jpg` | Page 1 — all pane | **Not yet sourced** — see `known-gaps.md`. Use `apps/launcher/references/images/applist_dark_blue.png` for list row styling until captured. |
-| `pivot_dark_blue.jpg` | Page 3 — filter contacts | Filter toggles + account checkboxes |
-| `detail_dark_blue.jpg` | Page 6 — profile pivot | Primary contact detail reference |
-| `detail_connect_dark_blue.jpg` | Page 7 — connect pivot | Linked app tiles |
-| `detail_whatsnew_dark_blue.jpg` | Page 8 — what's new pivot | Per-contact social feed |
-| `accounts_dark_blue.jpg` | Page 10 — add account | Account provider list |
+| `people panorama.jpg` / `people.jpeg` | Hub | Panorama reference |
+| `jumplist_dark_blue.png` | Jump list | Active/inactive tiles + globe |
+| `pivot_dark_blue.jpg` | Filter contacts | Toggles + account checkboxes |
+| `detail_dark_blue.jpg` | Profile pivot | Primary contact card |
+| `detail_connect_dark_blue.jpg` | Connect pivot | Linked app service tiles |
+| `detail_whatsnew_dark_blue.jpg` | What's new pivot | Per-contact feed |
+| `accounts_dark_blue.jpg` | Add contacts | Account setup |
+| `live tile.png` / `pin to start.png` | Tiles | Mosaic + pin |
 
 ## Data model (implementation hint)
 
-- `PersonSummary(id, displayName, photoUri, hasPhone, sourceLabel, defaultPhone)`
-- `PersonDetail` extends summary with emails, social blurbs, linked apps
-- `ContactMethod(type, label, value)`
-- `PeopleFilter(hideNoPhone, visibleAccounts)`
-- `PeoplePane { All, WhatsNew }`
+- `PersonSummary(id, displayName, photoUri, hasPhone, defaultPhone, defaultEmail, sourceLabel, sortKey)`
+- `PersonDetail(summary, phones, emails, ..., sources, whatsApp)`
+- `ContactMethod(type, label, value)` — real ContactsContract types/custom labels
+- `PeopleFilter(hideWithoutPhone, visibleAccounts)`
+- `ConnectedService(service, packageName, actions)` — Signal / WhatsApp in **Connect**
+- Hub sections: `contacts · what's new · rooms`
 
-## Out of scope (v1)
+## Out of scope / exceptions
 
-- Rooms, Groups, Together pane (WP 8.0 only)
-- Recent pane
-- Inline social like/comment/reply
-- Real Facebook/Twitter/LinkedIn API sync (stub feeds + external deep links only)
-- Me tile as live Start tile
-- Dual-SIM per-contact defaults
-- Contact binding / Connect tile rich content APIs
+- Microsoft Rooms cloud backend (discontinued) — Groups only.
+- Cortana Inner Circle (no Cortana-equivalent system).
+- Inline social like/comment/reply (feed deep-links to source apps).
+- Signal network probing (use Signal's own ContactsContract rows only).

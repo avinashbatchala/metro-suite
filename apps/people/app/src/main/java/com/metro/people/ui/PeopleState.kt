@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +38,8 @@ import kotlinx.coroutines.withContext
 sealed class PeopleRoute {
     data object Hub : PeopleRoute()
     data object Filter : PeopleRoute()
-    data object Accounts : PeopleRoute()
+    data object Settings : PeopleRoute()
+    data object AddContacts : PeopleRoute()
     data class Detail(val contactId: Long) : PeopleRoute()
     data object Import : PeopleRoute()
 }
@@ -107,6 +107,9 @@ class PeopleState(context: Context) {
     /** Set by the Activity so [PeopleState] can request WRITE_CONTACTS at import time only. */
     var requestWriteContactsPermission: (() -> Unit)? = null
 
+    /** Set by the Activity so [PeopleState] can request CALL_PHONE on the first direct call. */
+    var requestCallPhonePermission: (() -> Unit)? = null
+
     private var pendingImportUri: Uri? = null
 
     val accountOptions: List<AccountOption> = repository.accountOptions()
@@ -165,10 +168,48 @@ class PeopleState(context: Context) {
         notifyChanged()
     }
 
-    fun openAccounts() {
+    fun openSettings() {
         dismissSearch()
-        route = PeopleRoute.Accounts
+        route = PeopleRoute.Settings
         notifyChanged()
+    }
+
+    fun openAddContacts() {
+        route = PeopleRoute.AddContacts
+        notifyChanged()
+    }
+
+    /** Inline Metro status message (replaces Android Toasts). */
+    var statusMessage: String? by mutableStateOf(null)
+        private set
+
+    fun clearStatus() {
+        statusMessage = null
+        notifyChanged()
+    }
+
+    /** Opens the platform account-setup surface for adding contact sources. */
+    fun addAccount() {
+        val intent = Intent(android.provider.Settings.ACTION_ADD_ACCOUNT).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val ok = runCatching { appContext.startActivity(intent) }.isSuccess
+        if (!ok) {
+            statusMessage = appContext.getString(R.string.add_account_unavailable)
+            notifyChanged()
+        }
+    }
+
+    /** Opens the platform contact editor (device-local contacts are valid on Android). */
+    fun newContact() {
+        val intent = Intent(Intent.ACTION_INSERT, ContactsContract.Contacts.CONTENT_URI).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val ok = runCatching { appContext.startActivity(intent) }.isSuccess
+        if (!ok) {
+            statusMessage = appContext.getString(R.string.contact_editor_unavailable)
+            notifyChanged()
+        }
     }
 
     fun closeOverlay() {
@@ -304,16 +345,34 @@ class PeopleState(context: Context) {
     // ---- Existing actions --------------------------------------------------
 
     fun callContact(person: PersonSummary) {
-        val number = person.defaultPhone ?: return
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        appContext.startActivity(intent)
+        val number = person.defaultPhone
+        if (number.isNullOrBlank()) {
+            openDetail(person.id)
+            return
+        }
+        val hasCall = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.CALL_PHONE,
+        ) == PackageManager.PERMISSION_GRANTED
+        // WP8.1 taps the primary number directly; request CALL_PHONE contextually, else DIAL.
+        if (!hasCall) requestCallPhonePermission?.invoke()
+        val action = if (hasCall) Intent.ACTION_CALL else Intent.ACTION_DIAL
+        val intent = Intent(action, Uri.parse("tel:$number")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { appContext.startActivity(intent) }.onFailure {
+            val dial = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { appContext.startActivity(dial) }
+        }
     }
 
     fun addToSpeedDial(person: PersonSummary) {
         val number = person.defaultPhone
         if (number.isNullOrBlank()) {
-            Toast.makeText(appContext, R.string.speed_dial_needs_phone, Toast.LENGTH_SHORT).show()
+            statusMessage = appContext.getString(R.string.speed_dial_needs_phone)
+            notifyChanged()
             return
         }
         MetroIntents.requestAddSpeedDial(
@@ -321,7 +380,6 @@ class PeopleState(context: Context) {
             displayName = person.displayName,
             phoneNumber = number,
         )
-        Toast.makeText(appContext, R.string.added_to_speed_dial, Toast.LENGTH_SHORT).show()
     }
 
     fun pinToStart(person: PersonSummary) {
@@ -330,7 +388,6 @@ class PeopleState(context: Context) {
             packageName = MetroIntents.PACKAGE_PEOPLE,
             tileId = PeopleTileLogic.contactTileId(person.id),
         )
-        Toast.makeText(appContext, R.string.pinned_to_start, Toast.LENGTH_SHORT).show()
     }
 
     fun openDeepLink(uri: Uri?) {
@@ -361,11 +418,9 @@ class PeopleState(context: Context) {
             setPackage(link.packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        try {
-            appContext.startActivity(intent)
-        } catch (e: Exception) {
-            Log.w(TAG, "WhatsApp text deep-link failed", e)
-            Toast.makeText(appContext, R.string.whatsapp_unavailable, Toast.LENGTH_SHORT).show()
+        if (runCatching { appContext.startActivity(intent) }.isFailure) {
+            statusMessage = appContext.getString(R.string.whatsapp_unavailable)
+            notifyChanged()
         }
     }
 
@@ -376,11 +431,9 @@ class PeopleState(context: Context) {
             setPackage(packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        try {
-            appContext.startActivity(intent)
-        } catch (e: Exception) {
-            Log.w(TAG, "WhatsApp contact action failed", e)
-            Toast.makeText(appContext, R.string.whatsapp_unavailable, Toast.LENGTH_SHORT).show()
+        if (runCatching { appContext.startActivity(intent) }.isFailure) {
+            statusMessage = appContext.getString(R.string.whatsapp_unavailable)
+            notifyChanged()
         }
     }
 
@@ -388,10 +441,6 @@ class PeopleState(context: Context) {
         val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$address"))
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         appContext.startActivity(intent)
-    }
-
-    fun showExternalStub(message: String) {
-        Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
     }
 
     fun toggleJumpList() {

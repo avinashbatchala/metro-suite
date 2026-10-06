@@ -42,6 +42,10 @@ class MainActivity : ComponentActivity() {
         writePermissionResult?.invoke(granted)
     }
 
+    private val requestCallPhone = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* result is advisory; call falls back to ACTION_DIAL when denied */ }
+
     private val pickVcf = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -82,12 +86,16 @@ class MainActivity : ComponentActivity() {
                     writePermissionResult = { granted -> state.onWritePermissionResult(granted) }
                     requestWriteContacts.launch(Manifest.permission.WRITE_CONTACTS)
                 }
+                state.requestCallPhonePermission = {
+                    runCatching { requestCallPhone.launch(Manifest.permission.CALL_PHONE) }
+                }
                 onDeepLink = { deepIntent ->
                     latestDeepLink = deepIntent
                     deepLinkTick++
                 }
                 onDispose {
                     state.requestWriteContactsPermission = null
+                    state.requestCallPhonePermission = null
                     onDeepLink = null
                 }
             }
