@@ -1,6 +1,7 @@
 package com.pranshulgg.weather_master_app.feature.locations
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,12 +20,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.rememberBackgroundLocationPermissionLauncher
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.rememberLocationPermissionLauncher
@@ -46,7 +45,8 @@ data class LocationsScreenUiState(
 @Composable
 fun LocationsScreen(
     onBack: () -> Unit,
-    navController: NavController,
+    onAddPlace: () -> Unit,
+    onEditLocation: () -> Unit,
     onLocationSelect: (Location) -> Unit
 ) {
     val viewModel: LocationsScreenViewModel = hiltViewModel()
@@ -83,19 +83,10 @@ fun LocationsScreen(
         }
     )
 
-    LargeTopBarScaffold(
-        title = stringResource(R.string.locations),
-        navigationIcon = { LocAction(R.drawable.arrow_back_24px, "Back", onBack) },
-        actions = {
-            LocAction(R.drawable.info_24px, "Info") {
-                SnackbarManager.show(R.string.location_long_press_info)
-            }
-            LocAction(R.drawable.search_24px, "Add a place") {
-                navController.navigate(NavRoutes.SEARCH)
-            }
-        }
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.locations))
+
+        Box(modifier = Modifier.weight(1f)) {
             LocationsScreenContent(
                 locationStore.locations,
                 onLongClick = { viewModel.showBottomSheet(it) },
@@ -110,9 +101,7 @@ fun LocationsScreen(
     }
 
     LocationScreenConfirmationDialog(viewModel)
-    LocationScreenSheet(viewModel, sheetState, onEdit = {
-        navController.navigate(NavRoutes.EDIT_LOCATION)
-    })
+    LocationScreenSheet(viewModel, sheetState, onEdit = onEditLocation)
 
     SharedDialogs.DeviceBackgroundLocationPermissionInfoDialog(
         show = backgroundLocationPermissionInfoDialogOpen,

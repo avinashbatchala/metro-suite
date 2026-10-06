@@ -34,6 +34,7 @@ object MetroAppGlyphs {
     val Store: Int get() = R.drawable.metro_app_store
     val Photos: Int get() = R.drawable.metro_app_photos
     val Calendar: Int get() = R.drawable.metro_app_calendar
+    val Weather: Int get() = R.drawable.metro_app_weather
     val Mail: Int get() = R.drawable.metro_app_mail
     val Messaging: Int get() = R.drawable.metro_app_messaging
     val MessagingUnread: Int get() = R.drawable.metro_app_messaging_unread
@@ -64,6 +65,7 @@ object MetroAppGlyphs {
         "com.metro.store" to R.drawable.metro_app_store,
         "com.metro.photos" to R.drawable.metro_app_photos,
         "com.metro.calendar" to R.drawable.metro_app_calendar,
+        "com.metroweather.app" to R.drawable.metro_app_weather,
         "com.metro.mail" to R.drawable.metro_app_mail,
         "com.metro.messaging" to R.drawable.metro_app_messaging,
         "com.metro.people" to R.drawable.metro_app_people,

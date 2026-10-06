@@ -1,7 +1,6 @@
 package com.pranshulgg.weather_master_app.feature.settings.about
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,26 +25,28 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
+import com.metro.ui.metroClickable
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.ui.components.Gap
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.SettingSection
 import com.pranshulgg.weather_master_app.core.ui.components.SettingTile
 import com.pranshulgg.weather_master_app.core.ui.components.SettingsTileIcon
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 import com.pranshulgg.weather_master_app.feature.shared.ui.SharedBottomSheet
 import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(navController: NavController) {
+fun AboutScreen(
+    onOpenTerms: () -> Unit,
+    onOpenPrivacy: () -> Unit,
+    onOpenLicense: () -> Unit,
+) {
     val context = LocalContext.current
     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
     val viewModel: AboutScreenViewModel = hiltViewModel()
@@ -62,16 +63,14 @@ fun AboutScreen(navController: NavController) {
     )
 
 
-    LargeTopBarScaffold(
-        title = stringResource(R.string.setting_about_app),
-        navigationIcon = { NavigateUpBtn(navController) },
-    ) { paddingValues ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.setting_about_app))
+
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(paddingValues)
         ) {
             AppVersionTile(
                 description = "v${packageInfo.versionName} • ${packageInfo.versionCode}",
@@ -90,18 +89,18 @@ fun AboutScreen(navController: NavController) {
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.article_24px) },
                         title = stringResource(R.string.about_terms_conditions),
-                        onClick = { navController.navigate(NavRoutes.TERMS_CONDITIONS) }
+                        onClick = onOpenTerms
                     ),
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.policy_24px) },
                         title = stringResource(R.string.about_privacy_policy),
-                        onClick = { navController.navigate(NavRoutes.PRIVACY_POLICY) }
+                        onClick = onOpenPrivacy
                     ),
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.license_24px) },
                         title = stringResource(R.string.about_license),
                         description = "GNU General Public License v3.0",
-                        onClick = { navController.navigate(NavRoutes.LICENSE) }
+                        onClick = onOpenLicense
                     ),
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.bug_report_24px) },
@@ -170,7 +169,7 @@ private fun AppVersionTile(
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .size(44.dp)
-                .clickable(enabled = !isLoadingNewVersion) { onClick() },
+                .metroClickable(enabled = !isLoadingNewVersion) { onClick() },
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
             Symbol(R.drawable.refresh_24px, color = MetroTheme.colors.primaryText)

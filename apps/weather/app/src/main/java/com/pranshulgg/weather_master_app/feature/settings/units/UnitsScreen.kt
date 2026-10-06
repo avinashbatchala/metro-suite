@@ -3,7 +3,6 @@ package com.pranshulgg.weather_master_app.feature.settings.units
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -14,7 +13,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.model.weather.DistanceUnit
 import com.pranshulgg.weather_master_app.core.model.weather.PrecipitationUnit
@@ -22,16 +20,15 @@ import com.pranshulgg.weather_master_app.core.model.weather.PressureUnit
 import com.pranshulgg.weather_master_app.core.model.weather.TemperatureUnit
 import com.pranshulgg.weather_master_app.core.model.weather.WindSpeedUnit
 import com.pranshulgg.weather_master_app.core.model.weather.toName
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.SettingSection
 import com.pranshulgg.weather_master_app.core.ui.components.SettingTile
 import com.pranshulgg.weather_master_app.core.ui.components.SettingsTileIcon
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 import com.pranshulgg.weather_master_app.core.ui.components.tiles.DialogOption
 import com.pranshulgg.weather_master_app.feature.settings.SettingsScreenViewModel
 
 @Composable
-fun UnitsScreen(navController: NavController) {
+fun UnitsScreen() {
 
     val viewModel: SettingsScreenViewModel = hiltViewModel()
     val units by viewModel.weatherUnits.collectAsStateWithLifecycle()
@@ -39,21 +36,16 @@ fun UnitsScreen(navController: NavController) {
 
     val currentUnits = units
 
-
-
-    LargeTopBarScaffold(
-        title = stringResource(R.string.setting_units),
-        navigationIcon = { NavigateUpBtn(navController) },
-    ) { paddingValues ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.setting_units))
 
         if (currentUnits != null) {
 
             Column(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(paddingValues),
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
 

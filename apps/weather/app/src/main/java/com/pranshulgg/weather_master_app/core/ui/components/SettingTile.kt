@@ -133,8 +133,6 @@ fun SettingSection(
     val itemBgColor = Color.Unspecified
 
     Column(
-        modifier = Modifier
-            .padding(horizontal = if (noPadding) 0.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         title?.let {

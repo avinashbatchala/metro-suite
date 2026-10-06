@@ -91,7 +91,7 @@ fun ActionBottomSheet(
                                 onConfirm()
                                 hide()
                             },
-                            modifier = if (confirmBtnMaxWidth) Modifier.fillMaxWidth() else Modifier,
+                            modifier = if (confirmBtnMaxWidth) Modifier.weight(1f) else Modifier,
                             enabled = !isConfirmDisabled
                         )
                     }

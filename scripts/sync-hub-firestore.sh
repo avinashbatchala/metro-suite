@@ -125,7 +125,7 @@ const shell = new Set([
 ]);
 const core = new Set([
   "browser", "notes", "music", "calculator", "clock", "files", "settings", "store", "hub",
-  "photos", "calendar", "mail", "messaging", "people", "dialer", "widgets", "conversations",
+  "photos", "calendar", "weather", "mail", "messaging", "people", "dialer", "widgets", "conversations",
 ]);
 
 const descriptions = {
@@ -141,6 +141,7 @@ const descriptions = {
   music: "Metro YouTube Music client (Vivi engine): streaming, offline downloads, library, EQ, and sound recognition.",
   photos: "Photo hub with date and album pivots.",
   calendar: "Agenda, day, and month calendar views.",
+  weather: "Bing Weather-style: current conditions, hourly and daily forecast, and places.",
   mail: "Linked inboxes and conversation mail.",
   messaging: "SMS and MMS message threads.",
   people: "Contacts hub and people directory.",
@@ -163,6 +164,7 @@ const glyphFiles = {
   store: "metro_app_store.xml",
   photos: "metro_app_photos.xml",
   calendar: "metro_app_calendar.xml",
+  weather: "metro_app_weather.xml",
   mail: "metro_app_mail.xml",
   messaging: "metro_app_messaging.xml",
   people: null,
@@ -191,6 +193,7 @@ const brandHexFallback = {
   store: "#7CB342",
   photos: "#EB3C00",
   calendar: "#0078D7",
+  weather: "#001945",
   mail: "#0078D7",
   messaging: "#0078D7",
   people: "#D34829",

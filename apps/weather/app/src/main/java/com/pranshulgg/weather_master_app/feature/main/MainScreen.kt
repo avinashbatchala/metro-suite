@@ -15,14 +15,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.BuildConfig
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.model.domain.toMessageRes
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherBlock
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.data.provider.devicelocation.rememberLocationPermissionLauncher
 import com.pranshulgg.weather_master_app.feature.main.ui.MainScreenBottomSheets
@@ -47,7 +45,11 @@ data class MainScreenUiState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel) {
+fun MainScreen(
+    weatherViewModel: WeatherViewModel,
+    onOpenSearch: () -> Unit,
+    onEditLocation: () -> Unit,
+) {
     val viewModel: MainScreenViewModel = hiltViewModel()
     val uiState = viewModel.uiState.value
     val uriHandler = LocalUriHandler.current
@@ -113,15 +115,8 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
     }
 
     MainScreenScaffold(
-        navController = navController,
         weatherStore = weatherStore,
-        onRefresh = {
-            weatherViewModel.setActiveLoading()
-            weatherViewModel.refreshWeather(activeLocation)
-        },
-        onEditLocation = {
-            navController.navigate(NavRoutes.EDIT_LOCATION)
-        },
+        onEditLocation = onEditLocation,
         onLocationSelect = { location ->
             if (activeLocation?.id != location.id) {
                 weatherViewModel.setActiveLoading()
@@ -133,7 +128,8 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
         context = context,
         onWeatherSourceInfoClick = viewModel::showWeatherSourcesInfoForLocationSheet,
         prefs = prefs,
-        units = unitsStore
+        units = unitsStore,
+        onOpenSearch = onOpenSearch,
     )
 
     // WEATHER SOURCES INFO DIALOG
@@ -145,7 +141,7 @@ fun MainScreen(navController: NavController, weatherViewModel: WeatherViewModel)
         onDismiss = viewModel::hideUnsupportedSelectedSourceDialog,
         onConfirm = {
             locationStore.activeLocation?.let {
-                navController.navigate(NavRoutes.EDIT_LOCATION)
+                onEditLocation()
             }
         }
     )

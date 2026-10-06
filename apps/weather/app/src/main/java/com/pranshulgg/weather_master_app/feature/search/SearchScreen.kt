@@ -1,9 +1,8 @@
 package com.pranshulgg.weather_master_app.feature.search
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -25,21 +24,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.model.domain.weather.ApiKey
 import com.pranshulgg.weather_master_app.core.model.sources.SearchSource
 import com.pranshulgg.weather_master_app.core.model.sources.Source
 import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 import com.metro.ui.MetroDimens
 import com.metro.ui.MetroEmptyState
 import com.metro.ui.MetroListItem
 import com.metro.ui.MetroTextBox
 import com.metro.ui.MetroTheme
+import com.metro.ui.metroClickable
 import com.pranshulgg.weather_master_app.core.utils.formatters.toTitleCase
 import com.pranshulgg.weather_master_app.feature.search.ui.SearchScreenBottomSheets
 import com.pranshulgg.weather_master_app.feature.shared.ui.SharedBottomSheet
@@ -55,7 +53,7 @@ data class SearchUiState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(navController: NavController) {
+fun SearchScreen(onLocationSaved: () -> Unit) {
 
     val viewModel: SearchScreenViewModel = hiltViewModel()
     val results = viewModel.results
@@ -79,14 +77,23 @@ fun SearchScreen(navController: NavController) {
         }
     }
 
-    LargeTopBarScaffold(
-        title = stringResource(R.string.search),
-        navigationIcon = { NavigateUpBtn(navController) },
-        actions = {
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.search))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MetroTextBox(
+                value = uiState.query,
+                onValueChange = viewModel::updateQuery,
+                placeholder = "city name",
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = MetroDimens.ScreenHorizontalMargin)
+            )
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clickable { viewModel.showSearchSourcePickerSheet() },
+                    .padding(end = MetroDimens.ScreenHorizontalMargin)
+                    .metroClickable { viewModel.showSearchSourcePickerSheet() },
                 contentAlignment = Alignment.Center
             ) {
                 Symbol(
@@ -96,19 +103,13 @@ fun SearchScreen(navController: NavController) {
                 )
             }
         }
-    ) { _ ->
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MetroTheme.colors.background)
+                .weight(1f)
                 .padding(horizontal = MetroDimens.ScreenHorizontalMargin)
                 .verticalScroll(rememberScrollState())
         ) {
-            MetroTextBox(
-                value = uiState.query,
-                onValueChange = viewModel::updateQuery,
-                placeholder = "city name"
-            )
             Spacer(modifier = Modifier.height(8.dp))
 
             when {
@@ -153,7 +154,7 @@ fun SearchScreen(navController: NavController) {
             viewModel.hideWeatherSourcesForLocationSheet()
             viewModel.saveLocation(
                 selectedLocation,
-                onBack = { navController.popBackStack() },
+                onBack = onLocationSaved,
                 onReset = { },
                 it
             )

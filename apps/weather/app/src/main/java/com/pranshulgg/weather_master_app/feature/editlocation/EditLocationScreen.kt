@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.metro.ui.MetroDimens
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
@@ -40,11 +39,10 @@ import com.pranshulgg.weather_master_app.core.model.domain.weather.ApiKey
 import com.pranshulgg.weather_master_app.core.model.sources.Source
 import com.pranshulgg.weather_master_app.core.model.weather.openmeteo.OpenMeteoModel
 import com.pranshulgg.weather_master_app.core.ui.components.Gap
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.SettingSection
 import com.pranshulgg.weather_master_app.core.ui.components.SettingTile
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 import com.pranshulgg.weather_master_app.core.ui.snackbar.SnackbarManager
 import com.pranshulgg.weather_master_app.feature.editlocation.ui.EditLocationBottomSheet
 import com.pranshulgg.weather_master_app.feature.editlocation.ui.EditLocationScreenDialogs
@@ -69,7 +67,7 @@ data class EditLocationScreenUiState(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun EditLocationScreen(
-    navController: NavController
+    onBack: () -> Unit
 ) {
 
     val viewModel: EditLocationViewModel = hiltViewModel()
@@ -142,17 +140,14 @@ fun EditLocationScreen(
             append(" (${stringResource(it)})")
         }
     }
-    LargeTopBarScaffold(
-        title = stringResource(R.string.location_edit),
-        navigationIcon = { NavigateUpBtn(navController) },
-        floatingActionButtonPosition = FabPosition.Center,
-    ) { paddingValues ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.location_edit))
+
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(top = paddingValues.calculateTopPadding())
         ) {
             SettingSection(
                 tiles = listOf(
@@ -258,7 +253,7 @@ fun EditLocationScreen(
                             uiState.selectedOpenMeteoModel
                                 ?: locations.activeLocation.openMeteoModel,
                             onBack = {
-                                navController.popBackStack()
+                                onBack()
                             }
                         )
                     }
@@ -271,7 +266,7 @@ fun EditLocationScreen(
             ButtonWithIcon(
                 onClick = {
                     viewModel.updateDefaultLocation(locations.activeLocation.id)
-                    navController.popBackStack()
+                    onBack()
                 },
                 text = stringResource(R.string.action_set_default),
                 icon = R.drawable.home_pin_24px,
@@ -363,7 +358,7 @@ fun EditLocationScreen(
                 onConfirm = {
                     viewModel.deleteLocation(locations.activeLocation.id)
                     viewModel.hideConfirmationDialog()
-                    navController.popBackStack()
+                    onBack()
                 }
             )
 

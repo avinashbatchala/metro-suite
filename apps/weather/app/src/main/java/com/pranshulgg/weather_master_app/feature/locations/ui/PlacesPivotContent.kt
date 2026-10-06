@@ -122,7 +122,7 @@ fun PlacesPivotContent(
             MetroText(
                 text = "saved places",
                 style = MetroTextStyle.SectionHeader,
-                color = MetroTheme.colors.accent,
+                color = MetroTheme.colors.secondaryText,
                 modifier = Modifier.padding(
                     start = MetroDimens.ScreenHorizontalMargin,
                     top = 8.dp,
@@ -147,6 +147,7 @@ fun PlacesPivotContent(
             LocationItem(
                 title = location.name,
                 description = description,
+                modifier = Modifier.padding(horizontal = MetroDimens.ScreenHorizontalMargin),
                 onClick = { onLocationSelect(location) },
                 icon = icon.toIcon(
                     targetTimeMilli = if (weather != null) {

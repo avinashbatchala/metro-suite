@@ -24,6 +24,7 @@ object MetroAppRegistry {
         "com.metro.store" to Entry("Store", "#7CB342"),
         "com.metro.photos" to Entry("Photos", "#EB3C00"),
         "com.metro.calendar" to Entry("Calendar", "#0078D7"),
+        "com.metroweather.app" to Entry("Weather", "#001945"),
         "com.metro.mail" to Entry("Mail", "#0078D7"),
         "com.metro.messaging" to Entry("Messaging", "#0078D7"),
         "com.metro.conversations" to Entry("Conversations", "#00ABA9"),

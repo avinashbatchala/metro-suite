@@ -2,7 +2,6 @@ package com.pranshulgg.weather_master_app.feature.shared.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +20,7 @@ import com.metro.ui.MetroColors
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
+import com.metro.ui.metroClickable
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.ui.components.Symbol
 import com.pranshulgg.weather_master_app.core.ui.components.WeatherIconBox
@@ -38,16 +38,17 @@ fun LocationItem(
     onLongClick: () -> Unit,
     isDeviceLocation: Boolean = false,
     shape: androidx.compose.foundation.shape.RoundedCornerShape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
-    isAlertAvailable: Boolean = false
+    isAlertAvailable: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val onSurface = MetroTheme.colors.primaryText
     val subtle = MetroTheme.colors.secondaryText
     val contentColor = if (isSelected) MetroTheme.colors.accent else onSurface
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .metroClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

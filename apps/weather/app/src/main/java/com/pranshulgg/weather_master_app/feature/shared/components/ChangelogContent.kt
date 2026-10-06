@@ -75,9 +75,7 @@ fun ChangelogContent(hideSheet: () -> Unit) {
         MetroBorderButton(
             text = stringResource(R.string.action_ok),
             onClick = hideSheet,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = Modifier.padding(16.dp)
         )
     }
 }

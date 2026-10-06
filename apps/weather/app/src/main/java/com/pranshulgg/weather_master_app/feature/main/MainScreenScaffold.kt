@@ -10,20 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.navigation.NavController
-import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarDefaults
-import com.metro.ui.MetroAppBarIcon
-import com.metro.ui.MetroSystemIconType
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.prefs.AppPrefsState
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
 import com.pranshulgg.weather_master_app.data.store.WeatherStoreState
 import com.pranshulgg.weather_master_app.data.store.WeatherUnitsStoreState
 import com.pranshulgg.weather_master_app.feature.locations.ui.PlacesPivotContent
@@ -31,15 +24,14 @@ import com.pranshulgg.weather_master_app.feature.main.ui.layouts.PhoneLayout
 
 @Composable
 fun MainScreenScaffold(
-    navController: NavController,
     weatherStore: WeatherStoreState,
-    onRefresh: () -> Unit,
     onEditLocation: () -> Unit,
     onLocationSelect: (Location) -> Unit,
     context: Context,
     onWeatherSourceInfoClick: () -> Unit,
     prefs: AppPrefsState,
     units: WeatherUnitsStoreState,
+    onOpenSearch: () -> Unit,
 ) {
     val weather = remember(weatherStore.weather) { weatherStore.weather }
     val alerts = remember(weatherStore.alerts) { weatherStore.alerts }
@@ -50,7 +42,6 @@ fun MainScreenScaffold(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(bottom = MetroAppBarDefaults.BarHeight)
         ) {
             AnimatedContent(
@@ -65,10 +56,11 @@ fun MainScreenScaffold(
                             weather = weather,
                             units = units,
                             context = context,
-                            navController = navController,
                             alerts = alerts,
                             prefs = prefs,
                             onLocationSelect = onLocationSelect,
+                            onAddPlace = onOpenSearch,
+                            onEditLocation = onEditLocation,
                             modifier = Modifier.weight(1f)
                         )
                     } else {
@@ -76,7 +68,7 @@ fun MainScreenScaffold(
                         // Places pivot so a location can be added.
                         PlacesPivotContent(
                             onLocationSelect = onLocationSelect,
-                            onAddPlace = { navController.navigate(NavRoutes.SEARCH) },
+                            onAddPlace = onOpenSearch,
                             onEdit = onEditLocation,
                             onPin = {},
                             modifier = Modifier.weight(1f)
@@ -85,29 +77,5 @@ fun MainScreenScaffold(
                 }
             }
         }
-
-        MetroAppBar(
-            icons = listOf(
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Search,
-                    label = "search",
-                    contentDescription = "Search locations",
-                    onClick = { navController.navigate(NavRoutes.SEARCH) },
-                ),
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Settings,
-                    label = "settings",
-                    contentDescription = "Settings",
-                    onClick = { navController.navigate(NavRoutes.SETTINGS) },
-                ),
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Refresh,
-                    label = "refresh",
-                    contentDescription = "Refresh weather",
-                    onClick = onRefresh,
-                ),
-            ),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
     }
 }

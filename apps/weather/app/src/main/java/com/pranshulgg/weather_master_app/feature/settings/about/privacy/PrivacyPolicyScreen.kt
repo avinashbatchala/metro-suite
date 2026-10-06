@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -25,28 +26,23 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.ui.components.Gap
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 
 
 @Composable
-fun PrivacyPolicyScreen(navController: NavController) {
+fun PrivacyPolicyScreen() {
 
 
-    LargeTopBarScaffold(
-        title = stringResource(R.string.about_privacy_policy),
-        navigationIcon = { NavigateUpBtn(navController) },
-    ) { paddingValues ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.about_privacy_policy))
 
         Column(
-            Modifier
-                .padding(top = paddingValues.calculateTopPadding(), start = 16.dp, end = 16.dp)
-                .verticalScroll(
-                    rememberScrollState()
-                )
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp)
         ) {
             MetroText(
                 text = "WeatherMaster is an open-source application. \n\n" +

@@ -11,30 +11,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import com.pranshulgg.weather_master_app.R
 import com.pranshulgg.weather_master_app.core.prefs.LocalAppPrefs
-import com.pranshulgg.weather_master_app.core.ui.components.LargeTopBarScaffold
-import com.pranshulgg.weather_master_app.core.ui.components.NavigateUpBtn
 import com.pranshulgg.weather_master_app.core.ui.components.SettingSection
 import com.pranshulgg.weather_master_app.core.ui.components.SettingTile
 import com.pranshulgg.weather_master_app.core.ui.components.SettingsTileIcon
-import com.pranshulgg.weather_master_app.core.ui.navigation.NavRoutes
+import com.pranshulgg.weather_master_app.core.ui.components.WeatherPageHeader
 
 /**
  * Slim Metro Settings: units, 24-hour time, background updates and about.
  */
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun SettingsScreen(
+    onOpenUnits: () -> Unit,
+    onOpenBackgroundUpdates: () -> Unit,
+    onOpenAbout: () -> Unit,
+) {
     val prefs = LocalAppPrefs.current
 
-    LargeTopBarScaffold(
-        title = stringResource(R.string.settings),
-        navigationIcon = { NavigateUpBtn(navController) },
-    ) { _ ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeatherPageHeader(title = stringResource(R.string.settings))
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 4.dp)
         ) {
@@ -44,7 +44,7 @@ fun SettingsScreen(navController: NavController) {
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.linear_scale_24px) },
                         title = stringResource(R.string.setting_units),
-                        onClick = { navController.navigate(NavRoutes.UNITS) }
+                        onClick = onOpenUnits
                     ),
                     SettingTile.SwitchTile(
                         leading = { SettingsTileIcon(R.drawable.schedule_48px) },
@@ -56,13 +56,13 @@ fun SettingsScreen(navController: NavController) {
                         leading = { SettingsTileIcon(R.drawable.sync_24px) },
                         title = stringResource(R.string.setting_background_updates),
                         description = stringResource(R.string.setting_background_updates_secondary),
-                        onClick = { navController.navigate(NavRoutes.BACKGROUND_UPDATES) }
+                        onClick = onOpenBackgroundUpdates
                     ),
                     SettingTile.ActionTile(
                         leading = { SettingsTileIcon(R.drawable.info_24px) },
                         title = stringResource(R.string.setting_about_app),
                         description = stringResource(R.string.setting_about_app_secondary),
-                        onClick = { navController.navigate(NavRoutes.ABOUT) }
+                        onClick = onOpenAbout
                     )
                 )
             )

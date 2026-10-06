@@ -5,15 +5,17 @@ import com.metro.system.MetroIntents
 import com.metro.system.MetroPreferences
 import com.metro.system.MetroTileContract
 import com.metro.system.MetroTileData
+import com.metro.system.MetroTilePeek
 import com.metro.system.MetroTileProvider
 import com.metro.system.MetroTileUpdates
+import com.metro.system.MetroTileWidgetFace
+import com.metro.system.MetroTileWidgetFaceKind
 import com.pranshulgg.weather_master_app.core.model.domain.location.Location
 import com.pranshulgg.weather_master_app.core.model.domain.weather.Weather
 import com.pranshulgg.weather_master_app.core.model.domain.weather.WeatherUnits
 import com.pranshulgg.weather_master_app.core.model.weather.TemperatureUnit
-import com.pranshulgg.weather_master_app.core.model.weather.toIcon
 import com.pranshulgg.weather_master_app.core.model.weather.toLabel
-import com.pranshulgg.weather_master_app.core.utils.formatters.getCurrentTimeFor
+import com.pranshulgg.weather_master_app.core.utils.formatters.toWeekdayString
 import com.pranshulgg.weather_master_app.data.repository.WeatherContextRepository
 import com.pranshulgg.weather_master_app.data.repository.WeatherUnitsRepository
 import dagger.hilt.EntryPoint
@@ -73,31 +75,45 @@ class WeatherTileDataSource(context: Context) {
     }
 }
 
+/**
+ * Exports a cycling Start tile (no app icon): face 1 is the current conditions, then the next
+ * three days (weekday + hi/lo + condition). Uses the PEEK_CYCLE widget face so the launcher
+ * rotates the faces.
+ */
 private fun Weather.toTileData(context: Context, units: WeatherUnits): MetroTileData {
-    val today = daily.firstOrNull()
-    val temperature = TemperatureUnit.CELSIUS.convert(current.temperature, units.tempUnit)?.roundToInt()
-    val high = TemperatureUnit.CELSIUS.convert(today?.temperatureMax, units.tempUnit)?.roundToInt()
-    val low = TemperatureUnit.CELSIUS.convert(today?.temperatureMin, units.tempUnit)?.roundToInt()
-    val condition = current.weatherCondition.toLabel(context)
-    val accentHex = MetroPreferences(context).accentColorHex
     val placeLabel = location.customName ?: location.name
+    val timezone = location.timezone
+    val accentHex = MetroPreferences(context).accentColorHex
 
-    val iconRes = current.weatherCondition.toIcon(
-        targetTimeMilli = getCurrentTimeFor(location.timezone),
-        daily = today,
+    fun temp(value: Double?): Int? =
+        TemperatureUnit.CELSIUS.convert(value, units.tempUnit)?.roundToInt()
+
+    val currentFace = MetroTilePeek(
+        title = placeLabel,
+        subtitle = temp(current.temperature)?.let { "$it°" } ?: "--",
+        body = current.weatherCondition.toLabel(context).takeIf { it.isNotBlank() },
+        footer = "Weather",
+        packageName = context.packageName,
     )
 
-    val backFace = buildString {
-        append(temperature?.let { "$it°" } ?: "--")
-        if (condition.isNotBlank()) append("  $condition")
-        if (high != null && low != null) append("\nH $high°   L $low°")
+    val dayFaces = daily.drop(1).take(3).map { day ->
+        MetroTilePeek(
+            title = toWeekdayString(day.time, timezone),
+            subtitle = listOfNotNull(
+                temp(day.temperatureMax)?.let { "H $it°" },
+                temp(day.temperatureMin)?.let { "L $it°" },
+            ).joinToString("   ").takeIf { it.isNotBlank() },
+            body = day.weatherCondition.toLabel(context).takeIf { it.isNotBlank() },
+            footer = placeLabel,
+            packageName = context.packageName,
+        )
     }
 
     return MetroTileData(
         title = placeLabel,
         backgroundColorHex = accentHex,
-        backFaceTitle = backFace,
-        backFaceImageUri = "android.resource://${context.packageName}/$iconRes",
+        widgetFace = MetroTileWidgetFace(kind = MetroTileWidgetFaceKind.PEEK_CYCLE),
+        peeks = (listOf(currentFace) + dayFaces).filter { it.hasContent },
     )
 }
 
