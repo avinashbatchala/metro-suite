@@ -11,4 +11,7 @@ import androidx.compose.ui.graphics.Color
 object WeatherPalette {
     /** Deep Bing Weather blue — page surface for the home panorama. */
     val BingBlue: Color = Color(0xFF10538A)
+
+    /** Lighter Bing-blue rectangular forecast-row surface (historical Daily rows). */
+    val BingBlueRow: Color = Color(0xFF1B6299)
 }

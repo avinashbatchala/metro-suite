@@ -1,7 +1,7 @@
 # Weather — reference materials
 
-Target: the historical **Bing Weather app for Windows Phone 8 / 8.1** (released 7 Aug 2013;
-panorama `today · daily · hourly · maps`). Read
+Target: the mature **Bing/Microsoft Weather app for Windows Phone 8.1** (2014) — panorama
+`today · daily · hourly · maps · favourites` (favourites added in the Feb 2014 update). Read
 [`guides/blueprint.md`](guides/blueprint.md) first — it is the authoritative page and
 interaction spec. This folder informs the blueprint; it does not override it.
 
@@ -32,7 +32,7 @@ All mockups use the WP primary profile viewBox `768×1280`.
 | `images/hourly_bing_weather_blue.svg` | Hourly pane: uppercase location label, `hourly  maps  today  daily` heading track (adjacent headings dimmed), ~6 tall flat rows `TIME \| ART \| TEMP \| PRECIP` with thin low-contrast separators on a deep-blue surface |
 | `images/daily_bing_weather_blue.svg` | Daily pane: same visual language — day column, artwork, hi/lo, precipitation, flat rows |
 | `images/today_bing_weather_blue.svg` | Today pane: hero temperature + condition, hi/lo, flat detail rows |
-| `images/hourly_with_appbar_blue.svg` | Hourly pane with the bottom `MetroAppBar` (locations / search / current location / refresh / ellipsis) |
+| `images/hourly_with_appbar_blue.svg` | Hourly pane with the bottom `MetroAppBar` (pin to start / search / current location + `…`) |
 
 ## Original source URLs
 

@@ -553,6 +553,39 @@
     <string name="country_turkey">Turkey</string>
     <string name="country_belgium">Belgium</string>
 
+    <!-- WP8.1 Bing Weather panorama + panes -->
+    <string name="pane_today">today</string>
+    <string name="pane_daily">daily</string>
+    <string name="pane_hourly">hourly</string>
+    <string name="pane_maps">maps</string>
+    <string name="pane_favourites">favourites</string>
+    <string name="today_label">Today</string>
+    <string name="tonight_label">Tonight</string>
+    <string name="section_alerts">alerts</string>
+    <string name="weather_alert">Weather alert</string>
+    <string name="updated_attribution">Updated %1$s · %2$s</string>
+    <string name="fact_feels_like">Feels like</string>
+    <string name="fact_humidity">Humidity</string>
+    <string name="fact_visibility">Visibility</string>
+    <string name="fact_pressure">Pressure</string>
+    <string name="fact_wind">Wind</string>
+    <string name="fact_uv">UV index</string>
+    <string name="fact_precipitation">Precipitation</string>
+    <string name="no_daily_data">no daily data</string>
+    <string name="no_favourites">no saved places</string>
+    <string name="home_label">home</string>
+    <string name="add_place">add a place</string>
+    <string name="set_home">set home</string>
+    <string name="pin_to_start">pin to start</string>
+    <string name="remove">remove</string>
+
+    <!-- Maps categories -->
+    <string name="map_temperature">Temperature</string>
+    <string name="map_radar">Doppler Radar</string>
+    <string name="map_precipitation">Precipitation</string>
+    <string name="map_cloud">Cloud Cover</string>
+    <string name="map_regional">Regional</string>
+
 </resources>
 
     <!--<string name=""></string>-->

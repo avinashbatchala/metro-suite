@@ -32,6 +32,11 @@ fun MainScreenScaffold(
     prefs: AppPrefsState,
     units: WeatherUnitsStoreState,
     onOpenSearch: () -> Unit,
+    locations: List<Location>,
+    onRemoveLocation: (Location) -> Unit,
+    onSetHome: (Location) -> Unit,
+    onPinLocation: (Location) -> Unit,
+    onOpenDailyDetail: (Int) -> Unit,
 ) {
     val weather = remember(weatherStore.weather) { weatherStore.weather }
     val alerts = remember(weatherStore.alerts) { weatherStore.alerts }
@@ -57,7 +62,13 @@ fun MainScreenScaffold(
                             units = units,
                             context = context,
                             alerts = alerts,
-                            prefs = prefs,
+                            locations = locations,
+                            onLocationSelect = onLocationSelect,
+                            onAddFavourite = onOpenSearch,
+                            onRemoveLocation = onRemoveLocation,
+                            onSetHome = onSetHome,
+                            onPinLocation = onPinLocation,
+                            onOpenDailyDetail = onOpenDailyDetail,
                             modifier = Modifier.weight(1f)
                         )
                     } else {

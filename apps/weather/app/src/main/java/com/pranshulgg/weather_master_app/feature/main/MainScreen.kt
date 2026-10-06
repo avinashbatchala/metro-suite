@@ -49,6 +49,10 @@ fun MainScreen(
     weatherViewModel: WeatherViewModel,
     onOpenSearch: () -> Unit,
     onEditLocation: () -> Unit,
+    onRemoveLocation: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit = {},
+    onSetHome: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit = {},
+    onPinLocation: (com.pranshulgg.weather_master_app.core.model.domain.location.Location) -> Unit = {},
+    onOpenDailyDetail: (Int) -> Unit = {},
 ) {
     val viewModel: MainScreenViewModel = hiltViewModel()
     val uiState = viewModel.uiState.value
@@ -130,6 +134,11 @@ fun MainScreen(
         prefs = prefs,
         units = unitsStore,
         onOpenSearch = onOpenSearch,
+        locations = locationStore.locations,
+        onRemoveLocation = onRemoveLocation,
+        onSetHome = onSetHome,
+        onPinLocation = onPinLocation,
+        onOpenDailyDetail = onOpenDailyDetail,
     )
 
     // WEATHER SOURCES INFO DIALOG
