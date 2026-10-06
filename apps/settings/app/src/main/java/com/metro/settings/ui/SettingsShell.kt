@@ -84,6 +84,9 @@ private fun SettingsSubpageContent(
             kind = ConnectedAppKind.Conversation,
             modifier = modifier,
         )
+        SettingsRoute.RingtonesSounds -> RingtonesSoundsScreen(state = state, modifier = modifier)
+        SettingsRoute.SoundPicker -> SoundPickerScreen(state = state, modifier = modifier)
+        SettingsRoute.SoundAbout -> SoundAboutScreen(modifier = modifier)
         SettingsRoute.Root -> Unit
     }
 }
@@ -100,6 +103,7 @@ private fun SettingsRoute.parentRoute(): SettingsRoute = when (this) {
     SettingsRoute.GalleryAppPicker -> SettingsRoute.GalleryApps
     SettingsRoute.MusicAppPicker -> SettingsRoute.MusicApps
     SettingsRoute.ConversationAppPicker -> SettingsRoute.ConversationApps
+    SettingsRoute.SoundPicker, SettingsRoute.SoundAbout -> SettingsRoute.RingtonesSounds
     else -> SettingsRoute.Root
 }
 
@@ -111,5 +115,6 @@ private fun subpageLoadKey(route: SettingsRoute, state: SettingsState): Any = wh
     SettingsRoute.GalleryAppPicker -> "GalleryAppPicker"
     SettingsRoute.MusicAppPicker -> "MusicAppPicker"
     SettingsRoute.ConversationAppPicker -> "ConversationAppPicker"
+    SettingsRoute.SoundPicker -> "SoundPicker:${state.soundPickerRole.name}"
     else -> route
 }

@@ -13,9 +13,11 @@ import androidx.compose.ui.graphics.Color
 import com.metro.settings.data.ApplicationsBridge
 import com.metro.settings.data.InstalledAppEntry
 import com.metro.settings.data.SystemSettingsBridge
+import com.metro.settings.data.sounds.MetroSoundsController
 import com.metro.system.MetroAccentPalette
 import com.metro.system.MetroFontScale
 import com.metro.system.MetroPreferences
+import com.metro.system.MetroSoundRole
 import com.metro.system.MetroStartBackground
 import com.metro.system.MetroTypeface
 
@@ -38,6 +40,9 @@ enum class SettingsRoute {
     GalleryAppPicker,
     MusicAppPicker,
     ConversationAppPicker,
+    RingtonesSounds,
+    SoundPicker,
+    SoundAbout,
 }
 
 class SettingsState(
@@ -47,6 +52,7 @@ class SettingsState(
     private val prefs = MetroPreferences(appContext)
     val system = SystemSettingsBridge(appContext)
     val applications = ApplicationsBridge(appContext)
+    val sounds = MetroSoundsController(appContext)
 
     companion object {
         /** Suite keyboard settings (`com.metro.keyboard`), not Android Settings. */
@@ -135,6 +141,10 @@ class SettingsState(
     var conversationAppPackages by mutableStateOf(prefs.conversationAppPackages)
         private set
 
+    /** Role currently being chosen on the sound picker subpage. */
+    var soundPickerRole by mutableStateOf(MetroSoundRole.PHONE_RINGTONE)
+        private set
+
     val accentColor: Color
         get() = MetroPreferences.parseAccentHex(accentHex)
 
@@ -178,14 +188,32 @@ class SettingsState(
             SettingsRoute.GalleryAppPicker -> route = SettingsRoute.GalleryApps
             SettingsRoute.MusicAppPicker -> route = SettingsRoute.MusicApps
             SettingsRoute.ConversationAppPicker -> route = SettingsRoute.ConversationApps
+            SettingsRoute.SoundPicker,
+            SettingsRoute.SoundAbout,
+            -> route = SettingsRoute.RingtonesSounds
             SettingsRoute.EaseOfAccess,
             SettingsRoute.Brightness,
             SettingsRoute.StorageSense,
             SettingsRoute.Setup,
             SettingsRoute.About,
+            SettingsRoute.RingtonesSounds,
             -> route = SettingsRoute.Root
         }
     }
+
+    // ---- Metro sounds ------------------------------------------------------
+
+    fun openSoundPicker(role: MetroSoundRole) {
+        soundPickerRole = role
+        sounds.refresh()
+        route = SettingsRoute.SoundPicker
+    }
+
+    fun openSoundAbout() {
+        route = SettingsRoute.SoundAbout
+    }
+
+    fun hasWriteSettings(): Boolean = sounds.canWriteSystem()
 
     fun applyAccentHex(hex: String) {
         accentHex = MetroAccentPalette.normalizeHex(hex) ?: MetroPreferences.DEFAULT_ACCENT_HEX
@@ -334,6 +362,9 @@ class SettingsState(
     }
 
     fun refreshSystemReads() {
+        sounds.refresh()
+        // If the user just returned from granting Modify System Settings, finish the pending change.
+        sounds.applyPendingIfPossible()
         brightness = system.brightnessFraction()
         accentHex = prefs.accentColorHex
         fontScale = prefs.fontScale

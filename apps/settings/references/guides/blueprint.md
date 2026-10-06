@@ -136,6 +136,27 @@ Agents implement pages, layout, and interactions exactly as described here. Scre
 - **Navigation:** Back → connected apps. Picker back → gallery/music/conversation page.
 - **Consumers:** Launcher reads gallery/music lists for live tiles; Conversations reads the conversation list to decide which shade packages appear.
 
+### Page 9 — ringtones + sounds
+
+- **Layout:** `SETTINGS` overline + lowercase `ringtones + sounds` page title. If the pack is not
+  installed, an intro body + flush-left `install Metro sounds` button; otherwise a `Metro sounds
+  installed` line. Then sections:
+  - `ringer` — `ringtone` row (subtitle = current selection; tap → sound picker); `vibrate`
+    (`MetroToggleSwitch`).
+  - `notifications` — `messages`, `mail`, `calendar`, `reminders`, `system` rows.
+  - `alarms` — `default alarm`, `timer` rows.
+  - `about` — `about Metro sounds`.
+- **Sound picker (Page 9a):** lowercase page title (`ringtone` / `messages` / …). Optional hint +
+  `allow Modify System Settings` button when a system default is required and not yet granted.
+  List: `system default` then the role's category sounds (`Metro Beacon`, `Metro Orbit`, …). Tapping
+  a row selects and previews it; the current selection shows a `MetroCheckBox`. Leaving stops preview.
+- **About (Page 9b):** short attribution — original MetroSuite sound set, not official
+  Microsoft/Nokia audio.
+- **Modify System Settings:** choosing a system-linked sound when `canWrite` is false opens a
+  `MetroMessageDialog` explaining the permission; `open settings` launches Android's Modify System
+  Settings page; returning applies the pending choice. Refusal keeps Metro Settings fully functional.
+- **Background:** Theme background.
+
 ## Images
 
 | Image | Page | Notes |
@@ -151,7 +172,7 @@ Missing device captures for root / brightness / storage / extras+info → see [`
 
 ## Out of scope
 
-- Full WP8.1 system settings inventory (Wi‑Fi, Bluetooth, airplane, battery saver, date+time, ringtones+sounds content, cellular, backup, kid’s corner, etc.)
+- Full WP8.1 system settings inventory (Wi‑Fi, Bluetooth, airplane, battery saver, date+time, cellular, backup, kid’s corner, etc.; ringtones + sounds is implemented — see Page 9)
 - In-Settings chrome preference pages for navigation bar / status bar / notifications / volume / lock screen (setup lives in each shell APK; Settings root launches those apps)
 - start+theme Background ListPicker / Choose photo / Show more Tiles
 - Custom / Color Changer RGB accent picker

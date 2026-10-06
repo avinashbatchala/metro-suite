@@ -102,6 +102,19 @@ cd apps/mail
 |----------------|-------------------|------------|
 | Full first-party Microsoft mail account ecosystem | Backend/service scope not yet defined | Allow stubbed local/demo mail data in v1 while locking down Metro UI structure and thread behaviors |
 
+## Sounds
+
+Not scaffolded yet. When a new-mail notification channel is created, adopt the suite default on
+**first creation**:
+
+```kotlin
+MetroNotificationChannels.applyInitialSound(context, manager, channel, MetroSoundRole.MAIL)
+```
+
+Android channel sounds are user-owned after creation (never recreate a channel to change its sound).
+Metro Settings → ringtones + sounds exposes `mail` and can deep-link to the channel. Do not bundle
+sound files here.
+
 ## Agent postmortem
 
 _None._

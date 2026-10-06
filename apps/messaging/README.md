@@ -97,6 +97,19 @@ cd apps/messaging
 |----------------|-------------------|------------|
 | Deep phone-integrated messaging behavior | SMS/MMS APIs and permissions can vary and may be sensitive in development | Allow stub/demo data path in early v1 while preserving exact thread and conversation UX |
 
+## Sounds
+
+This app does not yet create a notification channel. When it does, its primary message channel
+should adopt the suite default on **first creation**:
+
+```kotlin
+MetroNotificationChannels.applyInitialSound(context, manager, channel, MetroSoundRole.MESSAGE)
+```
+
+Never recreate/delete an existing channel to change its sound (Android channel sounds are
+user-owned after creation). Metro Settings → ringtones + sounds exposes `messages` and can deep-link
+to the channel via `MetroNotificationChannels.openChannelSettings`. Do not bundle sound files here.
+
 ## Agent postmortem
 
 _None._

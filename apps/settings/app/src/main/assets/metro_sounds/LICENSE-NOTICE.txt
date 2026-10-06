@@ -1,0 +1,8 @@
+Metro Original Sound Pack v1
+
+These audio assets were synthetically generated for this user request and contain no sampled third-party recordings.
+They are intended for use, modification, and redistribution as part of MetroSuite or other projects.
+
+They are not official Microsoft, Nokia, Lumia, or Windows Phone assets and should not be represented as such.
+
+For public/commercial distribution, retain this notice or otherwise document that the sounds are original replacement assets.

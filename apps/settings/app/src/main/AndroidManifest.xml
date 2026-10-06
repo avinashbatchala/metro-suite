@@ -55,5 +55,11 @@
             android:authorities="com.metro.system"
             android:exported="true"
             android:grantUriPermissions="true" />
+
+        <!-- Read-only semantic sound resolution for other Metro apps (MetroSoundContract). -->
+        <provider
+            android:name=".sounds.MetroSoundsProvider"
+            android:authorities="com.metro.settings.sounds"
+            android:exported="true" />
     </application>
 </manifest>

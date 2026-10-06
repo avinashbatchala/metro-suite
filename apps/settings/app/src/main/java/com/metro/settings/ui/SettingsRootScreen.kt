@@ -58,7 +58,7 @@ fun SettingsRootScreen(
         stringResource(R.string.settings_system_title),
         stringResource(R.string.settings_applications_title),
     )
-    val systemRowCount = 12
+    val systemRowCount = 14
     val appSlotCount = remember(state.applicationEntries) {
         val user = state.applicationEntries.count { !it.isSystemApp }
         val system = state.applicationEntries.count { it.isSystemApp }
@@ -163,6 +163,16 @@ private fun SystemSettingsList(
             title = stringResource(R.string.settings_ease_of_access),
             subtitle = "text ${state.fontScaleIndex + 1}/${MetroFontScale.STEP_COUNT}",
             onClick = { state.open(SettingsRoute.EaseOfAccess) },
+        ),
+        SystemSettingsRow(
+            key = "ringtones_sounds",
+            title = stringResource(R.string.settings_ringtones_sounds),
+            subtitle = if (state.sounds.isPackInstalled()) {
+                stringResource(R.string.settings_sounds_installed)
+            } else {
+                stringResource(R.string.settings_sounds_not_installed)
+            },
+            onClick = { state.open(SettingsRoute.RingtonesSounds) },
         ),
         SystemSettingsRow(
             key = "connected_apps",

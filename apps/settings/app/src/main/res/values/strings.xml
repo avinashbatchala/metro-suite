@@ -52,6 +52,34 @@
 
     <string name="settings_status_unavailable">Unavailable</string>
 
+    <string name="settings_ringtones_sounds">ringtones + sounds</string>
+    <string name="settings_sounds_installed">Metro sounds installed</string>
+    <string name="settings_sounds_not_installed">Metro sounds not installed</string>
+    <string name="settings_sounds_not_installed_body">Metro sounds are not installed yet. Install the bundled Metro sound pack to choose them here.</string>
+    <string name="settings_sounds_install">install Metro sounds</string>
+    <string name="settings_sounds_not_installed_choice">Install Metro sounds first.</string>
+    <string name="settings_sounds_section_ringer">ringer</string>
+    <string name="settings_sounds_section_notifications">notifications</string>
+    <string name="settings_sounds_section_alarms">alarms</string>
+    <string name="settings_sounds_section_about">about</string>
+    <string name="settings_sound_ringtone">ringtone</string>
+    <string name="settings_sound_vibrate">vibrate</string>
+    <string name="settings_sound_messages">messages</string>
+    <string name="settings_sound_mail">mail</string>
+    <string name="settings_sound_calendar">calendar</string>
+    <string name="settings_sound_reminders">reminders</string>
+    <string name="settings_sound_system">system</string>
+    <string name="settings_sound_default_alarm">default alarm</string>
+    <string name="settings_sound_timer">timer</string>
+    <string name="settings_sound_about">about Metro sounds</string>
+    <string name="settings_sound_about_body">Original sound set created for MetroSuite. Not official Microsoft or Nokia audio.</string>
+    <string name="settings_sounds_write_settings_help">Changing the system default requires Modify System Settings.</string>
+    <string name="settings_sounds_grant_write">allow Modify System Settings</string>
+    <string name="settings_sounds_write_title">allow Modify System Settings?</string>
+    <string name="settings_sounds_write_body">Android requires this permission to change the system ringtone, notification or alarm sound. Metro Settings applies your choice after you allow it.</string>
+    <string name="settings_sounds_write_open">open settings</string>
+    <string name="settings_sounds_write_later">not now</string>
+
     <string name="settings_brightness">brightness</string>
     <string name="settings_brightness_label">Brightness</string>
     <string name="settings_brightness_help">Adjusts screen brightness for this device.</string>

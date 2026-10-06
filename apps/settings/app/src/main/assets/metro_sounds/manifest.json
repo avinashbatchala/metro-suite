@@ -1,0 +1,26 @@
+{
+  "packId": "metro.original.v1",
+  "name": "Metro Original Sound Pack",
+  "version": 1,
+  "sampleRateHz": 48000,
+  "channels": 1,
+  "note": "Original synthetic tones created for MetroSuite. No Microsoft/Nokia/Windows Phone recordings or melodies were sampled or copied.",
+  "roles": {
+    "PHONE_RINGTONE": "ringtones/metro_beacon.ogg",
+    "ALT_RINGTONE_1": "ringtones/metro_orbit.ogg",
+    "ALT_RINGTONE_2": "ringtones/metro_signal.ogg",
+    "ALT_RINGTONE_3": "ringtones/metro_glass.ogg",
+    "MESSAGE": "notifications/metro_message.ogg",
+    "MAIL": "notifications/metro_mail.ogg",
+    "CALENDAR": "notifications/metro_calendar.ogg",
+    "REMINDER": "notifications/metro_reminder.ogg",
+    "SYSTEM_NOTIFICATION": "notifications/metro_system.ogg",
+    "ALARM": "alarms/metro_dawn.ogg",
+    "ALT_ALARM_1": "alarms/metro_rise.ogg",
+    "ALT_ALARM_2": "alarms/metro_pulse.ogg",
+    "TIMER": "alarms/metro_urgent.ogg",
+    "UI_TAP": "ui/metro_tap.ogg",
+    "UI_CONFIRM": "ui/metro_confirm.ogg",
+    "UI_ERROR": "ui/metro_error.ogg"
+  }
+}

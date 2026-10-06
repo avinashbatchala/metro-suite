@@ -5,7 +5,7 @@
 
 ## Status
 
-Implemented — Settings root with `system` | `applications` pivot (all launchable user + system apps; in-Settings app detail with toggles/open/uninstall), start+theme (accent colour + font + icon pack + Start background choose photo + show more columns), accent picker (20 WP8 colours), ease of access (10-step text size), brightness, storage sense, connected apps (gallery / music live-tile package lists + conversation apps), navigation bar / status bar / notifications / volume / lock screen (launch shell setup apps), keyboard (launches `com.metro.keyboard`), and about (WP8.1 more info device details; Software = metro-os alpha-3). Hosts `content://com.metro.system` preferences provider.
+Implemented — Settings root with `system` | `applications` pivot (all launchable user + system apps; in-Settings app detail with toggles/open/uninstall), start+theme (accent colour + font + icon pack + Start background choose photo + show more columns), accent picker (20 WP8 colours), ease of access (10-step text size), brightness, storage sense, **ringtones + sounds** (Metro sound pack install + semantic sound pickers + system defaults), connected apps (gallery / music live-tile package lists + conversation apps), navigation bar / status bar / notifications / volume / lock screen (launch shell setup apps), keyboard (launches `com.metro.keyboard`), and about (WP8.1 more info device details; Software = metro-os alpha-3). Hosts `content://com.metro.system` preferences provider and the read-only `content://com.metro.settings.sounds` sound provider.
 
 ## App role
 
@@ -39,7 +39,45 @@ See [`references/guides/blueprint.md`](references/guides/blueprint.md).
 | keyboard | Done (launches `com.metro.keyboard` settings) |
 | connected apps | Done (gallery / music live tiles + conversation apps) |
 | gallery apps / music apps | Done (apps corner list + multi-select picker) |
+| ringtones + sounds | Done (install Metro sound pack; ringtone / messages / mail / calendar / reminders / system / alarm / timer; previews; system defaults) |
+| sound picker / about Metro sounds | Done |
 | about / more info | Done (device information; Software = metro-os alpha-3) |
+
+## Ringtones + sounds
+
+Settings is the canonical owner and installer of the Metro sound pack (`assets/metro_sounds/`, OGG
+only; WAV masters are not shipped). There is **no separate Sounds app**.
+
+- **Install:** user taps `install Metro sounds`; the pack is copied into Android **MediaStore** under
+  `Ringtones/Metro/`, `Notifications/Metro/`, `Alarms/Metro/` using scoped APIs
+  (`RELATIVE_PATH` + `IS_PENDING`). No `READ/WRITE_EXTERNAL_STORAGE` or
+  `MANAGE_EXTERNAL_STORAGE` is requested. Installation is **idempotent** — a stored URI is reused,
+  else an existing row is matched by `DISPLAY_NAME` (+ `RELATIVE_PATH`), else a new row is inserted.
+  A registry (`MetroSoundStore`, prefs `metro_sounds`) maps `soundId → content:// URI` and tracks the
+  pack version.
+- **Semantic roles** live in `metro-system-sdk` (`MetroSoundRole`, `MetroSoundCategory`,
+  `MetroSoundDescriptor`, `MetroSoundContract`). Apps resolve a role; they never see Settings asset
+  paths. Settings persists the role → sound-id selection separately from the URI so a URI can be
+  repaired/reinstalled.
+- **Preview:** tapping a sound selects it and previews it via a single-instance `Ringtone` (no
+  service); leaving the page stops playback.
+- **System defaults:** `ringtone` → `TYPE_RINGTONE`, `system` (notifications) → `TYPE_NOTIFICATION`,
+  `default alarm` → `TYPE_ALARM` via `RingtoneManager.setActualDefaultRingtoneUri`. This requires
+  Android's **Modify System Settings** capability (`Settings.System.canWrite`), requested only when
+  the user performs such a change. Silent/DND/volume/Bluetooth policy is left to Android.
+- **Notification channels:** Android channels are user-owned after creation. Settings never
+  deletes/recreates a channel to change its sound; the semantic `messages`/`mail`/`calendar`/
+  `reminders` selections are suite defaults that apps adopt only when first creating their channel
+  (`MetroNotificationChannels.applyInitialSound`), and channel settings deep links are available
+  (`MetroNotificationChannels.openChannelSettings`).
+- **Contract provider:** `content://com.metro.settings.sounds` (`role/<ROLE>`, `pack`) is read-only
+  and exposes the resolved sound id/title/category/URI plus pack version.
+- **Reversibility:** each picker offers `system default`; the prior default URI for a system role is
+  backed up before the first Metro change. Missing/broken URIs fail safely (no crash), with reinstall
+  available.
+- **Attribution:** `about Metro sounds` states the set is original for MetroSuite and not official
+  Microsoft/Nokia/Windows Phone audio.
+- **Offline:** the pack is bundled; no network access.
 
 ## System functions and contracts
 
