@@ -5,13 +5,16 @@
 
 ## Status
 
-Implemented — agenda / day / month pivot views with local calendar provider data, read-only ICS/URL subscriptions, demo fallback, and live tile provider.
+Implemented — WP8.1 **Day/Week/Month/Year** scales (default **Week**) with the View app-bar selector,
+Week/Month selected-day panes, a real Day timeline with Quick Events, appointment create/edit/delete,
+Calendar Settings, and a next-appointment live tile. Backed by the on-device calendar provider plus
+read-only ICS/URL subscriptions (MetroSuite extension).
 
 ## App role
 
-This app recreates the WP8.1 **Calendar** experience with agenda, day, and month views organized via pivot navigation and backed by local calendar-provider data in v1.
-
-The emphasis is information clarity, fast pivot switching, and Metro layout discipline rather than dense Android calendar chrome.
+This app recreates the mature 2014–2015 **Windows Phone 8.1 Calendar**: Week as the primary view, a
+context header that moves with horizontal paging, day/month selection panes that preserve context,
+and a fast appointment flow. Not Windows 10 Mobile Outlook Calendar.
 
 ## Build gate
 
@@ -21,84 +24,93 @@ The emphasis is information clarity, fast pivot switching, and Metro layout disc
 
 ## Screen inventory
 
-### 1. Agenda pivot
+### Week (default)
 
-- Chronological agenda list
-- Expected reference: `references/images/agenda_dark_blue.png`
+- Continuous 4×2 grid: seven day tiles + a mini-month tile
+- Selected-day pane expands in place (`references/images/week_dark_blue.jpg`, `week_expanded_dark_blue.png`)
 
-### 2. Day pivot
+### Day
 
-- Focused day schedule
-- Expected reference: `references/images/day_dark_blue.png`
+- 24-hour time grid with one block per appointment (durations/lanes), all-day section, now marker
+- Quick Events from empty slots (`references/images/day_dark_blue.png`)
 
-### 3. Month pivot
+### Month
 
-- Month overview surface
-- Expected reference: `references/images/month_dark_blue.png`
+- Dense edge-to-edge grid with per-calendar colour bars + selected-day pane (`references/images/month_dark_blue.jpg`)
 
-## Subscribed calendars (read-only ICS)
+### Year
 
-The app can subscribe to public **iCalendar (`.ics`) URLs** in addition to the on-device calendar
-provider. This is deliberately **read-only**: no CalDAV, no OAuth, no write-back, and no
-`WRITE_CALENDAR` permission.
+- Twelve mini-months (3×4); tapping a month enters Month
 
-- **URLs:** HTTPS only; `webcal://` is normalized to `https://`. Subscription URLs are treated like
-  secrets — they are stored in app-private storage and only ever displayed masked
-  (`SubscriptionUrl.mask`), never logged or put on a tile.
+### Agenda (later update)
+
+- Alternate Day/Week presentation reached from the ellipsis (`references/images/agenda_dark_blue.png`)
+
+## Subscribed calendars (read-only ICS — MetroSuite extension)
+
+The app can subscribe to public **iCalendar (`.ics`) URLs**. This is deliberately **read-only**: no
+CalDAV, no OAuth, no write-back.
+
+- **URLs:** HTTPS only; `webcal://` is normalized to `https://`. URLs are stored app-privately and
+  only ever displayed masked (`SubscriptionUrl.mask`), never logged or put on a tile.
 - **Fetching:** conditional requests (`ETag` / `Last-Modified`), 10 MB cap, `BEGIN:VCALENDAR`
-  validation. A failed refresh **keeps the last-good cache** rather than clearing events.
-- **Parsing:** RFC 5545 via biweekly with recurrence expansion (`RRULE` / `RDATE` / `EXDATE`),
-  `RECURRENCE-ID` overrides, and `STATUS:CANCELLED` filtering. UTC feeds expand in UTC; floating /
-  TZID / date-only events expand in the device timezone.
-- **Background refresh:** WorkManager periodic job (~6 h, network-constrained); manual **sync now**
-  performs a real fetch.
-- **Merge:** subscription events carry `sourceType = SUBSCRIPTION` and a deterministic id derived
-  from `(subscriptionId, UID, occurrence start)`, then merge with provider events into the single
-  `CalendarEvent` stream that feeds agenda/day/month and the live tile.
+  validation; a failed refresh keeps the last-good cache.
+- **Parsing:** RFC 5545 via biweekly with recurrence expansion (`RRULE`/`RDATE`/`EXDATE`),
+  `RECURRENCE-ID` overrides, `STATUS:CANCELLED` filtering.
+- **Background refresh:** WorkManager periodic job (~6 h); manual **sync all** lives in Calendar
+  Settings.
 
-Manage subscriptions from the app bar (**calendars** → **add calendar** / subscription detail).
-The device calendar permission is optional: a subscription-only setup works without granting it.
+Manage them in **Settings → subscribed calendars**. The device calendar permission is optional: a
+subscription-only setup works without granting it.
 
 ## System functions and contracts
 
-- Use local calendar provider data plus read-only ICS subscriptions
-- Provide a Today action in the app bar
-- Normalize event models so agenda/day/month render from the same source of truth
-- Recurrence and timezone handling: expanded with biweekly (`RRULE`/`RDATE`/`EXDATE`/`RECURRENCE-ID`); UTC feeds in UTC, others in the device timezone
+- View selector for Day/Week/Month/Year; Today, New, and agenda/settings commands in the app bar
+- Writes to the device provider (create/edit/delete, reminders, recurrence, availability)
+- Normalizes provider + subscription events into one `CalendarEvent` stream
+- Recurrence/timezone: biweekly expansion; UTC feeds in UTC, others in the device timezone
 
 ## UI and interaction guardrails
 
-- Pivot is the top-level navigation pattern here
-- Keep headers and typography consistent with WP8.1 hierarchy
-- Avoid dense Material calendars, chips, or floating create actions
-- Use app bar actions for Today and any add/edit flow
+- One way to change scale: the View command. Horizontal swipe changes period only. No pinch, no tabs
+- Week = continuous 4×2 grid; Month = dense hairline grid; selection expands in place
+- No Material cards/chips/FAB/bottom-nav/tab-row, no Android Toast/snackbar
 
 ## Data and state model
 
-- `CalendarEvent`, `DayBucket`, `MonthGridCell`
-- Track selected date, current pivot, timezone context, and provider sync/load state
+- `CalendarEvent` (+ `calendarId`, `canEdit`/`canDelete`, description, organizer, availability, recurring)
+- `CalendarView {Day,Week,Month,Year}` + `CalendarPresentation {Calendar,Agenda}`
+- Loading/error state; timezone/locale/12-24h refreshed on resume
 
 ## Primary implementation order
 
-1. Build provider repository and event normalization
-2. Implement selected-date state and Today action
-3. Implement agenda view
-4. Implement day view
-5. Implement month view
-6. Add event detail/create flows if in scope
+1. Provider + subscription repository and event normalization
+2. View/presentation state machine (default Week) + View selector
+3. Week grid + selected-day pane
+4. Month grid + selected-day pane
+5. Day timeline + Quick Events
+6. Year view + drill-down to Month
+7. Appointment editor (basic + more details)
+8. Calendar Settings
 
 ## Test-critical user flows
 
-1. Load local calendar events
-2. Switch among agenda/day/month pivots
-3. Jump back to Today
-4. Preserve selected date when navigating in and out of detail screens
+1. Launch → Week
+2. View: Week → Day → Month → Year
+3. Swipe next day/week/month/year
+4. Year → tap month → Month (not Day)
+5. Month → tap date → pane in Month; Week → tap day → pane in Week
+6. Day → tap empty slot → Quick Event
+7. Long-press editable appointment → edit/delete; read-only → no actions
+8. Agenda: Day/Week → show agenda → show calendar
+9. Today jumps the selected period in every view
 
 ## Reference and golden expectations
 
-- `references/images/agenda_dark_blue.png`
 - `references/images/day_dark_blue.png`
-- `references/images/month_dark_blue.png`
+- `references/images/month_dark_blue.jpg`
+- `references/images/week_dark_blue.jpg`, `week_expanded_dark_blue.png`
+- `references/images/agenda_dark_blue.png`
 
 ## Commands
 

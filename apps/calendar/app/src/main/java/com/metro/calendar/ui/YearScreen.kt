@@ -24,7 +24,7 @@ import com.metro.ui.metroClickable
 @Composable
 fun YearScreen(
     months: List<MiniMonth>,
-    onSelectMonth: (Long) -> Unit,
+    onSelectMonth: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -48,10 +48,7 @@ fun YearScreen(
                             showEventBars = true,
                             dayTextSize = 9,
                             modifier = Modifier.metroClickable(
-                                onClick = {
-                                    month.days.firstOrNull { it.inCurrentMonth }
-                                        ?.let { onSelectMonth(it.epochDay) }
-                                },
+                                onClick = { onSelectMonth(month.year, month.monthValue) },
                             ),
                         )
                     }

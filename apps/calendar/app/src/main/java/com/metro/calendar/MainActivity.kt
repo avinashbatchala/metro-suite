@@ -9,7 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -20,21 +20,26 @@ import com.metro.calendar.data.subscription.SubscriptionSyncWorker
 import com.metro.calendar.tiles.CalendarTileRefresh
 import com.metro.calendar.ui.CalendarShell
 import com.metro.calendar.ui.CalendarState
-import com.metro.calendar.ui.PermissionScreen
 import com.metro.ui.MetroActivities
-import com.metro.ui.MetroSplash
 import com.metro.ui.MetroAppPivotShell
-import com.metro.ui.MetroLoadingScreen
+import com.metro.ui.MetroSplash
 import com.metro.ui.MetroSystemTheme
 
 class MainActivity : ComponentActivity() {
-    private val requestCalendar = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { result ->
-        permissionResult?.invoke(result[Manifest.permission.READ_CALENDAR] == true)
+    private val requestRead = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        readResult?.invoke(granted)
     }
 
-    private var permissionResult: ((Boolean) -> Unit)? = null
+    private val requestWrite = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        writeResult?.invoke(granted)
+    }
+
+    private var readResult: ((Boolean) -> Unit)? = null
+    private var writeResult: ((Boolean) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         MetroSplash.install(this)
@@ -45,26 +50,23 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val state = remember { CalendarState(context) }
-            var permissionTick by remember { mutableStateOf(0) }
-            val generation = state.generation
-            @Suppress("UNUSED_VARIABLE")
-            val observeCalendarState = generation
+            var resumeTick by remember { mutableIntStateOf(0) }
 
             DisposableEffect(this@MainActivity) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        permissionTick++
+                        resumeTick++
                     }
                 }
                 lifecycle.addObserver(observer)
                 onDispose { lifecycle.removeObserver(observer) }
             }
 
-            DisposableEffect(permissionTick) {
-                state.refreshPermission(context)
-                if (state.hasCalendarPermission || state.skippedPermissions) {
-                    state.reloadEvents()
-                }
+            // Refresh permissions, timezone, clock format and events on launch/resume.
+            DisposableEffect(resumeTick) {
+                readResult = { granted -> state.onReadPermissionResult(granted) }
+                writeResult = { granted -> state.onWritePermissionResult(granted) }
+                state.refreshSettings(context)
                 CalendarTileRefresh.request(context)
                 onDispose { }
             }
@@ -74,35 +76,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     onExit = { MetroActivities.finishWithExitTransition(this@MainActivity) },
                 ) {
-                    when {
-                        !state.permissionsChecked -> {
-                            MetroLoadingScreen(modifier = Modifier.fillMaxSize())
-                        }
-                        state.needsPermissionGate -> {
-                            PermissionScreen(
-                                onRequestPermission = {
-                                    permissionResult = { granted ->
-                                        state.onPermissionResult(granted)
-                                    }
-                                    requestCalendar.launch(
-                                        arrayOf(
-                                            Manifest.permission.READ_CALENDAR,
-                                            Manifest.permission.WRITE_CALENDAR,
-                                        ),
-                                    )
-                                },
-                                onAddSubscription = state::skipToAddSubscription,
-                                onContinueWithDemo = state::continueWithDemo,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                        else -> {
-                            CalendarShell(
-                                state = state,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    }
+                    CalendarShell(
+                        state = state,
+                        onRequestReadPermission = {
+                            requestRead.launch(Manifest.permission.READ_CALENDAR)
+                        },
+                        onRequestWritePermission = {
+                            requestWrite.launch(Manifest.permission.WRITE_CALENDAR)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }

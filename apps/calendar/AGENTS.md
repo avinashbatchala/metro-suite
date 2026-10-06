@@ -1,25 +1,23 @@
 # Agent instructions — Calendar (`com.metro.calendar`)
 
-**Tier 2** | Day / week / month / year views (+ agenda). Reference: `references/images/`.
+**Tier 2** | Day / Week / Month / Year scales (default **Week**). Reference: `references/images/`.
 
-Views are a state machine in `CalendarView { Day, Week, Month, Year, Agenda }`, each with its own
-context pivot (weekday names / `this week next week` / month names / years) rendered by
-`MetroPivotTitleWindow` (toolkit). Switch views with **pinch-to-zoom** or the app-bar switch icon
-(`cycleView`); the app-bar **list** icon opens agenda. Region-first weekday / localized names come
-from `WeekFields.of(locale)`; 12/24h and locale are device-driven (`CalendarLogic`).
+Scale is a `CalendarView { Day, Week, Month, Year }`; agenda is a separate
+`CalendarPresentation { Calendar, Agenda }` toggled from the ellipsis (Day/Week only). **No permanent
+view tabs and no pinch** — the app bar **View** command selects the scale, and horizontal swipe moves
+the period only. Context headers (overline + pivot) move with the pager. Selecting a day in
+Week/Month expands a pane in place; a second tap opens Day. Year→Month drills into Month. The Day
+view is a real time grid (one block per event, durations/lanes) with Quick Events from empty slots.
 
-Events come from the on-device provider plus read-only ICS/URL subscriptions
-(`com.metro.calendar.data.subscription`), merged in `CalendarRepository` into one normalized
-`CalendarEvent` stream. Subscriptions: HTTPS only, stored app-privately, never logged; fetched with
-ETag/Last-Modified and a last-good cache; recurrence expanded with biweekly. Manage via app-bar
-**calendars** subpages (`MetroSubpageHost`).
+Events come from the on-device provider plus read-only ICS subscriptions
+(`com.metro.calendar.data.subscription`), merged in `CalendarRepository`. `canEdit`/`canDelete` are
+derived from the real calendar access level — never from the source type. Subscriptions are
+read-only. Loading runs off the main thread, range-scoped to the visible view, with loading/error
+state (no Android Toasts).
 
-Writes use `READ_CALENDAR` **and** `WRITE_CALENDAR` (`CalendarWriteRepository`). If no writable
-calendar exists (e.g. GrapheneOS with no accounts) the repo bootstraps a local `Phone` calendar
-(`ACCOUNT_TYPE_LOCAL`). Create/edit/delete appointments via the `EventEdit` subpage; per-calendar
-show/hide + colour live in the `Calendars` screen. v1 edits/deletes apply to the whole recurring
-series.
-
-Day/week headers read the Weather app's tile peek (`CalendarWeatherReader`, best-effort).
+Writes use `WRITE_CALENDAR` (`CalendarWriteRepository`), bootstrapping a local `Phone` calendar when
+none exists. Request READ and WRITE **by need**, never together on launch. No demo-data onboarding.
+Calendar Settings (ellipsis → settings) holds device show/hide + colour (local overrides) and
+subscribed calendars; there is no global "sync calendars".
 
 Verify: `../../scripts/verify-app.sh calendar`

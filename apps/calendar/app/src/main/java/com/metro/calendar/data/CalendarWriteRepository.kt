@@ -28,16 +28,18 @@ class CalendarWriteRepository(context: Context) {
         private const val ACCESS_OWNER = 700
     }
 
-    fun writableCalendars(): List<WritableCalendar> {
+    /** Every device calendar the user can see, with its real write capability. */
+    fun readableCalendars(): List<CalendarInfo> {
         val projection = arrayOf(
             CalendarContract.Calendars._ID,
             CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
             CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.ACCOUNT_TYPE,
             CalendarContract.Calendars.CALENDAR_COLOR,
             CalendarContract.Calendars.VISIBLE,
             CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
         )
-        val result = mutableListOf<WritableCalendar>()
+        val result = mutableListOf<CalendarInfo>()
         runCatching {
             resolver.query(
                 CalendarContract.Calendars.CONTENT_URI,
@@ -49,24 +51,33 @@ class CalendarWriteRepository(context: Context) {
                 val idIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars._ID)
                 val nameIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
                 val accountIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.ACCOUNT_NAME)
+                val accountTypeIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.ACCOUNT_TYPE)
                 val colorIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_COLOR)
                 val visibleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.VISIBLE)
                 val accessIdx = cursor.getColumnIndexOrThrow(CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL)
                 while (cursor.moveToNext()) {
                     val access = cursor.getInt(accessIdx)
-                    if (access < ACCESS_CONTRIBUTOR) continue
-                    result += WritableCalendar(
+                    result += CalendarInfo(
                         id = cursor.getLong(idIdx),
                         displayName = cursor.getString(nameIdx) ?: "Calendar",
                         accountName = cursor.getString(accountIdx),
+                        accountType = cursor.getString(accountTypeIdx),
                         colorHex = colorIntToHex(cursor.getInt(colorIdx)),
                         isVisible = cursor.getInt(visibleIdx) != 0,
+                        canWrite = access >= ACCESS_CONTRIBUTOR,
                     )
                 }
             }
         }
         return result
     }
+
+    /** Calendars the user can create events in. */
+    fun writableCalendars(): List<CalendarInfo> = readableCalendars().filter { it.canWrite }
+
+    /** calendarId → canWrite map, for deriving per-event edit/delete affordances. */
+    fun calendarAccessMap(): Map<Long, Boolean> =
+        readableCalendars().associate { it.id to it.canWrite }
 
     /** Returns the id of a writable calendar, creating a local "Phone" calendar if needed. */
     fun ensureWritableCalendar(): Long? {
@@ -167,6 +178,7 @@ class CalendarWriteRepository(context: Context) {
         put(CalendarContract.Events.EVENT_LOCATION, draft.location.takeIf { it.isNotBlank() })
         put(CalendarContract.Events.DESCRIPTION, draft.notes.takeIf { it.isNotBlank() })
         put(CalendarContract.Events.ALL_DAY, if (draft.allDay) 1 else 0)
+        put(CalendarContract.Events.AVAILABILITY, draft.availability.providerValue)
         if (draft.allDay) {
             val startDay = toLocalDate(draft.startMillis)
             val endDay = toLocalDate(draft.endMillis).let { if (it < startDay) startDay else it }

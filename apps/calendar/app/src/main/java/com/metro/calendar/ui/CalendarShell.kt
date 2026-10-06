@@ -3,37 +3,31 @@ package com.metro.calendar.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,25 +35,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metro.calendar.R
+import com.metro.calendar.data.CalendarEvent
 import com.metro.calendar.data.CalendarLogic
+import com.metro.calendar.data.CalendarPresentation
 import com.metro.calendar.data.CalendarView
 import com.metro.ui.LocalMetroSubpageExit
 import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarIcon
 import com.metro.ui.MetroAppBarMenuItem
+import com.metro.ui.MetroColors
+import com.metro.ui.MetroDimens
+import com.metro.ui.MetroListItem
 import com.metro.ui.MetroPivotTitleWindow
 import com.metro.ui.MetroSubpageHost
 import com.metro.ui.MetroSystemIconType
+import com.metro.ui.MetroText
+import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
-import com.metro.ui.MetroTransitions
+import com.metro.ui.metroClickable
 import com.metro.ui.metroNavBarPadding
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 import java.util.Locale
-import kotlin.math.ln
-import kotlin.math.round
 
 private val DayAnchorEpochDay = LocalDate.of(1970, 1, 1).toEpochDay()
 private const val DayPageCount = 200_000
@@ -70,15 +68,13 @@ private val MonthAnchor = LocalDate.of(1970, 1, 1)
 private const val MonthAnchorYear = 1970
 private const val YearAnchor = 1970
 
-/** Net zoom required per pinch step. */
-private const val PinchStepFactor = 1.25f
-
 @Composable
 fun CalendarShell(
     state: CalendarState,
+    onRequestReadPermission: () -> Unit,
+    onRequestWritePermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Observe state so the shell recomposes on any model change.
     @Suppress("UNUSED_VARIABLE")
     val generation = state.generation
 
@@ -87,22 +83,31 @@ fun CalendarShell(
         isRoot = { it is CalendarRoute.Root },
         parentOf = { route ->
             when (route) {
-                is CalendarRoute.SubscriptionDetail -> CalendarRoute.Calendars
-                CalendarRoute.AddSubscription -> CalendarRoute.Calendars
+                CalendarRoute.Settings -> CalendarRoute.Root
+                CalendarRoute.AddSubscription -> CalendarRoute.Settings
+                is CalendarRoute.SubscriptionDetail -> CalendarRoute.Settings
                 CalendarRoute.EventDetail -> CalendarRoute.Root
                 CalendarRoute.EventEdit -> CalendarRoute.EventDetail
-                CalendarRoute.Calendars -> CalendarRoute.Root
+                CalendarRoute.EventEditDetails -> CalendarRoute.EventEdit
                 CalendarRoute.Root -> CalendarRoute.Root
             }
         },
         onGoBack = state::routeBack,
         modifier = modifier,
-        rootContent = { CalendarRoot(state = state, modifier = Modifier.fillMaxSize()) },
+        rootContent = {
+            CalendarRoot(
+                state = state,
+                onRequestReadPermission = onRequestReadPermission,
+                onRequestWritePermission = onRequestWritePermission,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
         subpageContent = { route ->
             val exit = LocalMetroSubpageExit.current
             when (route) {
-                CalendarRoute.Calendars -> CalendarsScreen(
+                CalendarRoute.Settings -> SettingsScreen(
                     state = state,
+                    onRequestRead = onRequestReadPermission,
                     onBack = { exit?.invoke() ?: state.routeBack() },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -126,6 +131,7 @@ fun CalendarShell(
                     if (event != null) {
                         EventDetailScreen(
                             event = event,
+                            attendees = state.eventAttendees,
                             onBack = { exit?.invoke() ?: state.routeBack() },
                             onEdit = { state.openEditEvent() },
                             onDelete = { state.deleteEvent(event.id) },
@@ -136,9 +142,14 @@ fun CalendarShell(
                     }
                 }
 
-                CalendarRoute.EventEdit -> EventEditScreen(
+                CalendarRoute.EventEdit, CalendarRoute.EventEditDetails -> EventEditScreen(
                     state = state,
-                    onBack = { exit?.invoke() ?: state.routeBack() },
+                    advanced = route == CalendarRoute.EventEditDetails,
+                    onBack = {
+                        if (route == CalendarRoute.EventEditDetails) state.closeEditorDetails()
+                        else exit?.invoke() ?: state.routeBack()
+                    },
+                    onMoreDetails = state::openEditorDetails,
                     modifier = Modifier.fillMaxSize(),
                 )
 
@@ -151,119 +162,130 @@ fun CalendarShell(
 @Composable
 private fun CalendarRoot(
     state: CalendarState,
+    onRequestReadPermission: () -> Unit,
+    onRequestWritePermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Target view previewed while a pinch is in flight (committed on release).
-    var previewView by remember { mutableStateOf<CalendarView?>(null) }
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
             .statusBarsPadding()
-            .metroNavBarPadding()
-            .pinchToSwitchView(
-                current = state.view,
-                onPreview = { previewView = it },
-                onCommit = { target ->
-                    previewView = null
-                    target?.let(state::selectView)
-                },
-            ),
+            .metroNavBarPadding(),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            CalendarViewTabs(
-                view = state.view,
-                previewView = previewView,
-                onSelect = { state.selectView(it) },
-            )
-
-            AnimatedContent(
-                targetState = state.view,
-                transitionSpec = { viewTransition(initialState, targetState) },
+        when {
+            !state.permissionsChecked -> Unit
+            !state.hasAnySource -> OnboardingEmptyState(
+                onAllowDevice = onRequestReadPermission,
+                onSubscribe = state::openAddSubscription,
                 modifier = Modifier.fillMaxSize(),
-                label = "calendarView",
-            ) { view ->
-                if (view == CalendarView.Agenda) {
-                    AgendaScreen(
-                        buckets = state.agendaBuckets,
-                        usingDemoData = state.usingDemoData,
-                        loadFailed = state.loadFailed,
-                        scrollRequestId = state.agendaScrollRequestId,
-                        targetEpochDay = state.selectedEpochDay,
-                        onEventClick = state::openEventDetail,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+            )
+            else -> Column(modifier = Modifier.fillMaxSize()) {
+                if (state.presentation == CalendarPresentation.Agenda) {
+                    AgendaArea(state = state)
                 } else {
-                    PivotViewHost(state = state, view = view)
+                    AnimatedContent(
+                        targetState = state.view,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        modifier = Modifier.fillMaxSize(),
+                        label = "calendarView",
+                    ) { view ->
+                        PivotViewHost(state = state, view = view)
+                    }
                 }
             }
         }
 
-        MetroAppBar(
-            icons = listOf(
-                MetroAppBarIcon(
-                    label = stringResource(R.string.today),
-                    onClick = state::goToToday,
-                    icon = { color -> TodayDateBubbleIcon(color) },
+        if (state.hasAnySource) {
+            MetroAppBar(
+                icons = listOf(
+                    MetroAppBarIcon(
+                        label = stringResource(R.string.today),
+                        onClick = state::goToToday,
+                        icon = { color -> TodayDateBubbleIcon(color) },
+                    ),
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = stringResource(R.string.new_event),
+                        onClick = { state.openNewEvent() },
+                    ),
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.CalendarView,
+                        label = stringResource(R.string.view),
+                        onClick = { state.viewMenuOpen = true },
+                    ),
                 ),
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Add,
-                    label = stringResource(R.string.new_event),
-                    onClick = state::openNewEvent,
-                ),
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.List,
-                    label = stringResource(R.string.agenda),
-                    onClick = { state.selectView(CalendarView.Agenda) },
-                    selected = state.view == CalendarView.Agenda,
-                ),
+                menuItems = buildList {
+                    if (state.view == CalendarView.Day || state.view == CalendarView.Week) {
+                        add(
+                            MetroAppBarMenuItem(
+                                text = stringResource(
+                                    if (state.presentation == CalendarPresentation.Agenda) {
+                                        R.string.show_calendar
+                                    } else {
+                                        R.string.show_agenda
+                                    },
+                                ),
+                                onClick = state::togglePresentation,
+                            ),
+                        )
+                    }
+                    add(
+                        MetroAppBarMenuItem(
+                            text = stringResource(R.string.settings),
+                            onClick = state::openSettings,
+                        ),
+                    )
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        ViewSelector(state = state)
+        EventLongPressMenu(state = state)
+        InlineStatus(state = state)
+
+        if (state.requestWrite) {
+            LaunchedEffect(state.requestWrite) {
+                onRequestWritePermission()
+                state.consumeWriteRequest()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaArea(state: CalendarState) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        MetroText(
+            text = stringResource(
+                if (state.view == CalendarView.Week) R.string.this_week else R.string.agenda,
+            ).uppercase(),
+            style = MetroTextStyle.AppTitle,
+            color = MetroTheme.colors.secondaryText,
+            modifier = Modifier.padding(
+                start = MetroDimens.ScreenHorizontalMargin,
+                top = 8.dp,
             ),
-            menuItems = listOf(
-                MetroAppBarMenuItem(
-                    text = stringResource(R.string.calendars),
-                    onClick = state::openCalendars,
-                ),
-                MetroAppBarMenuItem(
-                    text = stringResource(R.string.sync_calendars),
-                    onClick = state::syncNow,
-                ),
-            ),
-            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        AgendaScreen(
+            buckets = state.agendaBuckets,
+            loadFailed = state.loadFailed,
+            scrollRequestId = state.scrollToNowRequestId,
+            targetEpochDay = state.selectedEpochDay,
+            onEventClick = state::openEventDetail,
+            onEventLongClick = state::openEventMenu,
+            modifier = Modifier.weight(1f),
         )
     }
 }
 
-/**
- * View transition: the four zoom levels cross-fade + scale (coarser grows in, finer shrinks in)
- * to read as a zoom; agenda enters/exits with a short vertical slide (a distinct mode, not a zoom).
- */
-private fun viewTransition(
-    initial: CalendarView,
-    target: CalendarView,
-): androidx.compose.animation.ContentTransform {
-    val initialIndex = scaleIndex(initial)
-    val targetIndex = scaleIndex(target)
-    val zoom = initialIndex >= 0 && targetIndex >= 0 && initial != target
-    val spec = MetroTransitions.pivotTween<Float>()
-    return if (zoom) {
-        val coarser = targetIndex > initialIndex
-        val enterScale = if (coarser) 0.92f else 1.08f
-        val exitScale = if (coarser) 1.06f else 0.94f
-        (fadeIn(spec) + scaleIn(spec, initialScale = enterScale)) togetherWith
-            (fadeOut(spec) + scaleOut(spec, targetScale = exitScale))
-    } else {
-        val slideSpec = MetroTransitions.pivotTween<androidx.compose.ui.unit.IntOffset>()
-        (fadeIn(spec) + slideInVertically(slideSpec) { height -> height / 14 }) togetherWith
-            (fadeOut(spec) + slideOutVertically(slideSpec) { height -> -height / 14 })
-    }
-}
-
-/** Per-view pager mapping between page index and a representative epoch day. */
+/** Per-view pager: overline + context pivot + content, all driven by the pager's current page. */
 private class ViewPivot(
     val pageCount: Int,
     val pageFor: (Long) -> Int,
     val epochDayFor: (Int) -> Long,
+    val overlineFor: (Int) -> String,
     val titleFor: (Int) -> String,
 )
 
@@ -276,23 +298,20 @@ private fun PivotViewHost(
     val today = remember { CalendarLogic.todayEpochDay() }
     val weekAnchor = remember(locale) {
         LocalDate.of(1970, 1, 1)
-            .with(TemporalAdjusters.previousOrSame(CalendarLogic.firstDayOfWeek(locale)))
+            .with(java.time.temporal.TemporalAdjusters.previousOrSame(CalendarLogic.firstDayOfWeek(locale)))
             .toEpochDay()
     }
     val monthShort = remember(locale) { DateTimeFormatter.ofPattern("MMM d", locale) }
+    val yearOverline = stringResource(R.string.year_overline)
 
-    val spec = remember(view, locale, today, weekAnchor) {
+    val spec = remember(view, locale, today, weekAnchor, yearOverline) {
         when (view) {
             CalendarView.Day -> ViewPivot(
                 pageCount = DayPageCount,
                 pageFor = { day -> (day - DayAnchorEpochDay).toInt() },
                 epochDayFor = { page -> DayAnchorEpochDay + page.toLong() },
-                titleFor = { page ->
-                    CalendarLogic.dayNameLower(
-                        DayAnchorEpochDay + page.toLong(),
-                        locale = locale,
-                    )
-                },
+                overlineFor = { page -> CalendarLogic.dateHeaderLabel(DayAnchorEpochDay + page.toLong(), locale = locale) },
+                titleFor = { page -> CalendarLogic.dayNameLower(DayAnchorEpochDay + page.toLong(), locale = locale) },
             )
 
             CalendarView.Week -> {
@@ -301,14 +320,17 @@ private fun PivotViewHost(
                     pageCount = WeekPageCount,
                     pageFor = { day -> Math.floorDiv((day - weekAnchor).toInt(), 7) },
                     epochDayFor = { page -> weekAnchor + page.toLong() * 7L },
+                    overlineFor = { page ->
+                        val date = LocalDate.ofEpochDay(weekAnchor + page.toLong() * 7L)
+                        "${date.month.getDisplayName(java.time.format.TextStyle.FULL, locale).uppercase(locale)} ${date.year}"
+                    },
                     titleFor = { page ->
                         when (page - todayPage) {
                             0 -> "this week"
                             1 -> "next week"
                             -1 -> "last week"
                             else -> "week of " +
-                                LocalDate.ofEpochDay(weekAnchor + page.toLong() * 7L)
-                                    .format(monthShort)
+                                LocalDate.ofEpochDay(weekAnchor + page.toLong() * 7L).format(monthShort)
                         }
                     },
                 )
@@ -320,13 +342,11 @@ private fun PivotViewHost(
                     val date = LocalDate.ofEpochDay(day)
                     (date.year - MonthAnchorYear) * 12 + (date.monthValue - 1)
                 },
-                epochDayFor = { page ->
-                    MonthAnchor.plusMonths(page.toLong()).toEpochDay()
-                },
+                epochDayFor = { page -> MonthAnchor.plusMonths(page.toLong()).toEpochDay() },
+                overlineFor = { page -> MonthAnchor.plusMonths(page.toLong()).year.toString() },
                 titleFor = { page ->
-                    val date = MonthAnchor.plusMonths(page.toLong())
-                    date.month.getDisplayName(java.time.format.TextStyle.FULL, locale)
-                        .lowercase(locale)
+                    MonthAnchor.plusMonths(page.toLong())
+                        .month.getDisplayName(java.time.format.TextStyle.FULL, locale).lowercase(locale)
                 },
             )
 
@@ -334,14 +354,8 @@ private fun PivotViewHost(
                 pageCount = YearRangeYears,
                 pageFor = { day -> (LocalDate.ofEpochDay(day).year - YearAnchor) },
                 epochDayFor = { page -> LocalDate.of(page + YearAnchor, 1, 1).toEpochDay() },
+                overlineFor = { yearOverline },
                 titleFor = { page -> (page + YearAnchor).toString() },
-            )
-
-            CalendarView.Agenda -> ViewPivot(
-                pageCount = 1,
-                pageFor = { 0 },
-                epochDayFor = { today },
-                titleFor = { "" },
             )
         }
     }
@@ -354,24 +368,32 @@ private fun PivotViewHost(
 
     LaunchedEffect(pagerState, view) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            val unitDay = spec.epochDayFor(page)
-            state.selectDateFromPager(mergeIntoUnit(view, unitDay, state.selectedEpochDay))
+            state.selectDateFromPager(mergeIntoUnit(view, spec.epochDayFor(page), state.selectedEpochDay))
         }
     }
     LaunchedEffect(state.selectedEpochDay, view) {
         val target = spec.pageFor(state.selectedEpochDay)
-        if (pagerState.currentPage != target) {
-            pagerState.scrollToPage(target)
-        }
+        if (pagerState.currentPage != target) pagerState.scrollToPage(target)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        val currentPage = pagerState.currentPage
+        MetroText(
+            text = spec.overlineFor(currentPage),
+            style = MetroTextStyle.SectionHeader,
+            color = MetroTheme.colors.secondaryText,
+            maxLines = 1,
+            modifier = Modifier.padding(
+                start = MetroDimens.ScreenHorizontalMargin,
+                top = 6.dp,
+            ),
+        )
         MetroPivotTitleWindow(
             pageCount = spec.pageCount,
-            selectedPage = pagerState.currentPage,
+            selectedPage = currentPage,
             titleFor = spec.titleFor,
             onSelect = { page -> scope.launch { pagerState.animateScrollToPage(page) } },
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = 6.dp),
         )
         HorizontalPager(
             state = pagerState,
@@ -394,44 +416,194 @@ private fun PivotPage(
 ) {
     when (view) {
         CalendarView.Day -> DayScreen(
-            dateOverline = state.dayDateOverline(epochDay),
-            allDayEvents = state.dayAllDayEvents(epochDay),
-            hourSlots = state.dayHourSlots(epochDay),
-            weather = state.weather,
-            usingDemoData = state.usingDemoData,
+            allDayEvents = state.allDayForDay(epochDay),
+            timeline = state.timeline(epochDay),
+            weather = if (epochDay == CalendarLogic.todayEpochDay()) state.weather else null,
             loadFailed = state.loadFailed,
+            use24Hour = state.use24Hour(),
+            scrollToNow = epochDay == CalendarLogic.todayEpochDay(),
+            scrollRequestId = state.scrollToNowRequestId,
             onEventClick = state::openEventDetail,
+            onEventLongClick = state::openEventMenu,
+            onQuickEvent = { startMinute, title -> state.quickCreateEvent(epochDay, startMinute, title) },
         )
 
         CalendarView.Week -> WeekScreen(
-            week = state.week(epochDay),
+            week = state.week,
             miniMonth = state.weekMiniMonth(epochDay),
-            weather = state.weather,
+            weather = if (epochDay <= CalendarLogic.todayEpochDay() && CalendarLogic.todayEpochDay() < epochDay + 7) state.weather else null,
+            paneEpochDay = state.detailPaneEpochDay,
+            use24Hour = state.use24Hour(),
             onSelectDay = state::selectDay,
+            onOpenDay = state::openDay,
             onEventClick = state::openEventDetail,
+            onEventLongClick = state::openEventMenu,
+            eventTime = state::eventTimeLabel,
         )
 
         CalendarView.Month -> MonthScreen(
+            monthEpochDay = epochDay,
             grid = state.monthGrid(epochDay),
             weekdayLabels = state.monthWeekdayLabels,
-            usingDemoData = state.usingDemoData,
-            loadFailed = state.loadFailed,
+            paneEpochDay = state.detailPaneEpochDay,
+            paneEvents = state.detailPaneEpochDay?.let { state.eventsForDay(it) }.orEmpty(),
+            paneOverline = state.detailPaneEpochDay?.let { state.dateOverline(it) },
+            use24Hour = state.use24Hour(),
             onSelectDay = state::selectDay,
+            onOpenDay = state::openDay,
+            onEventClick = state::openEventDetail,
+            onEventLongClick = state::openEventMenu,
+            eventTime = state::eventTimeLabel,
+            eventDuration = state::eventDurationLabel,
         )
 
         CalendarView.Year -> YearScreen(
             months = state.yearMonths(epochDay),
-            onSelectMonth = state::selectDay,
+            onSelectMonth = state::openMonth,
         )
-
-        CalendarView.Agenda -> Unit
     }
 }
 
-/**
- * WP8.1 Calendar "today" app-bar affordance: the current day number over a short month
- * abbreviation, inside the standard circular icon outline drawn by [MetroAppBarIcon].
- */
+@Composable
+private fun OnboardingEmptyState(
+    onAllowDevice: () -> Unit,
+    onSubscribe: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(top = 24.dp)) {
+        MetroText(
+            text = stringResource(R.string.app_name).uppercase(),
+            style = MetroTextStyle.AppTitle,
+            color = MetroTheme.colors.secondaryText,
+            modifier = Modifier.padding(start = MetroDimens.ScreenHorizontalMargin),
+        )
+        MetroText(
+            text = stringResource(R.string.no_calendars_yet),
+            style = MetroTextStyle.ListItemTitle,
+            color = MetroTheme.colors.primaryText,
+            modifier = Modifier.padding(
+                start = MetroDimens.ScreenHorizontalMargin,
+                top = 16.dp,
+                bottom = 8.dp,
+            ),
+        )
+        MetroListItem(
+            title = stringResource(R.string.allow_device_calendar),
+            onClick = onAllowDevice,
+        )
+        MetroListItem(
+            title = stringResource(R.string.subscribe_to_calendar),
+            onClick = onSubscribe,
+        )
+    }
+}
+
+/** WP8.1 View selector popup: day / week / month / year. */
+@Composable
+private fun ViewSelector(state: CalendarState) {
+    if (!state.viewMenuOpen) return
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .metroClickable { state.viewMenuOpen = false },
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(MetroColors.DarkSecondarySurface)
+                .metroNavBarPadding()
+                .padding(vertical = 8.dp),
+        ) {
+            CalendarView.entries.forEach { candidate ->
+                val active = candidate == state.view
+                MetroText(
+                    text = stringResource(labelOf(candidate)),
+                    style = MetroTextStyle.ListItemTitle,
+                    color = if (active) MetroTheme.colors.accent else MetroTheme.colors.primaryText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .metroClickable { state.selectView(candidate) }
+                        .padding(start = MetroDimens.ScreenHorizontalMargin).padding(vertical = 14.dp),
+                )
+            }
+        }
+    }
+}
+
+/** WP8.1 long-press menu on an editable event: edit / delete. */
+@Composable
+private fun EventLongPressMenu(state: CalendarState) {
+    val target = state.eventMenuTarget ?: return
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .metroClickable { state.closeEventMenu() },
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(MetroColors.DarkSecondarySurface)
+                .metroNavBarPadding()
+                .padding(vertical = 8.dp),
+        ) {
+            MetroText(
+                text = stringResource(R.string.edit_event),
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.primaryText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .metroClickable {
+                        state.closeEventMenu()
+                        state.openEventDetail(target)
+                        state.openEditEvent()
+                    }
+                    .padding(start = MetroDimens.ScreenHorizontalMargin).padding(vertical = 14.dp),
+            )
+            MetroText(
+                text = stringResource(R.string.delete_event),
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.primaryText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .metroClickable {
+                        state.closeEventMenu()
+                        state.deleteEvent(target.id)
+                    }
+                    .padding(start = MetroDimens.ScreenHorizontalMargin).padding(vertical = 14.dp),
+            )
+        }
+    }
+}
+
+/** Inline Metro status line (replaces Android Toasts). */
+@Composable
+private fun InlineStatus(state: CalendarState) {
+    val message = state.statusMessage ?: return
+    LaunchedEffect(message) {
+        kotlinx.coroutines.delay(4000)
+        state.clearStatus()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 96.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        MetroText(
+            text = message,
+            style = MetroTextStyle.Body,
+            color = MetroTheme.colors.primaryText,
+            modifier = Modifier
+                .background(MetroColors.DarkSecondarySurface)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
 @Composable
 private fun TodayDateBubbleIcon(color: Color) {
     val today = LocalDate.now()
@@ -465,10 +637,6 @@ private fun TodayDateBubbleIcon(color: Color) {
     }
 }
 
-/**
- * Preserves the selected day-of-month / weekday when the pivot settles on a new unit, so
- * switching to month/year keeps the current day instead of collapsing to the first of the unit.
- */
 private fun mergeIntoUnit(view: CalendarView, unitEpochDay: Long, currentEpochDay: Long): Long {
     val unit = LocalDate.ofEpochDay(unitEpochDay)
     val current = LocalDate.ofEpochDay(currentEpochDay)
@@ -486,45 +654,12 @@ private fun mergeIntoUnit(view: CalendarView, unitEpochDay: Long, currentEpochDa
             val day = current.dayOfMonth.coerceAtMost(LocalDate.of(unit.year, current.monthValue, 1).lengthOfMonth())
             LocalDate.of(unit.year, current.monthValue, day).toEpochDay()
         }
-        CalendarView.Agenda -> currentEpochDay
     }
 }
 
-/**
- * Two-finger pinch → view zoom. Accumulates net zoom during the gesture, reports the target view
- * for preview, and **commits on release** so the change animates instead of tearing down mid-pinch.
- * Single-finger drags are left untouched so the pivot pager still handles horizontal swipes.
- */
-private fun Modifier.pinchToSwitchView(
-    current: CalendarView,
-    onPreview: (CalendarView?) -> Unit,
-    onCommit: (CalendarView?) -> Unit,
-): Modifier = pointerInput(current) {
-    awaitEachGesture {
-        var netZoom = 1f
-        awaitFirstDown(requireUnconsumed = false)
-        do {
-            val event = awaitPointerEvent()
-            if (event.changes.size >= 2) {
-                val zoom = event.calculateZoom()
-                if (zoom != 1f) {
-                    event.changes.forEach { it.consume() }
-                    netZoom *= zoom
-                    val target = pinchTarget(current, netZoom)
-                    onPreview(target.takeIf { it != current })
-                }
-            }
-        } while (event.changes.any { it.pressed })
-        val target = pinchTarget(current, netZoom)
-        onCommit(target.takeIf { it != current })
-    }
-}
-
-/** Target view for the accumulated pinch [netZoom]; agenda is never a pinch target. */
-private fun pinchTarget(current: CalendarView, netZoom: Float): CalendarView {
-    val currentIndex = scaleIndex(current)
-    if (currentIndex < 0 || netZoom <= 0f) return current
-    val steps = round(ln(netZoom) / ln(PinchStepFactor)).toInt()
-    val targetIndex = (currentIndex - steps).coerceIn(0, ScaleViews.lastIndex)
-    return ScaleViews[targetIndex]
+private fun labelOf(view: CalendarView): Int = when (view) {
+    CalendarView.Day -> R.string.view_day
+    CalendarView.Week -> R.string.view_week
+    CalendarView.Month -> R.string.view_month
+    CalendarView.Year -> R.string.view_year
 }

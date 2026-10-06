@@ -60,6 +60,9 @@ object CalendarLogic {
     fun yearLabel(epochDay: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         LocalDate.ofEpochDay(epochDay).year.toString()
 
+    /** First day of a month as an epoch day (Year → Month drill-down anchor). */
+    fun monthAnchorEpochDay(year: Int, month: Int): Long = LocalDate.of(year, month, 1).toEpochDay()
+
     fun formatEventTime(
         event: CalendarEvent,
         zoneId: ZoneId = ZoneId.systemDefault(),
@@ -214,6 +217,7 @@ object CalendarLogic {
         events: List<CalendarEvent>,
         zoneId: ZoneId = ZoneId.systemDefault(),
         locale: Locale = Locale.US,
+        selectedEpochDay: Long = -1L,
     ): CalendarWeek {
         val firstDay = firstDayOfWeek(locale)
         val anchor = LocalDate.ofEpochDay(anchorEpochDay)
@@ -229,11 +233,100 @@ object CalendarLogic {
                 dayNumber = date.dayOfMonth,
                 weekdayShort = date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).uppercase(locale),
                 isToday = epochDay == today,
+                isSelected = epochDay == selectedEpochDay,
                 isWeekend = date.dayOfWeek.value >= 6,
                 events = dayEvents,
             )
         }
         return CalendarWeek(startEpochDay = weekStart.toEpochDay(), days = days)
+    }
+
+    /**
+     * Day timeline: one [TimelineEvent] per appointment with absolute minute offsets and a
+     * de-overlapped lane. Multi-hour events appear **once** at their true duration.
+     */
+    fun buildTimeline(
+        events: List<CalendarEvent>,
+        epochDay: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): List<TimelineEvent> {
+        val dayStart = millisFromEpochDay(epochDay, zoneId)
+        val timed = timedEventsForDay(events, epochDay, zoneId)
+        val laid = timed.map { event ->
+            val startMinute = (((event.startMillis - dayStart) / 60_000L).coerceIn(0L, 1440L)).toInt()
+            val endMinute = (((event.endMillis - dayStart) / 60_000L).coerceIn(0L, 1440L)).toInt()
+            TimelineEvent(
+                event = event,
+                startMinute = startMinute,
+                endMinute = endMinute.coerceAtLeast(startMinute + 15),
+                lane = 0,
+                laneCount = 1,
+            )
+        }.sortedBy { it.startMinute }
+
+        // Greedy overlap lanes: assign each event the first lane whose last end <= its start.
+        val laneEnds = mutableListOf<Int>()
+        val laneOf = IntArray(laid.size)
+        laid.forEachIndexed { index, item ->
+            var lane = laneEnds.indexOfFirst { end -> end <= item.startMinute }
+            if (lane == -1) {
+                lane = laneEnds.size
+                laneEnds.add(item.endMinute)
+            } else {
+                laneEnds[lane] = item.endMinute
+            }
+            laneOf[index] = lane
+        }
+        // laneCount per event = size of its connected overlap cluster.
+        val result = ArrayList<TimelineEvent>(laid.size)
+        var clusterStart = 0
+        var clusterMaxEnd = 0
+        var clusterMaxLane = 0
+        fun flush(endIndex: Int) {
+            val laneCount = clusterMaxLane + 1
+            for (i in clusterStart until endIndex) {
+                result.add(laid[i].copy(lane = laneOf[i], laneCount = laneCount))
+            }
+        }
+        laid.forEachIndexed { index, item ->
+            if (index > clusterStart && item.startMinute >= clusterMaxEnd) {
+                flush(index)
+                clusterStart = index
+                clusterMaxLane = 0
+            }
+            clusterMaxEnd = maxOf(clusterMaxEnd, item.endMinute)
+            clusterMaxLane = maxOf(clusterMaxLane, laneOf[index])
+        }
+        if (laid.isNotEmpty()) flush(laid.size)
+        return result
+    }
+
+    /** All-day (and multi-day spanning) events for the compact section above the day timeline. */
+    fun timelineAllDayEvents(
+        events: List<CalendarEvent>,
+        epochDay: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): List<CalendarEvent> = allDayEventsForDay(events, epochDay, zoneId)
+
+    /** Epoch-day window that must be loaded for a given view (inclusive start, exclusive end). */
+    fun visibleRangeDays(
+        view: CalendarView,
+        epochDay: Long,
+    ): Pair<Long, Long> = when (view) {
+        CalendarView.Day -> (epochDay - 1) to (epochDay + 2)
+        CalendarView.Week -> (epochDay - 7) to (epochDay + 8)
+        CalendarView.Month -> {
+            val date = LocalDate.ofEpochDay(epochDay)
+            val gridStart = date.withDayOfMonth(1).minusDays(
+                ((date.withDayOfMonth(1).dayOfWeek.value + 6) % 7).toLong(),
+            )
+            gridStart.toEpochDay() to (gridStart.plusDays(42).toEpochDay())
+        }
+        CalendarView.Year -> {
+            val year = LocalDate.ofEpochDay(epochDay).year
+            LocalDate.of(year, 1, 1).minusDays(7).toEpochDay() to
+                LocalDate.of(year, 12, 31).plusDays(8).toEpochDay()
+        }
     }
 
     fun buildMiniMonth(

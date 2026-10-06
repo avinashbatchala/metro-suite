@@ -21,13 +21,14 @@ references/
 
 | Screen | Image | Notes |
 |--------|-------|-------|
-| Agenda pivot | `images/agenda_dark_blue.png` | Chronological event list grouped by date (WP8.0 layout ref; restored in 8.1 Update 2) |
-| Day pivot | `images/day_dark_blue.png` | Hourly schedule grid with date header |
-| Month pivot | `images/month_dark_blue.jpg` | Month grid with event color bars (official Microsoft) |
+| Week (default) | `images/week_dark_blue.jpg` | Continuous 4×2 grid + mini-month + weather |
+| Week expanded | `images/week_expanded_dark_blue.png` | Selected day's appointments in place |
+| Day | `images/day_dark_blue.png` | 24-hour time grid, all-day section |
+| Month | `images/month_dark_blue.jpg` | Dense grid with event colour bars (official Microsoft) |
+| Year | — | 3×4 mini-months (per WP8.1 conventions; see known-gaps) |
+| Agenda (later update) | `images/agenda_dark_blue.png` | Day/Week alternate list |
 | Live tile 2×2 | `images/live_tile_medium_dark_blue.png` | Agenda tile — title, time, today's date badge |
 | Live tile 4×2 | `images/live_tile_wide_dark_blue.png` | Agenda tile — title, location, time, `Calendar` footer, date badge |
-| Week view (ref only) | `images/week_dark_blue.jpg` | Out of v1 scope |
-| Week expanded (ref only) | `images/week_expanded_dark_blue.png` | Out of v1 scope |
 
 ## Image catalog (attribution)
 

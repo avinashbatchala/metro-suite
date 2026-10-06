@@ -3,26 +3,28 @@ package com.metro.calendar.ui
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import com.metro.calendar.data.CalendarAttendee
 import com.metro.calendar.data.CalendarDraft
 import com.metro.calendar.data.CalendarEvent
+import com.metro.calendar.data.CalendarInfo
 import com.metro.calendar.data.CalendarLogic
+import com.metro.calendar.data.CalendarPreferences
+import com.metro.calendar.data.CalendarPresentation
+import com.metro.calendar.data.CalendarRepository
 import com.metro.calendar.data.CalendarView
 import com.metro.calendar.data.CalendarWeather
 import com.metro.calendar.data.CalendarWeatherReader
 import com.metro.calendar.data.CalendarWeek
-import com.metro.calendar.data.CalendarRepository
 import com.metro.calendar.data.CalendarWriteRepository
 import com.metro.calendar.data.DayBucket
-import com.metro.calendar.data.HourSlot
 import com.metro.calendar.data.MiniMonth
 import com.metro.calendar.data.MonthGridCell
-import com.metro.calendar.data.WritableCalendar
+import com.metro.calendar.data.TimelineEvent
 import com.metro.calendar.data.subscription.CalendarSubscription
 import com.metro.calendar.data.subscription.SubscriptionUrl
 import kotlinx.coroutines.CoroutineScope
@@ -37,20 +39,23 @@ import java.util.Locale
 /** In-app page stack (rendered by [com.metro.ui.MetroSubpageHost]). */
 sealed interface CalendarRoute {
     data object Root : CalendarRoute
-    data object Calendars : CalendarRoute
+    data object Settings : CalendarRoute
     data object AddSubscription : CalendarRoute
     data object EventDetail : CalendarRoute
     data object EventEdit : CalendarRoute
+    data object EventEditDetails : CalendarRoute
     data class SubscriptionDetail(val id: String) : CalendarRoute
 }
 
 class CalendarState(context: Context) {
     private val repository = CalendarRepository(context)
     private val writeRepository = CalendarWriteRepository(context)
+    private val calendarPrefs = CalendarPreferences(context)
     internal val appContext = context.applicationContext
-    private val zoneId: ZoneId = ZoneId.systemDefault()
-    private val locale: Locale = Locale.getDefault()
-    private val use24Hour: Boolean = android.text.format.DateFormat.is24HourFormat(appContext)
+
+    private var zoneId: ZoneId = ZoneId.systemDefault()
+    private var locale: Locale = Locale.getDefault()
+    private var use24Hour: Boolean = android.text.format.DateFormat.is24HourFormat(appContext)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     var generation by mutableIntStateOf(0)
@@ -60,24 +65,14 @@ class CalendarState(context: Context) {
         generation++
     }
 
-    var hasCalendarPermission: Boolean by mutableStateOf(false)
+    // ---- Permissions -------------------------------------------------------
+
+    var hasReadPermission: Boolean by mutableStateOf(false)
+        private set
+    var hasWritePermission: Boolean by mutableStateOf(false)
         private set
 
-    var usingDemoData: Boolean by mutableStateOf(false)
-        private set
-
-    /** User chose to proceed without granting the device calendar permission. */
-    var skippedPermissions: Boolean by mutableStateOf(false)
-        private set
-
-    /** User explicitly asked for demo data (as opposed to simply having no source yet). */
-    private var demoExplicit: Boolean = false
-
-    /** True when the latest load failed (distinct from no permission/source). */
-    var loadFailed: Boolean by mutableStateOf(false)
-        private set
-
-    /** False until the first [refreshPermission] completes — avoids flashing the permission gate. */
+    /** False until the first [refreshSettings] completes. */
     var permissionsChecked: Boolean by mutableStateOf(false)
         private set
 
@@ -91,25 +86,25 @@ class CalendarState(context: Context) {
 
     val hasSubscriptionSource: Boolean get() = subscriptions.any { it.enabled }
 
-    /** True when at least one event source (device provider or ICS subscription) is available. */
-    val hasAnySource: Boolean get() = hasCalendarPermission || hasSubscriptionSource
+    /** True when the user has neither device access nor any subscription. */
+    val hasAnySource: Boolean get() = hasReadPermission || subscriptions.isNotEmpty()
 
-    val needsPermissionGate: Boolean
-        get() = !hasCalendarPermission && subscriptions.isEmpty() && !skippedPermissions
+    // ---- Calendars (settings) ----------------------------------------------
+
+    var readableCalendars: List<CalendarInfo> by mutableStateOf(emptyList())
+        private set
+    var writableCalendars: List<CalendarInfo> by mutableStateOf(emptyList())
+        private set
 
     // ---- Navigation --------------------------------------------------------
 
     var route: CalendarRoute by mutableStateOf(CalendarRoute.Root)
         private set
 
-    fun openCalendars() {
-        route = CalendarRoute.Calendars
-        loadWritableCalendars()
+    fun openSettings() {
+        route = CalendarRoute.Settings
+        loadCalendars()
         notifyChanged()
-    }
-
-    fun loadWritableCalendars() {
-        writableCalendars = writeRepository.writableCalendars()
     }
 
     fun openAddSubscription() {
@@ -122,82 +117,174 @@ class CalendarState(context: Context) {
         notifyChanged()
     }
 
-    /** Route-aware Back for [CalendarRoute]s outside the subpage host's own Back handling. */
+    /** Route-aware Back for subpages. */
     fun routeBack() {
         when (route) {
-            is CalendarRoute.SubscriptionDetail -> route = CalendarRoute.Calendars
-            CalendarRoute.AddSubscription -> route = CalendarRoute.Calendars
+            is CalendarRoute.SubscriptionDetail -> route = CalendarRoute.Settings
+            CalendarRoute.AddSubscription -> route = CalendarRoute.Settings
+            CalendarRoute.Settings -> route = CalendarRoute.Root
+            CalendarRoute.EventEditDetails -> route = CalendarRoute.EventEdit
             CalendarRoute.EventDetail -> {
                 eventDetail = null
                 route = CalendarRoute.Root
             }
             CalendarRoute.EventEdit -> {
+                eventDraft = null
                 route = if (eventDetail != null) CalendarRoute.EventDetail else CalendarRoute.Root
             }
-            CalendarRoute.Calendars -> route = CalendarRoute.Root
             CalendarRoute.Root -> route = CalendarRoute.Root
         }
         notifyChanged()
     }
 
+    // ---- View / presentation ----------------------------------------------
+
+    var view: CalendarView by mutableStateOf(CalendarView.Week)
+        private set
+
+    var presentation: CalendarPresentation by mutableStateOf(CalendarPresentation.Calendar)
+        private set
+
+    /** True while the WP8.1 View selector popup is open. */
+    var viewMenuOpen: Boolean by mutableStateOf(false)
+
+    fun selectView(value: CalendarView) {
+        viewMenuOpen = false
+        if (view == value) return
+        view = value
+        detailPaneEpochDay = null
+        if (presentation == CalendarPresentation.Agenda && value >= CalendarView.Month) {
+            presentation = CalendarPresentation.Calendar
+        }
+        reloadEvents()
+        notifyChanged()
+    }
+
+    /** Ellipsis: show agenda (Day/Week) or show calendar. */
+    fun togglePresentation() {
+        presentation = presentation.toggled()
+        notifyChanged()
+    }
+
+    // ---- Selected period ---------------------------------------------------
+
     var selectedEpochDay: Long by mutableStateOf(CalendarLogic.todayEpochDay(zoneId))
         private set
 
-    /** Active top-level view (day / week / month / year / agenda). */
-    var view: CalendarView by mutableStateOf(CalendarView.Agenda)
+    /** The day whose appointments are expanded in the Week/Month panes (null = none). */
+    var detailPaneEpochDay: Long? by mutableStateOf(null)
         private set
 
-    /** Bumped by the Today action so the agenda list scrolls back to the selected day. */
-    var agendaScrollRequestId: Int = 0
+    /** Bumped by the Today action so the agenda/day list scrolls to now. */
+    var scrollToNowRequestId: Int = 0
         private set
 
-    /** Non-null while the event detail subpage is open. */
-    var eventDetail: CalendarEvent? by mutableStateOf(null)
-        private set
+    fun goToToday() {
+        selectedEpochDay = CalendarLogic.todayEpochDay(zoneId)
+        detailPaneEpochDay = null
+        ensureRangeLoaded()
+        scrollToNowRequestId++
+        notifyChanged()
+    }
+
+    /** Expand a day's appointments within the current Week/Month view (does not leave the view). */
+    fun selectDay(epochDay: Long) {
+        detailPaneEpochDay = epochDay
+        notifyChanged()
+    }
+
+    fun clearDetailPane() {
+        if (detailPaneEpochDay != null) {
+            detailPaneEpochDay = null
+            notifyChanged()
+        }
+    }
+
+    /** Deliberate drill-down into the full Day view. */
+    fun openDay(epochDay: Long) {
+        selectedEpochDay = epochDay
+        detailPaneEpochDay = null
+        selectView(CalendarView.Day)
+    }
+
+    /** Year → Month drill-down (must not jump to Day). */
+    fun openMonth(year: Int, monthValue: Int) {
+        selectedEpochDay = CalendarLogic.monthAnchorEpochDay(year, monthValue)
+        detailPaneEpochDay = null
+        view = CalendarView.Month
+        ensureRangeLoaded()
+        notifyChanged()
+    }
+
+    /** Year → Month for the current day's month. */
+    fun openMonthOf(epochDay: Long) {
+        val date = LocalDate.ofEpochDay(epochDay)
+        openMonth(date.year, date.monthValue)
+    }
+
+    /** Pager settle: move the selected day without changing the view. */
+    fun selectDateFromPager(epochDay: Long) {
+        if (selectedEpochDay == epochDay) return
+        selectedEpochDay = epochDay
+        detailPaneEpochDay = null
+        ensureRangeLoaded()
+        notifyChanged()
+    }
+
+    // ---- Events ------------------------------------------------------------
 
     var events: List<CalendarEvent> by mutableStateOf(emptyList())
         private set
 
-    /** Current conditions from the Weather app's tile (best-effort), for the day/week headers. */
-    var weather: CalendarWeather? by mutableStateOf(null)
+    var loading: Boolean by mutableStateOf(false)
         private set
 
-    fun loadWeather() {
+    var loadFailed: Boolean by mutableStateOf(false)
+        private set
+
+    private var loadedStartDay: Long = Long.MIN_VALUE
+    private var loadedEndDay: Long = Long.MIN_VALUE
+    private var loadToken: Int = 0
+
+    fun reloadEvents() {
+        loadedStartDay = Long.MIN_VALUE
+        loadedEndDay = Long.MIN_VALUE
+        ensureRangeLoaded()
+    }
+
+    private fun ensureRangeLoaded() {
+        val (start, end) = CalendarLogic.visibleRangeDays(view, selectedEpochDay)
+        if (loadedStartDay != Long.MIN_VALUE && start >= loadedStartDay && end <= loadedEndDay) return
+        val token = ++loadToken
+        loading = true
+        loadFailed = false
         scope.launch {
-            val loaded = withContext(Dispatchers.IO) { CalendarWeatherReader.read(appContext) }
-            weather = loaded
+            val result = withContext(Dispatchers.IO) {
+                runCatching { repository.loadEventsForDays(start, end) }
+            }
+            if (token != loadToken) return@launch
+            loading = false
+            result.onSuccess {
+                events = it
+                loadedStartDay = start
+                loadedEndDay = end
+            }.onFailure {
+                events = emptyList()
+                loadFailed = true
+            }
+            notifyChanged()
         }
     }
 
-    private var loadedStartEpochDay: Long = 0L
-    private var loadedEndEpochDay: Long = 0L
-    private var rangeLoaded: Boolean = false
+    // ---- Derived view models ----------------------------------------------
 
-    val agendaBuckets: List<DayBucket>
-        get() = CalendarLogic.groupIntoAgendaBuckets(
-            events = events,
-            startEpochDay = selectedEpochDay,
-            dayCount = AGENDA_DAY_COUNT,
-            zoneId = zoneId,
-        )
-
-    fun dayAllDayEvents(epochDay: Long): List<CalendarEvent> =
-        CalendarLogic.allDayEventsForDay(events, epochDay, zoneId)
-
-    fun dayHourSlots(epochDay: Long): List<HourSlot> =
-        CalendarLogic.buildHourSlots(
-            events = events,
-            epochDay = epochDay,
-            zoneId = zoneId,
-            use24Hour = use24Hour,
-        )
-
-    fun week(epochDay: Long): CalendarWeek =
-        CalendarLogic.buildWeek(
-            anchorEpochDay = epochDay,
+    val week: CalendarWeek
+        get() = CalendarLogic.buildWeek(
+            anchorEpochDay = selectedEpochDay,
             events = events,
             zoneId = zoneId,
             locale = locale,
+            selectedEpochDay = selectedEpochDay,
         )
 
     fun monthGrid(epochDay: Long): List<MonthGridCell> {
@@ -223,7 +310,6 @@ class CalendarState(context: Context) {
         )
     }
 
-    /** Mini-month for the week view's bottom-right tile (month containing [epochDay]). */
     fun weekMiniMonth(epochDay: Long): MiniMonth {
         val date = LocalDate.ofEpochDay(epochDay)
         return CalendarLogic.buildMiniMonth(
@@ -236,10 +322,15 @@ class CalendarState(context: Context) {
         )
     }
 
-    fun dayDateOverline(epochDay: Long): String =
-        CalendarLogic.dateHeaderLabel(epochDay, zoneId, locale)
+    fun timeline(epochDay: Long): List<TimelineEvent> =
+        CalendarLogic.buildTimeline(events, epochDay, zoneId)
 
-    /** Short weekday headers starting at the region's first day of week. */
+    fun allDayForDay(epochDay: Long): List<CalendarEvent> =
+        CalendarLogic.timelineAllDayEvents(events, epochDay, zoneId)
+
+    fun eventsForDay(epochDay: Long): List<CalendarEvent> =
+        CalendarLogic.eventsForDay(events, epochDay, zoneId)
+
     val monthWeekdayLabels: List<String>
         get() {
             val first = CalendarLogic.firstDayOfWeek(locale)
@@ -249,169 +340,199 @@ class CalendarState(context: Context) {
             }
         }
 
-    fun refreshPermission(context: Context) {
-        hasCalendarPermission = ContextCompat.checkSelfPermission(
+    fun dateOverline(epochDay: Long): String =
+        CalendarLogic.dateHeaderLabel(epochDay, zoneId, locale)
+
+    fun monthName(epochDay: Long): String =
+        CalendarLogic.monthNameLower(epochDay, zoneId, locale)
+
+    fun yearLabel(epochDay: Long): String = CalendarLogic.yearLabel(epochDay, zoneId)
+
+    fun dayLabel(epochDay: Long, style: java.time.format.TextStyle = java.time.format.TextStyle.FULL): String =
+        LocalDate.ofEpochDay(epochDay).dayOfWeek.getDisplayName(style, locale).lowercase(locale)
+
+    fun use24Hour(): Boolean = use24Hour
+
+    fun timeLabel(millis: Long): String =
+        CalendarLogic.formatEventTime(
+            CalendarEvent(0, "", millis, millis, false, "#FFFFFF", null, null),
+            zoneId,
+            locale,
+            use24Hour,
+        )
+
+    fun eventTimeLabel(event: CalendarEvent): String =
+        CalendarLogic.formatEventTime(event, zoneId, locale, use24Hour)
+
+    fun eventDurationLabel(event: CalendarEvent): String =
+        CalendarLogic.formatEventDuration(event, zoneId)
+
+    /** Agenda list for the selected Day or Week period only (later WP8.1 update behavior). */
+    val agendaBuckets: List<DayBucket>
+        get() {
+            val (start, end) = when (view) {
+                CalendarView.Week -> {
+                    val date = LocalDate.ofEpochDay(selectedEpochDay)
+                    val offset = (date.dayOfWeek.value - CalendarLogic.firstDayOfWeek(locale).value + 7) % 7
+                    date.minusDays(offset.toLong()).toEpochDay() to 7
+                }
+                else -> selectedEpochDay to 1
+            }
+            return CalendarLogic.groupIntoAgendaBuckets(events, start, end, zoneId)
+                .map { it.copy(headerLabel = CalendarLogic.dateHeaderLabel(it.epochDay, zoneId, locale)) }
+        }
+
+    // ---- Weather (date-correct only) --------------------------------------
+
+    var weather: CalendarWeather? by mutableStateOf(null)
+        private set
+
+    private fun loadWeather() {
+        val today = CalendarLogic.todayEpochDay(zoneId)
+        if (selectedEpochDay != today) {
+            weather = null
+            return
+        }
+        scope.launch {
+            val loaded = withContext(Dispatchers.IO) { CalendarWeatherReader.read(appContext) }
+            weather = loaded
+        }
+    }
+
+    // ---- Settings / permissions -------------------------------------------
+
+    fun refreshSettings(context: Context) {
+        zoneId = ZoneId.systemDefault()
+        locale = Locale.getDefault()
+        use24Hour = android.text.format.DateFormat.is24HourFormat(context)
+        hasReadPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.READ_CALENDAR,
         ) == PackageManager.PERMISSION_GRANTED
+        hasWritePermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_CALENDAR,
+        ) == PackageManager.PERMISSION_GRANTED
         subscriptions = repository.subscriptions()
         permissionsChecked = true
+        loadCalendars()
         loadWeather()
-        loadWritableCalendars()
+        reloadEvents()
         notifyChanged()
     }
 
-    fun onPermissionResult(granted: Boolean) {
-        hasCalendarPermission = granted
-        skippedPermissions = false
-        demoExplicit = false
+    fun onReadPermissionResult(granted: Boolean) {
+        hasReadPermission = granted
         reloadEvents()
     }
 
-    fun continueWithDemo() {
-        skippedPermissions = true
-        demoExplicit = true
-        reloadEvents()
+    fun onWritePermissionResult(granted: Boolean) {
+        hasWritePermission = granted
+        notifyChanged()
     }
 
-    /** Proceed without the device permission and jump straight to the add-a-calendar form. */
-    fun skipToAddSubscription() {
-        skippedPermissions = true
-        demoExplicit = false
-        route = CalendarRoute.AddSubscription
-        reloadEvents()
+    fun loadCalendars() {
+        if (!hasReadPermission) {
+            readableCalendars = emptyList()
+            writableCalendars = emptyList()
+            return
+        }
+        readableCalendars = writeRepository.readableCalendars()
+        writableCalendars = readableCalendars.filter { it.canWrite }
     }
 
-    /**
-     * Loads the merged event stream (device provider + ICS subscriptions). Demo data is only used
-     * when the user skipped the permission gate and has no subscriptions.
-     */
-    fun reloadEvents() {
+    // ---- Calendar settings (local overrides) ------------------------------
+
+    fun isCalendarVisible(calendar: CalendarInfo): Boolean =
+        calendarPrefs.isVisible(CalendarPreferences.deviceKey(calendar.id)) && calendar.isVisible
+
+    fun calendarColorOverride(calendar: CalendarInfo): String? =
+        calendarPrefs.colorOverride(CalendarPreferences.deviceKey(calendar.id))
+
+    fun setCalendarVisible(calendar: CalendarInfo, visible: Boolean) {
+        calendarPrefs.setVisible(CalendarPreferences.deviceKey(calendar.id), visible)
+        reloadEvents()
+        notifyChanged()
+    }
+
+    fun setCalendarColor(calendar: CalendarInfo, colorHex: String) {
+        calendarPrefs.setColor(CalendarPreferences.deviceKey(calendar.id), colorHex)
+        reloadEvents()
+        notifyChanged()
+    }
+
+    fun isSubscriptionVisible(subscription: CalendarSubscription): Boolean =
+        calendarPrefs.isVisible(CalendarPreferences.subscriptionKey(subscription.id)) && subscription.enabled
+
+    fun setSubscriptionVisible(subscription: CalendarSubscription, visible: Boolean) {
+        calendarPrefs.setVisible(CalendarPreferences.subscriptionKey(subscription.id), visible)
+        setSubscriptionEnabled(subscription.id, visible)
+    }
+
+    fun setSubscriptionEnabled(id: String, enabled: Boolean) {
+        repository.setSubscriptionEnabled(id, enabled)
         subscriptions = repository.subscriptions()
-        if (hasAnySource) {
-            usingDemoData = false
-            val loaded = runCatching {
-                repository.loadEventsAround(selectedEpochDay, LOAD_RADIUS_DAYS)
-            }
-            if (loaded.isSuccess) {
-                events = loaded.getOrDefault(emptyList())
-                loadFailed = false
-                loadedStartEpochDay = selectedEpochDay - LOAD_RADIUS_DAYS
-                loadedEndEpochDay = selectedEpochDay + LOAD_RADIUS_DAYS
-                rangeLoaded = true
-            } else {
-                events = emptyList()
-                loadFailed = true
-                rangeLoaded = false
-            }
-        } else if (demoExplicit) {
-            usingDemoData = true
-            loadFailed = false
-            events = repository.loadDemoEvents()
-            rangeLoaded = false
-        } else {
-            events = emptyList()
-            loadFailed = false
-            rangeLoaded = false
-        }
+        reloadEvents()
         notifyChanged()
     }
 
-    /**
-     * Pulls fresh events whenever the selected date drifts near the edge of the loaded window, so
-     * paging days/months always reflects the real calendar.
-     */
-    private fun ensureRangeLoaded(epochDay: Long) {
-        if (!hasAnySource || usingDemoData) return
-        if (rangeLoaded &&
-            epochDay in (loadedStartEpochDay + RELOAD_MARGIN_DAYS)..(loadedEndEpochDay - RELOAD_MARGIN_DAYS)
-        ) {
-            return
-        }
-        val loaded = runCatching { repository.loadEventsAround(epochDay, LOAD_RADIUS_DAYS) }
-        if (loaded.isFailure) {
-            loadFailed = true
-            notifyChanged()
-            return
-        }
-        events = loaded.getOrDefault(emptyList())
-        loadFailed = false
-        loadedStartEpochDay = epochDay - LOAD_RADIUS_DAYS
-        loadedEndEpochDay = epochDay + LOAD_RADIUS_DAYS
-        rangeLoaded = true
-    }
+    // ---- Event detail ------------------------------------------------------
 
-    fun selectView(value: CalendarView) {
-        if (view == value) return
-        view = value
-        notifyChanged()
-    }
+    var eventDetail: CalendarEvent? by mutableStateOf(null)
+        private set
 
-    /** Shared selected date: month-grid / week-tile drill-down moves it and opens the day. */
-    fun selectDay(epochDay: Long) {
-        selectedEpochDay = epochDay
-        view = CalendarView.Day
-        ensureRangeLoaded(selectedEpochDay)
-        notifyChanged()
-    }
-
-    /**
-     * Moves the selected date as the pivot pager settles on a new unit, without changing the
-     * active view (the pager owns navigation within a view).
-     */
-    fun selectDateFromPager(epochDay: Long) {
-        if (selectedEpochDay == epochDay) return
-        selectedEpochDay = epochDay
-        ensureRangeLoaded(epochDay)
-        notifyChanged()
-    }
-
-    fun shiftDay(deltaDays: Long) {
-        selectedEpochDay = LocalDate.ofEpochDay(selectedEpochDay)
-            .plusDays(deltaDays)
-            .toEpochDay()
-        ensureRangeLoaded(selectedEpochDay)
-        notifyChanged()
-    }
-
-    fun shiftMonth(deltaMonths: Long) {
-        selectedEpochDay = LocalDate.ofEpochDay(selectedEpochDay)
-            .plusMonths(deltaMonths)
-            .toEpochDay()
-        ensureRangeLoaded(selectedEpochDay)
-        notifyChanged()
-    }
-
-    fun goToToday() {
-        selectedEpochDay = CalendarLogic.todayEpochDay(zoneId)
-        ensureRangeLoaded(selectedEpochDay)
-        if (view == CalendarView.Agenda) {
-            agendaScrollRequestId++
-        }
-        notifyChanged()
-    }
+    var eventAttendees: List<CalendarAttendee> by mutableStateOf(emptyList())
+        private set
 
     fun openEventDetail(event: CalendarEvent) {
         eventDetail = event
+        eventAttendees = emptyList()
         route = CalendarRoute.EventDetail
+        if (event.sourceType == com.metro.calendar.data.CalendarSourceType.DEVICE) {
+            scope.launch {
+                val list = withContext(Dispatchers.IO) { repository.attendees(event.id) }
+                if (route == CalendarRoute.EventDetail && eventDetail?.id == event.id) {
+                    eventAttendees = list
+                }
+            }
+        }
         notifyChanged()
     }
 
-    // ---- Write / edit -------------------------------------------------------
+    // ---- Long-press event actions -----------------------------------------
 
-    var writableCalendars: List<WritableCalendar> by mutableStateOf(emptyList())
+    /** Non-null while a long-press context menu is open on an editable event. */
+    var eventMenuTarget: CalendarEvent? by mutableStateOf(null)
         private set
 
-    /** Non-null while the appointment editor is open. */
+    fun openEventMenu(event: CalendarEvent) {
+        if (!event.canEdit) return
+        eventMenuTarget = event
+        notifyChanged()
+    }
+
+    fun closeEventMenu() {
+        eventMenuTarget = null
+        notifyChanged()
+    }
+
+    // ---- Editor ------------------------------------------------------------
+
     var eventDraft: CalendarDraft? by mutableStateOf(null)
         private set
 
-    fun openNewEvent() {
+    fun openNewEvent(epochDay: Long = selectedEpochDay) {
+        if (!hasWritePermission) {
+            requestWrite = true
+            notifyChanged()
+            return
+        }
         writableCalendars = writeRepository.writableCalendars()
         if (writableCalendars.isEmpty()) {
-            ensureWritableCalendar()
+            writeRepository.ensureWritableCalendar()
+            writableCalendars = writeRepository.writableCalendars()
         }
-        val start = defaultStartMillis(selectedEpochDay)
+        val start = defaultStartMillis(epochDay)
         eventDraft = CalendarDraft(
             calendarId = writableCalendars.firstOrNull()?.id ?: -1L,
             startMillis = start,
@@ -423,22 +544,35 @@ class CalendarState(context: Context) {
 
     fun openEditEvent() {
         val event = eventDetail ?: return
-        if (event.readOnly) return
+        if (!event.canEdit) return
+        if (!hasWritePermission) {
+            requestWrite = true
+            notifyChanged()
+            return
+        }
         writableCalendars = writeRepository.writableCalendars()
         eventDraft = CalendarDraft(
             id = event.id,
-            calendarId = writeRepository.calendarIdForEvent(event.id)
-                ?: writableCalendars.firstOrNull()?.id
-                ?: -1L,
+            calendarId = event.calendarId,
             title = event.title,
             location = event.location.orEmpty(),
+            notes = event.description.orEmpty(),
             allDay = event.allDay,
             startMillis = event.startMillis,
             endMillis = event.endMillis,
-            readOnly = false,
+            availability = event.availability,
+            recurrence = com.metro.calendar.data.RecurrenceRule.None,
         )
         route = CalendarRoute.EventEdit
         notifyChanged()
+    }
+
+    /** Flag consumed by MainActivity to launch the WRITE_CALENDAR request. */
+    var requestWrite: Boolean by mutableStateOf(false)
+        private set
+
+    fun consumeWriteRequest() {
+        requestWrite = false
     }
 
     fun updateDraft(transform: (CalendarDraft) -> CalendarDraft) {
@@ -447,9 +581,19 @@ class CalendarState(context: Context) {
         notifyChanged()
     }
 
+    fun openEditorDetails() {
+        route = CalendarRoute.EventEditDetails
+        notifyChanged()
+    }
+
+    fun closeEditorDetails() {
+        route = CalendarRoute.EventEdit
+        notifyChanged()
+    }
+
     fun saveDraft() {
         val draft = eventDraft ?: return
-        if (draft.readOnly) return
+        if (draft.readOnly || !hasWritePermission) return
         val ok = if (draft.id == null) {
             writeRepository.createEvent(draft) != null
         } else {
@@ -457,13 +601,13 @@ class CalendarState(context: Context) {
         }
         eventDraft = null
         eventDetail = null
+        // Return to the origin context (same view/period), not an arbitrary view.
         route = CalendarRoute.Root
         reloadEvents()
-        showStub(
-            appContext.getString(
-                if (ok) com.metro.calendar.R.string.event_saved else com.metro.calendar.R.string.event_save_failed,
-            ),
-        )
+        if (!ok) {
+            statusMessage = appContext.getString(com.metro.calendar.R.string.event_save_failed)
+        }
+        notifyChanged()
     }
 
     fun deleteEvent(eventId: Long) {
@@ -472,44 +616,48 @@ class CalendarState(context: Context) {
         eventDetail = null
         route = CalendarRoute.Root
         reloadEvents()
-        showStub(
-            appContext.getString(
-                if (ok) com.metro.calendar.R.string.event_deleted else com.metro.calendar.R.string.event_delete_failed,
-            ),
-        )
-    }
-
-    private fun ensureWritableCalendar() {
-        writeRepository.ensureWritableCalendar()
-        writableCalendars = writeRepository.writableCalendars()
-    }
-
-    fun setCalendarVisible(calendarId: Long, visible: Boolean) {
-        writeRepository.setCalendarVisible(calendarId, visible)
-        writableCalendars = writeRepository.writableCalendars()
-        reloadEvents()
-    }
-
-    fun setCalendarColor(calendarId: Long, colorHex: String) {
-        writeRepository.setCalendarColor(calendarId, colorHex)
-        writableCalendars = writeRepository.writableCalendars()
-        reloadEvents()
-    }
-
-    private fun defaultStartMillis(epochDay: Long): Long {
-        val date = LocalDate.ofEpochDay(epochDay)
-        val today = CalendarLogic.todayEpochDay(zoneId)
-        val hour = if (epochDay == today) {
-            java.time.LocalTime.now(zoneId).hour + 1
-        } else {
-            9
+        if (!ok) {
+            statusMessage = appContext.getString(com.metro.calendar.R.string.event_delete_failed)
         }
-        return date.atTime(hour.coerceIn(0, 23), 0).atZone(zoneId).toInstant().toEpochMilli()
+        notifyChanged()
+    }
+
+    /** Quick Event: create a default-duration appointment from an empty Day slot. */
+    fun quickCreateEvent(epochDay: Long, startMinute: Int, title: String): Boolean {
+        if (!hasWritePermission) {
+            requestWrite = true
+            notifyChanged()
+            return false
+        }
+        val date = LocalDate.ofEpochDay(epochDay)
+        val start = date.atStartOfDay(zoneId).plusMinutes(startMinute.toLong()).toInstant().toEpochMilli()
+        writableCalendars = writeRepository.writableCalendars()
+        if (writableCalendars.isEmpty()) {
+            writeRepository.ensureWritableCalendar()
+            writableCalendars = writeRepository.writableCalendars()
+        }
+        val draft = CalendarDraft(
+            calendarId = writableCalendars.firstOrNull()?.id ?: -1L,
+            title = title,
+            startMillis = start,
+            endMillis = start + 30 * 60_000L,
+        )
+        val created = writeRepository.createEvent(draft) != null
+        if (created) reloadEvents()
+        return created
+    }
+
+    // ---- Status ------------------------------------------------------------
+
+    /** Inline status text (replaces Android Toasts). Auto-cleared by the UI. */
+    var statusMessage: String? by mutableStateOf(null)
+
+    fun clearStatus() {
+        statusMessage = null
     }
 
     // ---- Subscription actions ---------------------------------------------
 
-    /** Validates and stores a subscription, then fetches it once. Returns false on invalid URL. */
     fun addSubscription(name: String, url: String, colorHex: String): Boolean {
         if (!SubscriptionUrl.isValid(url)) return false
         val subscription = repository.addSubscription(name, url, colorHex) ?: return false
@@ -525,35 +673,22 @@ class CalendarState(context: Context) {
         reloadEvents()
     }
 
-    fun setSubscriptionEnabled(id: String, enabled: Boolean) {
-        repository.setSubscriptionEnabled(id, enabled)
-        subscriptions = repository.subscriptions()
-        reloadEvents()
-    }
-
-    /** Fetches a single subscription, reloads the stream, and surfaces the outcome. */
     fun syncSubscription(id: String) {
         if (syncing) return
         syncing = true
         notifyChanged()
         scope.launch {
-            val outcome = withContext(Dispatchers.IO) { repository.syncSubscription(id) }
+            withContext(Dispatchers.IO) { repository.syncSubscription(id) }
             syncing = false
             subscriptions = repository.subscriptions()
             reloadEvents()
-            showStub(syncMessage(outcome))
+            notifyChanged()
         }
     }
 
-    /** Fetches every enabled subscription (manual "sync calendars"). */
-    fun syncNow() {
-        refreshPermission(appContext)
-        if (!hasSubscriptionSource) {
-            reloadEvents()
-            showStub(appContext.getString(com.metro.calendar.R.string.sync_done))
-            return
-        }
-        if (syncing) return
+    /** Manual refresh of every enabled subscription (moved out of the root menu). */
+    fun syncAllSubscriptions() {
+        if (syncing || !hasSubscriptionSource) return
         syncing = true
         notifyChanged()
         scope.launch {
@@ -561,30 +696,17 @@ class CalendarState(context: Context) {
             syncing = false
             subscriptions = repository.subscriptions()
             reloadEvents()
-            showStub(
-                if (failures == 0) {
-                    appContext.getString(com.metro.calendar.R.string.sync_done)
-                } else {
-                    appContext.getString(com.metro.calendar.R.string.sync_failed_count, failures)
-                },
-            )
+            if (failures > 0) {
+                statusMessage = appContext.getString(com.metro.calendar.R.string.sync_failed_count, failures)
+            }
+            notifyChanged()
         }
     }
 
-    private fun syncMessage(
-        outcome: com.metro.calendar.data.subscription.IcsCalendarSource.SyncOutcome,
-    ): String = when (outcome) {
-        is com.metro.calendar.data.subscription.IcsCalendarSource.SyncOutcome.Failure -> outcome.message
-        else -> appContext.getString(com.metro.calendar.R.string.sync_done)
-    }
-
-    fun showStub(message: String) {
-        Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private companion object {
-        const val LOAD_RADIUS_DAYS = 120
-        const val RELOAD_MARGIN_DAYS = 21
-        const val AGENDA_DAY_COUNT = 90
+    private fun defaultStartMillis(epochDay: Long): Long {
+        val date = LocalDate.ofEpochDay(epochDay)
+        val today = CalendarLogic.todayEpochDay(zoneId)
+        val hour = if (epochDay == today) java.time.LocalTime.now(zoneId).hour + 1 else 9
+        return date.atTime(hour.coerceIn(0, 23), 0).atZone(zoneId).toInstant().toEpochMilli()
     }
 }

@@ -3,133 +3,146 @@
 **Spec for this app.** Reference screenshots in `images/` are authoritative where they disagree
 with this file (update this file when they do). Read this before `images/` or `web-resources.md`.
 
+Target: the mature 2014–2015 **Windows Phone 8.1 Calendar**. Not Windows 10 Mobile.
+
 ## Navigation
 
-Top-level **views** are `CalendarView { Day, Week, Month, Year, Agenda }`:
+Top-level **scales** are `CalendarView { Day, Week, Month, Year }`. **Default is Week.** There is
+**no permanent view-tab row** and **no pinch-to-switch**.
 
-- **day** — full 24-hour schedule for the selected date.
-- **week** — 4×2 grid of tiles (seven days + a mini-month tile).
-- **month** — month grid with per-calendar colour bars.
-- **year** — twelve mini-months in a 3×4 grid.
-- **agenda** — chronological list of upcoming events (reached via the app-bar **list** icon).
+- **View** is chosen from the app-bar **View** command (a WP8.1 picker listing day/week/month/year).
+- **Horizontal swipe** moves to the previous/next day / week / month / year — it never changes scale.
+- The **context header** above the grid moves with the pager:
+  - Day: `02 APRIL 2026` overline + weekday names (`thursday friday …`)
+  - Week: `APRIL 2026` overline + `this week / next week / …`
+  - Month: `2026` overline + month names (`april may june …`)
+  - Year: `YEAR` overline + years (`2025 2026 2027 …`)
 
-Each view shows a **context pivot** of its unit, rendered by `MetroPivotTitleWindow`:
+A **selected date** is shared. Selecting a day inside Week/Month expands that day's appointments in
+a pane **without leaving the view**; a second tap on the selected day opens the full Day view.
 
-| View | Pivot titles |
-|------|--------------|
-| day | weekday names (`tuesday wednesday …`) |
-| week | `this week`, `next week`, `last week`, `week of <Mon d>` |
-| month | month names (`october november …`) |
-| year | years (`2026 2027 …`) |
-| agenda | none |
+## Agenda (later WP8.1 update)
 
-**View switching:** a compact tab row `day · week · month · year` sits directly under the status
-bar (the app title is omitted; the tabs are the header). Tapping a tab switches with an animated
-cross-fade + scale. Two-finger pinch is an accelerator: it previews the target tab, then commits on
-release. Pivot flick/tap moves between units within a view. **Agenda is a separate destination**,
-reached via the app-bar **list** icon — it is not a zoom level and is excluded from pinch.
+Agenda is **not** a fifth scale. It is an alternate **presentation** of the selected Day or Week:
 
-Region drives the first day of week (`WeekFields.of(locale)` — Sunday in the US, Monday in the UK).
-12/24h and localized month/day names follow the device.
+- Day/Week ellipsis menu: `show agenda` → a concise list for the selected day/week.
+- While agenda is shown the menu becomes `show calendar`.
+- Month/Year show no agenda command.
 
-## Header (top)
-
-```
-day   week   month   year        <- view tabs (active = accent; preview = accent @ 55%)
-<context pivot>                  <- weekday names / this week next week / month names / years
-<content>
-```
+State: `CalendarPresentation { Calendar, Agenda }`; choosing Month/Year returns to Calendar.
 
 ## App bar (bottom)
 
-Round icon buttons (no text buttons, no labels at rest):
-
 | Icon | Label | Action |
 |------|-------|--------|
-| Date bubble (day + month) | `today` | Jump to today; highlight/scroll to now |
-| Add | `new` | Open the new-appointment editor |
-| List | `agenda` | Switch to the agenda view (icon shows the **selected** filled state in agenda) |
-| (ellipsis) | — | Expand; menu: `calendars`, `sync calendars` |
+| Date bubble (day + month) | `today` | Jump to the current date/scale (Day scrolls to now) |
+| Add | `new` | New appointment (basic editor) |
+| View | `view` | WP8.1 scale selector: day / week / month / year |
+| (ellipsis) | — | `show agenda`/`show calendar` (Day/Week) then `settings` |
 
-## Pages
+No global `sync calendars` (subscription refresh lives in Settings).
 
-### Agenda
+## Week view
 
-Black background. Selected-date line above the list, then a vertically scrolling list grouped by
-date. Date group header: `SUNDAY, 06 OCTOBER 2026` (`SectionHeader`, secondary). Event row: time
-column (`All day` / `HH:mm`), accent title, duration subtitle, thin accent bar on the right.
+A **continuous 4×2 grid** with hairline separators and no gaps/cards:
 
-### Day
+```
+MON 7   TUE 8   WED 9   THU 10
+FRI 11  SAT 12  SUN 13  mini-month
+```
 
-Date overline (`TUESDAY, 06 OCTOBER 2026`), all-day rows (with weather temp + condition when the
-Weather app is installed), then a **full 24-hour** grid. Left-aligned hour labels, thin dividers;
-events inline in their hour, accent-coloured. Today scrolls to and highlights the current hour.
+Each day tile shows the uppercase weekday, the date, and event titles (calendar colours). Today is
+accented. The eighth cell is a full mini-month (today boxed). Tapping a day expands that day's
+appointments in a pane below (`TIME · title · duration`), keeping Week visible; tapping the expanded
+day again opens Day. Weather (when date-correct) appears on today's tile.
 
-### Week
+## Month view
 
-Four columns × two rows of tiles: seven day tiles (`MON 7` + event titles) and a **mini-month tile**
-in the bottom-right. Today is accent-bordered; today's tile shows the weather temp. Weekend tiles are
-tinted. Tapping a day drills into the day view; tapping an event opens its detail.
+A dense, nearly edge-to-edge seven-column grid with horizontal **and** vertical hairline separators.
+Weekday labels sit directly above the grid. Each cell: small date number, up to three per-calendar
+colour bars below it; outside-month dates are subdued; today is accented. Tapping a day shows the
+selected-day pane below (`12:00 PM Event · 1 hour`), keeping Month visible; a second tap opens Day.
+There is no invented corner-triangle marker.
 
-### Month
+## Year view
 
-Region-first weekday header, six-week grid with thin dividers. Date number top-left; up to three
-**per-calendar colour bars under the date number**; selected day shows an accent corner notch; today
-is emphasised. Tapping a day drills into the day view.
+Twelve mini-months in a 3×4 grid, each with single-letter weekday headers and event bars; today is
+boxed. Tapping a month drills into **Month** (never Day), anchored to the first of the month (or
+today when the current month is selected).
 
-### Year
+## Day view
 
-Twelve mini-months in a 3×4 grid, each with single-letter weekday headers, event bars, and today
-boxed. Tapping a mini-month drills into it.
+A real time grid: a 24-hour ruler with one **event block per appointment** at its absolute position
+and true duration (multi-hour events render **once**, not per hour). Overlapping events share
+side-by-side lanes. All-day appointments sit in a compact section above the timeline. Today shows a
+current-time marker and auto-scrolls near now.
+
+**Quick Events:** tapping an empty hour opens an inline subject editor at that slot; saving creates a
+default-duration appointment in the default writable calendar. The full editor is reachable from the
+app-bar Add command.
 
 ## Event detail
 
-Subpage with a back affordance: title (accent), `when`, `where`, `calendar`. For writable (device)
-events the app bar shows **edit** (save glyph) and **delete** (trash). Subscriptions are read-only.
+`title` (calendar colour), `when`, `where`, `calendar`, `status` (when not busy), attendees
+(`N people` + list), `notes`, and a read-only note for subscriptions. An editable event shows
+**edit** (pencil) and **delete** (trash) in the app bar. Long-pressing an editable event anywhere
+opens a context menu with edit/delete; read-only events expose neither.
 
-## Appointment editor (`new appointment` / `edit appointment`)
+## Appointment editor
 
-Fields: subject, location, all-day toggle, starts (date + time wheels), ends, calendar list picker,
-reminder list picker (none / at start / 5 / 10 / 30 min / 1 h / 1 day before), repeat (never / daily
-/ weekly / monthly / yearly), notes. Date/time use the toolkit `MetroDatePicker` / `MetroTimePicker`.
-App bar: save (check); delete (when editing). Recurring edits apply to the whole series (v1).
+**Basic** screen: subject, location, all-day, starts/ends (date + time open picker surfaces),
+`more details`. **More details**: calendar, reminder, repeat, status, notes. Date/time use the
+toolkit `MetroDatePicker` / `MetroTimePicker`. Recurring edits apply to the whole series (v1).
 
-## Calendars screen (`… → calendars`)
+## Settings (`… → settings`)
 
-Device calendars (writable) with a visibility toggle and a per-calendar colour picker (accent
-palette). Subscribed ICS calendars with enable toggles + drill-in detail. App-bar `add calendar`.
+WP8.1 Calendar Settings:
 
-## Data & writes
+- **device** — every visible device calendar with a square show/hide checkbox and a colour swatch
+  (opens a palette). Visibility/colour are stored as **local overrides**, not written to provider
+  metadata (safe on GrapheneOS).
+- **subscribed calendars** — read-only ICS subscriptions with enable toggles, `subscribe to
+  calendar`, and `sync all subscribed calendars`. A subscription with a failed refresh shows a
+  concise `couldn't update`; technical detail lives on the subscription detail page.
 
-- Reads `CalendarContract` via `READ_CALENDAR`; subscriptions are read-only ICS (HTTPS only).
-- Writes via `WRITE_CALENDAR` (`CalendarWriteRepository`): insert/update/delete `Events` +
-  `Reminders`, `RRULE` for recurrence. If no writable calendar exists, bootstrap a local `Phone`
-  calendar (`ACCOUNT_TYPE_LOCAL`) — needed on GrapheneOS with no accounts.
+## Permissions
+
+Requested **by need**, never together on launch: READ_CALENDAR only when the user chooses “allow
+device calendar access”; WRITE_CALENDAR only when creating/editing/deleting a provider event. A
+subscription-only setup needs no permission. No demo-data onboarding.
+
+## Data
+
+- Reads `CalendarContract.Instances` (title, description, location, organizer, RRULE, availability)
+  and `CalendarContract.Attendees`; computes `canEdit`/`canDelete` from the real calendar access
+  level — never from source type. Subscriptions are read-only.
+- Writes via `WRITE_CALENDAR` (`CalendarWriteRepository`): insert/update/delete `Events`+`Reminders`,
+  `RRULE`, availability. A local `Phone` calendar (`ACCOUNT_TYPE_LOCAL`) is bootstrapped when no
+  writable calendar exists.
+- Loading is **off the main thread**, range-scoped to the visible view (Day/Week/Month/year), with
+  loading/error state instead of Toasts. Timezone, locale, and 12/24h refresh on resume.
+- Weather is shown only when date-correct (today) and only from the Weather tile contract.
 - All-day events are stored in UTC; timed events use the device zone.
-- Weather (day/week) is a best-effort read of the Weather app's tile peek.
-
-## Live tile
-
-WP8.1 Calendar agenda tile. Accent background from the system accent. Structured agenda payload
-(`MetroTileData.agenda`) for 2×2 / 4×2; lines `[title, location?, time]`; date badge (short weekday
-+ day-of-month) bottom-right; footer `Calendar`.
 
 ## Images
 
 | Image | Page | Notes |
 |-------|------|-------|
-| `agenda_dark_blue.png` | Agenda | WP8.0 agenda list (restored in WP8.1 Update 2) |
 | `day_dark_blue.png` | Day | Hourly grid |
 | `month_dark_blue.jpg` | Month | Month grid |
-| `week_dark_blue.jpg` | Week | 4×2 grid + mini-month |
+| `week_dark_blue.jpg` | Week | 4×2 grid |
 | `week_expanded_dark_blue.png` | Week | Expanded day |
-| `live_tile_medium_dark_blue.png` | Live tile (2×2) | Agenda tile |
-| `live_tile_wide_dark_blue.png` | Live tile (4×2) | Agenda tile |
-| `hero_dark_blue.jpg` | — | Marketing hero |
+| `agenda_dark_blue.png` | Agenda | WP8.0 list (restored in 8.1 Update 2) |
+| `live_tile_medium_dark_blue.png` / `live_tile_wide_dark_blue.png` | Live tile | Agenda tile |
 
 ## Out of scope (v1)
 
 - Lockscreen "next appointment".
-- Recurring-instance (this-occurrence-only) edits — whole series only.
-- Account-specific sync (Exchange/Google quirks).
+- Per-occurrence recurring edits (whole series only).
+- Native invite delivery (attendee writes limited to provider-supported calendars).
 - Landscape layout.
+
+## MetroSuite extension
+
+Read-only ICS/URL subscriptions are a MetroSuite extension presented inside Calendar Settings; they
+are not part of stock WP8.1.

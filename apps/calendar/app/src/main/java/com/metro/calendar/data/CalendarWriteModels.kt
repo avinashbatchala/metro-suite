@@ -1,12 +1,14 @@
 package com.metro.calendar.data
 
-/** A calendar the user is allowed to write to (device provider). */
-data class WritableCalendar(
+/** A device calendar the user can see (and possibly write to). */
+data class CalendarInfo(
     val id: Long,
     val displayName: String,
     val accountName: String?,
+    val accountType: String?,
     val colorHex: String,
     val isVisible: Boolean,
+    val canWrite: Boolean,
 )
 
 /** Recurrence presets exposed in the appointment editor (v1: whole-series only). */
@@ -30,6 +32,7 @@ data class CalendarDraft(
     val endMillis: Long,
     val reminderMinutes: Int? = null,
     val recurrence: RecurrenceRule = RecurrenceRule.None,
+    val availability: EventAvailability = EventAvailability.Busy,
     /** True when the source event is read-only (subscription) — editor is disabled for it. */
     val readOnly: Boolean = false,
 )

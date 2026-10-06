@@ -175,6 +175,54 @@ class CalendarLogicTest {
         assertEquals(0, CalendarLogic.monthStartOffset(first, DayOfWeek.MONDAY))
     }
 
+    @Test
+    fun buildTimeline_rendersMultiHourEventOnce() {
+        val day = epochDayOf("2026-06-26")
+        val event = sampleEvent(
+            id = 1,
+            startMillis = isoMillis("2026-06-26T09:00:00Z"),
+            endMillis = isoMillis("2026-06-26T17:00:00Z"),
+        )
+        val timeline = CalendarLogic.buildTimeline(listOf(event), day, zoneId)
+        assertEquals("multi-hour event renders once", 1, timeline.size)
+        assertEquals(540, timeline.first().startMinute) // 09:00
+        assertEquals(1020, timeline.first().endMinute) // 17:00
+    }
+
+    @Test
+    fun buildTimeline_assignsOverlapLanes() {
+        val day = epochDayOf("2026-06-26")
+        val a = sampleEvent(id = 1, startMillis = isoMillis("2026-06-26T09:00:00Z"), endMillis = isoMillis("2026-06-26T10:00:00Z"))
+        val b = sampleEvent(id = 2, startMillis = isoMillis("2026-06-26T09:30:00Z"), endMillis = isoMillis("2026-06-26T10:30:00Z"))
+        val timeline = CalendarLogic.buildTimeline(listOf(a, b), day, zoneId)
+        assertEquals(2, timeline.size)
+        assertEquals(2, timeline.first().laneCount)
+        assertFalse(timeline[0].lane == timeline[1].lane)
+    }
+
+    @Test
+    fun visibleRangeDays_yearCoversDisplayedYear() {
+        val day = epochDayOf("2026-06-15")
+        val (start, end) = CalendarLogic.visibleRangeDays(CalendarView.Year, day)
+        assertTrue(start <= epochDayOf("2026-01-01"))
+        assertTrue(end >= epochDayOf("2026-12-31"))
+    }
+
+    @Test
+    fun visibleRangeDays_monthCoversSixWeekGrid() {
+        val day = epochDayOf("2026-06-15")
+        val (start, end) = CalendarLogic.visibleRangeDays(CalendarView.Month, day)
+        assertTrue(end - start >= 42)
+    }
+
+    @Test
+    fun eventAvailability_mapsProviderValues() {
+        assertEquals(EventAvailability.Busy, EventAvailability.fromProvider(0))
+        assertEquals(EventAvailability.Free, EventAvailability.fromProvider(1))
+        assertEquals(EventAvailability.Tentative, EventAvailability.fromProvider(2))
+        assertEquals(EventAvailability.OutOfOffice, EventAvailability.fromProvider(3))
+    }
+
     // --- Timezone / all-day / recurrence-instance edge cases -------------------------------
 
     @Test
