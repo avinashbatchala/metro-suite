@@ -15,7 +15,6 @@ object MetroIntents {
     const val ACTION_TILE_TAP = "com.metro.action.TILE_TAP"
     /** Explicit broadcast to Phone — extras [EXTRA_DISPLAY_NAME], [EXTRA_PHONE_NUMBER]. */
     const val ACTION_ADD_SPEED_DIAL = "com.metro.action.ADD_SPEED_DIAL"
-
     const val EXTRA_PACKAGE = "package"
     const val EXTRA_QUERY = "query"
     const val EXTRA_URI = "uri"
@@ -25,6 +24,15 @@ object MetroIntents {
     const val EXTRA_TILE_SIZE = "tile_size"
     const val EXTRA_DISPLAY_NAME = "display_name"
     const val EXTRA_PHONE_NUMBER = "phone_number"
+    /** Durable contact identity for speed-dial handoff (`Contacts.LOOKUP_KEY`). */
+    const val EXTRA_CONTACT_LOOKUP_KEY = "contact_lookup_key"
+    const val EXTRA_CONTACT_ID = "contact_id"
+
+    /**
+     * Signature-level permission guarding Metro-internal write contracts (speed-dial injection).
+     * Suite APKs must be signed compatibly (shared debug/release key).
+     */
+    const val PERMISSION_INTERNAL = "com.metro.dialer.permission.INTERNAL"
 
     const val PACKAGE_LAUNCHER = "com.metro.launcher"
     const val PACKAGE_DIALER = "com.metro.dialer"
@@ -80,6 +88,8 @@ object MetroIntents {
         context: Context,
         displayName: String,
         phoneNumber: String,
+        contactLookupKey: String? = null,
+        contactId: Long? = null,
     ) {
         val trimmed = phoneNumber.trim()
         if (trimmed.isEmpty()) return
@@ -87,6 +97,8 @@ object MetroIntents {
             setPackage(PACKAGE_DIALER)
             putExtra(EXTRA_DISPLAY_NAME, displayName.ifBlank { trimmed })
             putExtra(EXTRA_PHONE_NUMBER, trimmed)
+            contactLookupKey?.let { putExtra(EXTRA_CONTACT_LOOKUP_KEY, it) }
+            contactId?.let { putExtra(EXTRA_CONTACT_ID, it) }
         }
         context.sendBroadcast(intent)
     }
