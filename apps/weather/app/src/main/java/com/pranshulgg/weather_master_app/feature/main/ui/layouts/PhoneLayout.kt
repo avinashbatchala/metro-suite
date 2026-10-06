@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
@@ -266,19 +267,39 @@ private fun HourlyPage(weather: Weather, units: WeatherUnits, context: Context, 
             val kind = item.weatherCondition.toGlyphKind(daily = today, targetTimeMilli = item.time)
             val timeLabel = if (index == 0) "now" else hourLabel(item.time, weather.location.timezone, prefs.is24HrTimeFormat)
             val precip = item.precipitationProbability
-            val subtitle = buildString {
-                append(timeLabel)
-                if (precip != null && precip > 0) append(" · $precip%")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText(
+                    text = timeLabel,
+                    style = MetroTextStyle.ListItemTitle,
+                    color = MetroTheme.colors.primaryText,
+                    modifier = Modifier.width(72.dp),
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (precip != null && precip > 0) {
+                    MetroText(
+                        text = "$precip%",
+                        style = MetroTextStyle.ListItemSubtitle,
+                        color = MetroTheme.colors.secondaryText,
+                        maxLines = 1,
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                MetroText(
+                    text = "${temp ?: "-"}°",
+                    style = MetroTextStyle.ListItemTitle,
+                    color = MetroTheme.colors.primaryText,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                WeatherGlyph(kind, size = 28.dp, color = MetroTheme.colors.primaryText)
             }
-            MetroListItem(
-                title = "${temp ?: "-"}°",
-                subtitle = subtitle,
-                leading = { WeatherGlyph(kind, size = 32.dp, color = MetroTheme.colors.primaryText) },
-                verticalPadding = 4.dp,
-                oneLineMinHeight = 48.dp,
-                twoLineMinHeight = 56.dp,
-                singleLine = false,
-            )
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -315,46 +336,33 @@ private fun DailyPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .heightIn(min = 52.dp)
+                    .padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                WeatherGlyph(kind, size = 28.dp, color = MetroTheme.colors.primaryText)
+                MetroText(
+                    text = if (index == 0) "Today" else toWeekdayString(day.time, weather.location.timezone),
+                    style = MetroTextStyle.ListItemTitle,
+                    color = MetroTheme.colors.primaryText,
+                    modifier = Modifier.width(88.dp),
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                MetroText(
+                    text = "${max ?: "-"}° / ${min ?: "-"}°",
+                    style = MetroTextStyle.ListItemTitle,
+                    color = MetroTheme.colors.primaryText,
+                    maxLines = 1,
+                )
                 Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            MetroText(
-                                text = if (index == 0) "Today" else toWeekdayString(day.time, weather.location.timezone),
-                                style = MetroTextStyle.ListItemTitle,
-                                color = MetroTheme.colors.primaryText
-                            )
-                            MetroText(
-                                text = buildString {
-                                    append(day.weatherCondition.toLabel(context))
-                                    val pop = day.precipitationProbabilityMax
-                                    if (pop != null && pop > 0) append(" · $pop%")
-                                },
-                                style = MetroTextStyle.ListItemSubtitle,
-                                color = MetroTheme.colors.secondaryText
-                            )
-                        }
-                        MetroText(
-                            text = "$max° / $min°",
-                            style = MetroTextStyle.ListItemTitle,
-                            color = MetroTheme.colors.primaryText
-                        )
-                    }
-                    RangeBar(
-                        startFraction = (((day.temperatureMin ?: lo) - lo) / span).toFloat().coerceIn(0f, 1f),
-                        endFraction = (((day.temperatureMax ?: lo) - lo) / span).toFloat().coerceIn(0f, 1f),
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
+                WeatherGlyph(kind, size = 28.dp, color = MetroTheme.colors.primaryText)
             }
+            RangeBar(
+                startFraction = (((day.temperatureMin ?: lo) - lo) / span).toFloat().coerceIn(0f, 1f),
+                endFraction = (((day.temperatureMax ?: lo) - lo) / span).toFloat().coerceIn(0f, 1f),
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Spacer(modifier = Modifier.height(10.dp))
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
