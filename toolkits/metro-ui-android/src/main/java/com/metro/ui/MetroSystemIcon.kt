@@ -69,6 +69,10 @@ enum class MetroSystemIconType {
     Refresh,
     /** Bulleted list rows — Calendar agenda / list view. */
     List,
+    /** 2×2 grid — Calendar "View" (scale) selector. */
+    CalendarView,
+    /** Pencil — edit. */
+    Edit,
     /** Filled folder — music directories / file pickers. */
     Folder,
 
@@ -207,6 +211,8 @@ fun DrawScope.drawMetroSystemIconGlyph(
         MetroSystemIconType.SwitchView -> drawRefreshGlyph(color)
         MetroSystemIconType.Refresh -> drawRefreshGlyph(color)
         MetroSystemIconType.List -> drawListGlyph(color, glyphStroke)
+        MetroSystemIconType.CalendarView -> drawCalendarViewGlyph(color, glyphStroke)
+        MetroSystemIconType.Edit -> drawEditGlyph(color)
         MetroSystemIconType.Folder -> drawFolderGlyph(color)
         MetroSystemIconType.Phone -> drawViewportPath(phoneHandsetPath, color, 0.72f)
         MetroSystemIconType.Message -> drawViewportPath(messagingBubblePath, color, 0.66f)
@@ -544,6 +550,50 @@ private fun DrawScope.drawAddGlyph(color: Color) {
         translate(left = -256f, top = -256f)
     }) {
         drawPath(addGlyphPath, color)
+    }
+}
+
+/**
+ * 2×2 rounded-square grid — Calendar "View" (scale) selector. Distinct from the refresh glyph.
+ */
+private fun DrawScope.drawCalendarViewGlyph(color: Color, stroke: Stroke) {
+    val strokeWidth = stroke.width * 0.9f
+    val inset = size.minDimension * 0.18f
+    val cell = (size.minDimension - inset * 2f - strokeWidth) / 2f
+    val start = inset
+    for (row in 0..1) {
+        for (col in 0..1) {
+            val x = start + col * (cell + strokeWidth)
+            val y = start + row * (cell + strokeWidth)
+            drawRect(
+                color = color,
+                topLeft = Offset(x, y),
+                size = Size(cell, cell),
+                style = Stroke(width = strokeWidth),
+            )
+        }
+    }
+}
+
+/** WP8.1 pencil — edit affordance (not the Save/check glyph). */
+private fun DrawScope.drawEditGlyph(color: Color) {
+    val bodyWidth = size.width * 0.30f
+    val bodyHeight = size.height * 0.62f
+    val cx = size.width / 2f
+    val top = (size.height - bodyHeight) / 2f
+    withTransform({ rotate(degrees = -45f, pivot = center) }) {
+        drawRect(
+            color = color,
+            topLeft = Offset(cx - bodyWidth / 2f, top),
+            size = Size(bodyWidth, bodyHeight * 0.72f),
+        )
+        val tip = Path().apply {
+            moveTo(cx - bodyWidth / 2f, top + bodyHeight * 0.72f)
+            lineTo(cx + bodyWidth / 2f, top + bodyHeight * 0.72f)
+            lineTo(cx, top + bodyHeight)
+            close()
+        }
+        drawPath(tip, color)
     }
 }
 
