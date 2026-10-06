@@ -171,9 +171,15 @@ data class TilePeekLines(
     val footer: String? = null,
     /** Notifying app package — peek-cycle taps open this instead of the host tile. */
     val packageName: String? = null,
+    /**
+     * Optional structured temporal state (Clock timers/stopwatches/world clocks). When present the
+     * launcher renders the value locally and ticks without querying the provider every second.
+     */
+    val temporal: com.metro.system.MetroTileTemporalState? = null,
 ) {
     val hasContent: Boolean
-        get() = !title.isNullOrBlank() || !subtitle.isNullOrBlank() || !body.isNullOrBlank()
+        get() = !title.isNullOrBlank() || !subtitle.isNullOrBlank() || !body.isNullOrBlank() ||
+            temporal?.hasContent == true
 
     /**
      * Promote subtitle/body into the title slot when the leading line is blank so the flip

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +19,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -38,15 +41,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.metro.system.MetroClockFace
 import com.metro.system.MetroClockFaceParts
+import com.metro.system.MetroTileTemporalRender
 import com.metro.system.MetroTileWidgetFace
 import com.metro.system.MetroTileWidgetFaceKind
+import com.metro.system.MetroWorldClockFaceEntry
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroTileWidgetGlyphs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Locale
 
 /**
  * Renders [MetroTileWidgetFace] on Start — shared contract for catalog widgets and future
@@ -138,7 +146,129 @@ fun StartWidgetFace(
                 }
             }
         }
+        MetroTileWidgetFaceKind.WORLD_CLOCK -> {
+            var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+            val context = LocalContext.current
+            val use24 = remember(context) { android.text.format.DateFormat.is24HourFormat(context) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    now = System.currentTimeMillis()
+                    delay(1000L)
+                }
+            }
+            WorldClockWideFace(
+                entries = face.worldClocks.orEmpty(),
+                now = now,
+                use24Hour = use24,
+                contentColor = contentColor,
+                modifier = modifier,
+            )
+        }
         else -> Unit
+    }
+}
+
+@Composable
+private fun WorldClockWideFace(
+    entries: List<MetroWorldClockFaceEntry>,
+    now: Long,
+    use24Hour: Boolean,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val deviceZone = remember { ZoneId.systemDefault() }
+    val deviceDate = remember(now) { Instant.ofEpochMilli(now).atZone(deviceZone).toLocalDate() }
+    val shown = remember(entries) { entries.take(MetroTileWidgetFace.MAX_WORLD_CLOCK_ENTRIES) }
+    if (shown.isEmpty()) return
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        // Row height drives the type scale so 1 / 2 / 3 cities all fill the tile cleanly.
+        // Narrow/medium tiles stack the city over its time so names are never truncated.
+        val stacked = maxWidth < maxHeight * 1.3f
+        val rowHeight = maxHeight.value / shown.size
+        val timeSize = ((if (stacked) rowHeight * 0.46f else rowHeight * 0.56f)).coerceIn(14f, 36f).sp
+        val citySize = (rowHeight * 0.24f).coerceIn(9f, 15f).sp
+        val offsetSize = (rowHeight * 0.18f).coerceIn(8f, 12f).sp
+        val divider = contentColor.copy(alpha = 0.16f)
+        val cityStyle = TextStyle(
+            color = contentColor.copy(alpha = 0.72f),
+            fontSize = citySize,
+            lineHeight = citySize,
+            letterSpacing = 0.6.sp,
+            fontFamily = MetroTheme.fontFamily,
+            fontWeight = FontWeight.Normal,
+        )
+        val offsetStyle = TextStyle(
+            color = contentColor.copy(alpha = 0.5f),
+            fontSize = offsetSize,
+            lineHeight = offsetSize,
+            fontFamily = MetroTheme.fontFamily,
+        )
+        val timeStyle = TextStyle(
+            color = contentColor,
+            fontSize = timeSize,
+            lineHeight = timeSize,
+            fontFamily = MetroTheme.fontFamily,
+            fontWeight = FontWeight.Light,
+        )
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            shown.forEachIndexed { index, entry ->
+                val zone = remember(entry.zoneId) {
+                    runCatching { ZoneId.of(entry.zoneId) }.getOrDefault(deviceZone)
+                }
+                val zoned = Instant.ofEpochMilli(now).atZone(zone)
+                val offset = MetroTileTemporalRender.dayOffsetLabel(zoned.toLocalDate(), deviceDate)
+                val time = MetroClockFace.time(now, zone, use24Hour)
+                if (stacked) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        BasicText(
+                            text = entry.cityName.uppercase(Locale.US),
+                            style = cityStyle,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        offset?.let { BasicText(text = it, style = offsetStyle, maxLines = 1, softWrap = false) }
+                        BasicText(text = time, style = timeStyle, maxLines = 1, softWrap = false)
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            BasicText(
+                                text = entry.cityName.uppercase(Locale.US),
+                                style = cityStyle,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                            offset?.let { BasicText(text = it, style = offsetStyle, maxLines = 1, softWrap = false) }
+                        }
+                        BasicText(text = time, style = timeStyle, maxLines = 1, softWrap = false)
+                    }
+                }
+                if (index != shown.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(divider),
+                    )
+                }
+            }
+        }
     }
 }
 

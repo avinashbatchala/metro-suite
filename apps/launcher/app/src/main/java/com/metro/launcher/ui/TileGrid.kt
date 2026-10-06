@@ -1,12 +1,17 @@
 package com.metro.launcher.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -78,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import com.metro.launcher.data.DisplayTile
 import com.metro.launcher.data.GridPlacement
 import com.metro.launcher.data.TileCustomIcon
@@ -107,6 +113,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import android.os.SystemClock
+import android.text.format.DateFormat
+import androidx.compose.runtime.mutableLongStateOf
+import com.metro.system.MetroTileTemporalRender
+import com.metro.system.MetroTileTemporalState
+import com.metro.system.MetroTemporalKind
+import java.util.Locale
+import java.time.ZoneId
 import kotlinx.coroutines.launch
 
 private const val MESSAGING_PACKAGE = "com.metro.messaging"
@@ -124,14 +138,18 @@ private fun tileCornerSideHang(horizontalPad: Dp) = minOf(horizontalPad, TILE_GR
 private const val TILE_RESIZE_MS = 300
 /** Slightly snappier magnet motion while a tile is mid-drag. */
 private const val TILE_MAGNET_MS = 220
-/** How long each live-tile face stays visible before the next 600ms flip. */
-private const val TILE_FLIP_HOLD_MS = 5_000L
+/** How long each live-tile face stays visible before the next peek slide. */
+private const val TILE_FLIP_HOLD_MS = 3_000L
 /** Max initial stagger so neighboring live tiles don't flip in sync. */
-private const val TILE_FLIP_STAGGER_MAX_MS = 4_000L
+private const val TILE_FLIP_STAGGER_MAX_MS = 3_000L
 /** Per-cycle hold jitter (±) so tiles stay desynced over time. */
-private const val TILE_FLIP_HOLD_JITTER_MS = 1_200L
+private const val TILE_FLIP_HOLD_JITTER_MS = 800L
 /** Camera distance multiplier so rotationX reads as a 3D flip, not a squash. */
 private const val TILE_FLIP_CAMERA_DISTANCE = 16f
+/** Peek-carriage slide duration (Photos-style): fast in, decelerating into place. */
+private const val PEEK_SLIDE_MS = 560
+/** Gentle continuous drift amplitude during the hold so a peek never looks frozen. */
+private const val PEEK_DRIFT_FRACTION = 0.045f
 /**
  * Live-tile / press-tilt perspective may spill into the inter-tile gutter. Clip at the
  * neighboring tile edge ([TILE_GRID_GAP] past each side) — not at the tile bounds, which
@@ -2332,8 +2350,9 @@ private fun MessagingGlyph(
 }
 
 /**
- * [MetroTileWidgetFaceKind.PEEK_CYCLE] — flip between provider peeks only (no host app icon).
- * Matches the Widgets catalog Notifier face.
+ * [MetroTileWidgetFaceKind.PEEK_CYCLE] — Photos-style carriage between provider peeks (no host app
+ * icon). Each incoming peek slides up and decelerates into place ([MetroTransitions.PageEasing]);
+ * a gentle out-and-back drift during the hold keeps the face from ever looking frozen.
  */
 @Composable
 private fun PeekCycleWidgetFace(
@@ -2354,69 +2373,100 @@ private fun PeekCycleWidgetFace(
         listOf(TilePeekLines(title = "no notifications", subtitle = null, body = null))
     }
     var peekIndex by remember(flipSeed) { mutableIntStateOf(0) }
-    val density = LocalDensity.current.density
-    val rotation = remember { Animatable(0f) }
+    val drift = remember(flipSeed) { Animatable(0f) }
     val peekCountState = rememberUpdatedState(faces.size)
     val onVisiblePeekPackageState = rememberUpdatedState(onVisiblePeekPackage)
+    val safeCount = faces.size.coerceAtLeast(1)
+    val peek = faces[peekIndex.mod(safeCount)]
 
     LaunchedEffect(flipSeed, liveMotionEnabled) {
         if (!liveMotionEnabled) {
-            rotation.snapTo(0f)
+            drift.snapTo(0f)
+            peekIndex = 0
             return@LaunchedEffect
-        }
-        if (abs(rotation.value) > 0.01f) {
-            rotation.snapTo(0f)
         }
         val rng = Random(flipSeed)
         delay(rng.nextLong(0L, TILE_FLIP_STAGGER_MAX_MS + 1))
         while (true) {
             val count = peekCountState.value.coerceAtLeast(1)
             val jitter = rng.nextLong(-TILE_FLIP_HOLD_JITTER_MS, TILE_FLIP_HOLD_JITTER_MS + 1)
-            delay((TILE_FLIP_HOLD_MS + jitter).coerceAtLeast(2_500L))
+            val hold = (TILE_FLIP_HOLD_MS + jitter).coerceAtLeast(1_800L)
+            // Sub-pixel drift out-and-back (sin of 0→1) so the face always reads as alive.
+            drift.snapTo(0f)
+            drift.animateTo(1f, animationSpec = tween(hold.toInt(), easing = LinearEasing))
             if (count <= 1) continue
-            rotation.animateTo(90f, animationSpec = TileFlipHalfAnimation)
             peekIndex = (peekIndex + 1) % count
-            rotation.snapTo(-90f)
-            rotation.animateTo(0f, animationSpec = TileFlipSettleAnimation)
+            delay(PEEK_SLIDE_MS.toLong())
         }
     }
 
-    val peek = faces[peekIndex.mod(faces.size.coerceAtLeast(1))]
     LaunchedEffect(peek.packageName, peek.title, peek.body, peek.footer) {
         onVisiblePeekPackageState.value(peek.packageName?.takeIf { it.isNotBlank() })
     }
+
     Box(
         modifier = modifier
-            .graphicsLayer {
-                rotationX = rotation.value
-                transformOrigin = TransformOrigin(0.5f, 0.5f)
-                cameraDistance = TILE_FLIP_CAMERA_DISTANCE * density
-                clip = false
-            }
             .then(
                 if (startBackground != null) {
                     Modifier.drawStartBackgroundWindow(startBackground)
                 } else {
                     Modifier.background(faceColor)
                 },
-            )
-            .padding(chrome.contentInset),
-    ) {
-        NotificationPeekTileContent(
-            title = peek.title,
-            subtitle = peek.subtitle,
-            body = peek.body,
-            footer = peek.footer.orEmpty(),
-            wide = wide,
-            contentColor = contentColor,
-            footerEndReserve = peekBadgeEndReserve(
-                tileMinEdge = tileMinEdge,
-                count = badgeCount ?: 0,
-                withIcon = false,
-                chrome = chrome,
             ),
-            modifier = Modifier.fillMaxSize(),
-        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(chrome.contentInset)
+                .graphicsLayer {
+                    translationY = -size.height * PEEK_DRIFT_FRACTION * sin(Math.PI * drift.value).toFloat()
+                    clip = false
+                },
+        ) {
+            AnimatedContent(
+                targetState = peekIndex.mod(safeCount),
+                transitionSpec = {
+                    slideInVertically(
+                        animationSpec = tween(PEEK_SLIDE_MS, easing = MetroTransitions.PageEasing),
+                        initialOffsetY = { height -> height },
+                    ) togetherWith slideOutVertically(
+                        animationSpec = tween(PEEK_SLIDE_MS, easing = MetroTransitions.PageEasing),
+                        targetOffsetY = { height -> -height },
+                    )
+                },
+                label = "peekCarriage",
+            ) { index ->
+                val face = faces[index.mod(safeCount)]
+                Box(modifier = Modifier.fillMaxSize()) {
+                    val temporal = face.temporal
+                    if (temporal != null) {
+                        TemporalPeekTileContent(
+                            label = face.title,
+                            temporal = temporal,
+                            wide = wide,
+                            contentColor = contentColor,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        NotificationPeekTileContent(
+                            title = face.title,
+                            subtitle = face.subtitle,
+                            body = face.body,
+                            footer = face.footer.orEmpty(),
+                            wide = wide,
+                            contentColor = contentColor,
+                            footerEndReserve = peekBadgeEndReserve(
+                                tileMinEdge = tileMinEdge,
+                                count = badgeCount ?: 0,
+                                withIcon = false,
+                                chrome = chrome,
+                            ),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
         badgeCount?.let { count ->
             TileNotificationBadge(
                 count = count,
@@ -2426,6 +2476,80 @@ private fun PeekCycleWidgetFace(
                 inset = false,
                 alignBottom = true,
             )
+        }
+    }
+}
+
+/**
+ * Locally-ticking face for Clock temporal peeks (timer / stopwatch / world clock). The provider
+ * exports structured timestamps; the launcher computes the displayed value here, so there is no
+ * per-second tile broadcast. The tick loop only runs while this peek is the visible face.
+ */
+@Composable
+private fun TemporalPeekTileContent(
+    label: String?,
+    temporal: MetroTileTemporalState,
+    wide: Boolean,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val use24 = remember(context) { DateFormat.is24HourFormat(context) }
+    val deviceZone = remember { ZoneId.systemDefault() }
+    var nowElapsed by remember(temporal) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var nowWall by remember(temporal) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(temporal) {
+        while (true) {
+            nowElapsed = SystemClock.elapsedRealtime()
+            nowWall = System.currentTimeMillis()
+            delay(500L)
+        }
+    }
+    val rendered = MetroTileTemporalRender.render(
+        state = temporal,
+        nowElapsedRealtimeMillis = nowElapsed,
+        nowEpochMillis = nowWall,
+        use24Hour = use24,
+        deviceZone = deviceZone,
+    )
+    val chrome = LocalTileChrome.current
+    // World clock peeks read like a destination card: city overline + large local time + day offset.
+    val isWorldClock = temporal.kind == MetroTemporalKind.WORLD_CLOCK
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        if (!label.isNullOrBlank()) {
+            TileText(
+                text = if (isWorldClock) label.uppercase(Locale.US) else label,
+                style = if (isWorldClock) chrome.titleStyle else chrome.liveTitleStyle,
+                color = if (isWorldClock) contentColor.copy(alpha = 0.72f) else contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Column {
+            rendered.primary?.let { value ->
+                TileText(
+                    text = value,
+                    style = if (isWorldClock || wide) chrome.liveTitleStyle else chrome.liveBodyStyle,
+                    color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            rendered.secondary?.let { status ->
+                TileText(
+                    text = status,
+                    style = chrome.titleStyle,
+                    color = if (isWorldClock) contentColor.copy(alpha = 0.65f) else contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

@@ -35,6 +35,19 @@ Supplementary: [`references/guides/startmenu.md`](references/guides/startmenu.md
 - Long-press: in-place edit mode, not a separate menu screen
 - No FAB; no Material decorations
 
+## Live-tile faces (rendering)
+
+- `StartWidgetFace` renders provider widget faces: `digital_clock` / `analog_clock` (tick locally,
+  12/24h via `DateFormat.is24HourFormat`), `battery`, `glyph` / `glyph_toggle`, `peek_cycle`, and
+  `world_clock` (up to 3 city rows, ticked locally).
+- `PeekCycleWidgetFace` renders each peek as a Photos-style carriage: the next peek slides up and
+  decelerates into place (`PageEasing`, `PEEK_SLIDE_MS`), with a gentle out-and-back drift during the
+  ~3 s hold so the face never looks frozen. Holds/slide/stagger are the `TILE_FLIP_*` / `PEEK_*`
+  constants in `TileGrid.kt`.
+- When `TilePeekLines.temporal` is set (Clock timers / stopwatches / world clocks) the value is
+  computed locally with `MetroTileTemporalRender` and a ~500ms loop — **never** by polling the source
+  provider per second. Text-only peeks unchanged.
+
 ## Verify
 
 ```bash

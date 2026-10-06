@@ -192,13 +192,24 @@ class LauncherRepository(private val context: Context) {
         val widgetFace = providerData?.widgetFace?.takeIf { it.hasContent }
         val isPeekCycle = widgetFace?.kind == MetroTileWidgetFaceKind.PEEK_CYCLE
         val providerPeeks = providerData?.peeks.orEmpty().map { peek ->
-            TilePeekLines(
-                title = peek.title,
-                subtitle = peek.subtitle,
-                body = peek.body,
-                footer = peek.footer,
-                packageName = peek.packageName?.takeIf { it.isNotBlank() },
-            ).normalizedForFlip()
+            if (peek.temporal != null) {
+                TilePeekLines(
+                    title = peek.title,
+                    subtitle = peek.subtitle,
+                    body = peek.body,
+                    footer = peek.footer,
+                    packageName = peek.packageName?.takeIf { it.isNotBlank() },
+                    temporal = peek.temporal,
+                )
+            } else {
+                TilePeekLines(
+                    title = peek.title,
+                    subtitle = peek.subtitle,
+                    body = peek.body,
+                    footer = peek.footer,
+                    packageName = peek.packageName?.takeIf { it.isNotBlank() },
+                ).normalizedForFlip()
+            }
         }.filter { it.hasContent }
         val hasRichFrontFace =
             photoGrid?.hasContent == true ||
