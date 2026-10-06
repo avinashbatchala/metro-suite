@@ -28,6 +28,7 @@ enum class SettingsRoute {
     EaseOfAccess,
     Brightness,
     StorageSense,
+    Setup,
     About,
     AppDetail,
     ConnectedApps,
@@ -180,6 +181,7 @@ class SettingsState(
             SettingsRoute.EaseOfAccess,
             SettingsRoute.Brightness,
             SettingsRoute.StorageSense,
+            SettingsRoute.Setup,
             SettingsRoute.About,
             -> route = SettingsRoute.Root
         }

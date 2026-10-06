@@ -50,6 +50,7 @@ private fun SettingsSubpageContent(
         SettingsRoute.EaseOfAccess -> EaseOfAccessScreen(state = state, modifier = modifier)
         SettingsRoute.Brightness -> BrightnessScreen(state = state, modifier = modifier)
         SettingsRoute.StorageSense -> StorageSenseScreen(state = state, modifier = modifier)
+        SettingsRoute.Setup -> SetupScreen(state = state, modifier = modifier)
         SettingsRoute.About -> AboutScreen(state = state, modifier = modifier)
         SettingsRoute.AppDetail -> AppDetailScreen(state = state, modifier = modifier)
         SettingsRoute.ConnectedApps -> ConnectedAppsScreen(state = state, modifier = modifier)

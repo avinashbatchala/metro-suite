@@ -36,28 +36,8 @@ for app in launcher statusbar notifications navbar volume lockscreen; do
 done
 
 echo ""
-echo "==> shell grants"
-adb shell cmd package set-home-activity com.metro.launcher/.MainActivity >/dev/null 2>&1 \
-  && echo "OK  home: com.metro.launcher" \
-  || echo "WARN  set-home-activity failed"
-
-adb shell appops set com.metro.statusbar SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1 \
-  && echo "OK  overlay: statusbar" \
-  || echo "WARN  overlay grant failed: statusbar"
-adb shell appops set com.metro.volume SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1 \
-  && echo "OK  overlay: volume" \
-  || echo "WARN  overlay grant failed: volume"
-adb shell appops set com.metro.notifications SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1 \
-  && echo "OK  overlay: notifications" \
-  || echo "WARN  overlay grant failed: notifications"
-adb shell pm grant com.metro.notifications android.permission.WRITE_SECURE_SETTINGS >/dev/null 2>&1 \
-  && echo "OK  WRITE_SECURE_SETTINGS: notifications (heads-up suppress)" \
-  || echo "WARN  WRITE_SECURE_SETTINGS grant failed (device may require adb root / manual grant)"
-
+echo "==> deep provisioning (grants + immersive takeover)"
+"$ROOT/scripts/provision.sh" "$@"
 echo ""
-echo "Enable Volume accessibility (volume keys + overlay layer) from the Volume app setup screen."
-echo "Enable Notifications accessibility + notification access from the Notifications app setup screen."
-echo "Enable Lock screen accessibility + Show lock screen toggle from the Lock screen app setup."
-echo "With Show notifications on, Metro sets heads_up_notifications_enabled=0 so stock peeks do not compete."
-echo ""
+echo "You can also drive this from Settings → 'set up windows phone' (guided wizard)."
 echo "install-shell: done"

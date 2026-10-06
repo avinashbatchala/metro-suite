@@ -135,6 +135,12 @@ private fun SystemSettingsList(
 
     val rows = listOf(
         SystemSettingsRow(
+            key = "setup",
+            title = "set up windows phone",
+            subtitle = "grant system access and make it feel like a Lumia",
+            onClick = { state.open(SettingsRoute.Setup) },
+        ),
+        SystemSettingsRow(
             key = "start_theme",
             title = stringResource(R.string.settings_start_theme),
             subtitle = state.accentDisplayName,
