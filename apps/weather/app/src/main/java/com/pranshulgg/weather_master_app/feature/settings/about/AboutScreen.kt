@@ -156,7 +156,7 @@ private fun AppVersionTile(
             modifier = Modifier.weight(1f)
         ) {
             MetroText(
-                text = "MetroWeather",
+                text = stringResource(R.string.app_name),
                 color = MetroTheme.colors.primaryText,
                 style = MetroTextStyle.ListItemTitle
             )

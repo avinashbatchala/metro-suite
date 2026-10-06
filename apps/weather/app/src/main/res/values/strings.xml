@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">MetroWeather</string>
+    <string name="app_name" translatable="false">Weather</string>
     <string name="app_launcher_name">Weather</string>
     <string name="weather_hourly_forecast">Hourly forecast</string>
     <string name="action_save">Save</string>
