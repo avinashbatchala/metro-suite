@@ -35,6 +35,7 @@ object MetroAppRegistry {
         "com.metro.files" to Entry("Files", "#0078D7"),
         "com.metro.hub" to Entry("Hub", "#1BA1E2"),
         "com.metro.widgets" to Entry("Widgets", "#1BA1E2"),
+        "com.metro.training" to Entry("Training", "#0078D7"),
     )
 
     fun label(packageName: String): String? = entries[packageName]?.label
