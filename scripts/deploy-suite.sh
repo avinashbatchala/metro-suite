@@ -28,7 +28,7 @@ source "$ROOT/scripts/lib/metro-common.sh"
 # Same tier order as build-apks.sh / verify-all.sh
 APP_ORDER=(
   launcher statusbar notifications navbar volume lockscreen
-  browser notes music weather vivimusic
+  browser notes music weather
   photos calendar mail messaging people dialer store settings calculator clock files hub discord widgets conversations
 )
 

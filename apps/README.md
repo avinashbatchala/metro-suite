@@ -37,7 +37,6 @@ apps/<name>/references/
 | [browser](browser/) | `com.metro.browser` | [AGENTS.md](browser/AGENTS.md) |
 | [notes](notes/) | `com.metro.notes` | [AGENTS.md](notes/AGENTS.md) |
 | [music](music/) | `com.metro.music` | [AGENTS.md](music/AGENTS.md) |
-| [vivimusic](vivimusic/) | `com.metro.vivimusic` | [AGENTS.md](vivimusic/AGENTS.md) |
 
 ## Tier 2 — Extended
 

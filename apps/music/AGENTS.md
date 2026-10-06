@@ -1,60 +1,68 @@
 # Agent instructions — Music (`com.metro.music`)
 
-**Tier 1** | Package: `com.metro.music`
-
-Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
+**Tier 1** | Read [`scope.md`](../../scope.md) and root [`AGENTS.md`](../../AGENTS.md) first.
 
 ## App role
 
-**Xbox Music** — panorama hub (collection / get music / now playing / local), artists/albums/songs pivots, now playing, playlists. Streaming = **YouTube Music**.
+Music for metro-os. Application id: `com.metro.music`; source namespace stays
+`com.music.vivi` (the vendored Vivi Music engine). It is a Metro-restyled YouTube Music
+client: anonymous YT/YT Music streaming (no account required), background playback,
+offline downloads, local library, playlists, search, queue, equalizer, sound recognition
+and SponsorBlock. Lyrics, Last.fm, Spotify/JioSaavn import, animated canvas, Cast/Android
+Auto, TV, widgets, in-app updater and Listen Together were removed in the port.
 
 ## Build phase gate
 
 | Prerequisite | Required |
 |--------------|----------|
-| Toolkits verified | Yes |
-| Tier 0 shell passes verify | **Yes** |
+| `metro-ui-android` verified | Yes |
+| `metro-system-sdk` verified | Yes |
+| Tier 0 shell (if Tier ≥ 1) | Yes |
 
-## Screens
-
-| Screen | Pattern | Reference |
-|--------|---------|-----------|
-| Hub / Now playing | `MetroPanorama` + panoramic `metro music` brand (no app overline) | `references/images/hub_fullpage.png` |
-| Artists / Albums / Songs | `MetroPivot` + `MetroShowingLabel` | `references/images/artists_showing_dark_teal.jpg` |
-| Album / artist detail | Full page | `references/images/album_detail_dark_teal.jpg` |
-| Settings / YT connect | Full page | `references/images/settings_dark_teal.jpg` |
-
-## WP8.1 rules
-
-- Hub panorama; collection uses pivots (≤ 5 primary: artists, albums, songs, playlists, genres)
-- Now playing: large square art, `MediaCircleSeekBar` scrubber (art-width, elapsed/remaining times on either side, hollow ring thumb — not `MetroSlider`), circular prev/play/next, up next line
-- Swipe art up = next, down = previous
-- `showing …` filter via `MetroShowingLabel`
-- Local via MediaStore; streaming via YouTube Music connect
-- List items use `MetroListItem` press nudge (`metroClickable`)
-
-## Primary flows
-
-1. Scan local library; populate pivots
-2. Tap song → now playing
-3. Play/pause/seek + background notification
-4. Settings → connect YouTube Music → search/play in explore or Showing=youtube music
-
-## Golden screenshots
+This app is **AGP 9** and consumes the AGP 8 toolkits from `mavenLocal()`. Publish them
+first (`build-apks.sh`/`verify-app.sh` do this automatically for `vivimusic`):
 
 ```
-screenshots/golden/hub_dark_blue.png
-screenshots/golden/nowplaying_dark_blue.png
+(cd ../../toolkits/metro-system-sdk && ./gradlew publishToMavenLocal)
+(cd ../../toolkits/metro-ui-android && ./gradlew publishToMavenLocal)
 ```
+
+## Screens to implement
+
+| Screen | Navigation pattern | Reference |
+|--------|-------------------|-----------|
+| Hub (panorama) | `MetroPanorama` — collection / get music / now playing / downloads | `references/guides/blueprint.md` |
+| Collection | `MetroPivot` songs / albums / artists / playlists | blueprint |
+| Now playing | Hub pane (not a route) | blueprint |
+| Search | Subpage | blueprint |
+| Queue | Subpage | blueprint |
+| Downloads | Subpage | blueprint |
+| Equalizer | Subpage | blueprint |
+| Recognition | Subpage | blueprint |
+| Settings | Subpage | blueprint |
+
+## WP8.1 rules specific to this app
+
+- Use `com.metro.ui.*` chrome only; `androidx.compose.material3.*` is banned (metro lint).
+- Flat `MetroTheme.colors.background`; never an album-art/gradient background.
+- App bar at bottom; no FAB.
+- Apply `Modifier.metroNavBarPadding()` on screen roots.
+- `MetroBorderButton` must not `fillMaxWidth()`; rows use `metroClickable`.
+
+## Engine (do not rewrite)
+
+Playback/library/search/downloads are the vendored Vivi engine under
+`app/src/main/kotlin/com/music/vivi/{playback,db,models,viewmodels,eq,recognition,sponsorblock,innertube}`.
+The Metro UI is `app/src/main/kotlin/com/music/vivi/ui/metro/`. `MainActivity` binds
+`MusicService`, builds `PlayerConnection`, and provides composition locals
+(`LocalPlayerConnection`, `LocalDatabase`, `LocalDownloadUtil`, `LocalSyncUtils`).
+
+## License
+
+GPL-3.0 (see `LICENSE`). Fork of [Vivi Music](https://github.com/vivizzz007/vivi-music).
 
 ## Verify
 
-```bash
-../../scripts/verify-app.sh music
 ```
-
-## Platform exceptions
-
-| WP8.1 behavior | Android limitation | Compromise |
-|----------------|-------------------|------------|
-| Xbox Music cloud | Defunct | YouTube Music |
+../../scripts/verify-app.sh vivimusic
+```

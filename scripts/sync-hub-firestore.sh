@@ -124,7 +124,7 @@ const shell = new Set([
   "launcher", "statusbar", "notifications", "navbar", "volume", "lockscreen", "keyboard",
 ]);
 const core = new Set([
-  "browser", "notes", "music", "vivimusic", "calculator", "clock", "files", "settings", "store", "hub",
+  "browser", "notes", "music", "calculator", "clock", "files", "settings", "store", "hub",
   "photos", "calendar", "mail", "messaging", "people", "dialer", "widgets", "conversations",
 ]);
 
@@ -138,8 +138,7 @@ const descriptions = {
   keyboard: "Metro SIP / Word Flow–style touch keyboard.",
   browser: "IE Mobile–style browser with tabs and favorites.",
   notes: "OneNote-style notebooks, sections, and pages.",
-  music: "Xbox Music–style player with local and streaming library.",
-  vivimusic: "Metro YouTube Music client: streaming, offline downloads, library, EQ, and sound recognition.",
+  music: "Metro YouTube Music client (Vivi engine): streaming, offline downloads, library, EQ, and sound recognition.",
   photos: "Photo hub with date and album pivots.",
   calendar: "Agenda, day, and month calendar views.",
   mail: "Linked inboxes and conversation mail.",
@@ -160,7 +159,6 @@ const glyphFiles = {
   browser: "metro_app_browser.xml",
   notes: "metro_app_notes.xml",
   music: "metro_app_music.xml",
-  vivimusic: "metro_app_vivimusic.xml",
   settings: "metro_app_settings.xml",
   store: "metro_app_store.xml",
   photos: "metro_app_photos.xml",
@@ -189,7 +187,6 @@ const brandHexFallback = {
   browser: "#1BA1E2",
   notes: "#A200FF",
   music: "#E3008C",
-  vivimusic: "#B4009E",
   settings: "#F09609",
   store: "#7CB342",
   photos: "#EB3C00",

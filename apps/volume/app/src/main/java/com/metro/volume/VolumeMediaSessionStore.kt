@@ -299,5 +299,5 @@ object VolumeMediaSessionStore {
         this?.getString(key)?.trim()?.takeIf { it.isNotEmpty() }
 
     private const val SUITE_MUSIC_PACKAGE = "com.metro.music"
-    private const val SUITE_MUSIC_SERVICE = "com.metro.music.playback.MusicPlaybackService"
+    private const val SUITE_MUSIC_SERVICE = "com.music.vivi.playback.MusicService"
 }

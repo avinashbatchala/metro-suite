@@ -30,7 +30,6 @@ object MetroAppGlyphs {
     val Browser: Int get() = R.drawable.metro_app_browser
     val Notes: Int get() = R.drawable.metro_app_notes
     val Music: Int get() = R.drawable.metro_app_music
-    val ViviMusic: Int get() = R.drawable.metro_app_vivimusic
     val Settings: Int get() = R.drawable.metro_app_settings
     val Store: Int get() = R.drawable.metro_app_store
     val Photos: Int get() = R.drawable.metro_app_photos
@@ -61,7 +60,6 @@ object MetroAppGlyphs {
         "com.metro.browser" to R.drawable.metro_app_browser,
         "com.metro.notes" to R.drawable.metro_app_notes,
         "com.metro.music" to R.drawable.metro_app_music,
-        "com.metro.vivimusic" to R.drawable.metro_app_vivimusic,
         "com.metro.settings" to R.drawable.metro_app_settings,
         "com.metro.store" to R.drawable.metro_app_store,
         "com.metro.photos" to R.drawable.metro_app_photos,

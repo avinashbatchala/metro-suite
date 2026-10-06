@@ -1,50 +1,45 @@
 # Music — known gaps
 
-High-fidelity WP8.1 captures missing or low-fidelity for blueprint pages. Prefer filling these before golden polish.
+Implementation debt and platform caveats for the MetroSuite port.
 
-| Missing / weak file | Should show | Workaround |
-|---------------------|-------------|------------|
-| Full `collection` panorama pane (recent plays + section links) without now-playing chrome | Collection hub content | Use `hub_nowplaying_compare_dark_unknown.jpg` + blueprint § Page 2; artists showing for list chrome |
-| Dense artists A–Z list (many rows) | Long letter list + jump list | `artists_showing_dark_teal.jpg` shows header + `#` jump tile; implement `MetroLetterList` |
-| Playlists pivot | Playlist titles list | Same list chrome as artists; WP text sources in Thurrott Showing article |
-| Genres pivot capture | Genre names list | Implemented from MediaStore tags; use artists list chrome + blueprint § Page 3 |
-| Artist detail discover / about | Accent `in collection` + `discover` sections; `about` wiki bio | No WP8.1 capture for YT discover or Wikipedia about — use album detail chrome + blueprint § Page 4 |
-| Radio panorama pane | Station list / create station | Blueprint stub; YT Music search “radio” when connected |
-| `local` panorama pane capture | Settings + sync now + music directories accent tiles | Same tile chrome as get music (`hub_fullpage.png` centre); glyphs from `MetroSystemIconType.Settings` / `Refresh` / `Folder` |
-| Music directories multi-select | Checkbox folder list | Same as Settings connected-apps picker (`MetroMultiSelectList`); MediaStore `RELATIVE_PATH` / `DATA` |
-| Explore / Store pane | Featured albums | Blueprint Page 9; YT Music search results |
-| Light theme Music captures | Light bg Music UI | Dark refs + `MetroTheme` light tokens |
+## 16 KB page size
 
-Do not start UI against an empty `images/` folder — primary now-playing and showing captures are present.
+The app ships three prebuilt native libraries whose ELF LOAD segments are not 16 KB
+page-aligned (built by their upstream projects with a 4 KB linker page size):
 
-## Resolved — YouTube Music stream resolution
+- `lib/arm64-v8a/libquickjs.so` — `io.github.dokar3:quickjs-kt` (via `innertubex`)
+- `lib/arm64-v8a/libdatastore_shared_counter.so` — `androidx.datastore:datastore-core`
+- `lib/arm64-v8a/libandroidx.graphics.path.so` — `androidx.graphics:graphics-path`
 
-Measured against Innertube on 2026-08-05. Anonymous player clients, art track
-(a `music.youtube.com` upload) versus a regular video:
+Android shows the "app isn't 16 KB-compatible" dialog only for **debuggable** builds; the
+`debug` build type is therefore marked `isDebuggable = false` (unminified, debug-signed) to
+suppress the dev-only nag while keeping the app fully functional. **Before shipping a release
+to 16 KB-page devices**, rebuild these libraries with `-Wl,-z,max-page-size=16384` (or swap to
+16 KB-aligned versions) so real 16 KB pages are supported.
 
-| Client | Art track | Regular video |
-|--------|-----------|---------------|
-| `ANDROID_MUSIC` | `LOGIN_REQUIRED` | `LOGIN_REQUIRED` |
-| `WEB_REMIX` | `UNPLAYABLE` (`OK` but cipher-only when signed in) | ciphered formats only |
-| `TVHTML5` / `WEB` signed in | `OK` but SABR-only, no stream URLs | — |
-| `IOS` | `OK`, progressive **403 past ~1.5 MiB** (no HLS on art tracks) | HLS / progressive past 1.5 MiB |
-| `ANDROID_VR` **without** `visitorData` | `LOGIN_REQUIRED` | plays fully |
-| `ANDROID_VR` **with** `visitorData` | `OK`, adaptive GVS **403 past ~1 MiB** without PO token | 403 past ~1 MiB without PO |
+(Not related to NewPipe Extractor, which is pure JVM and unused at runtime in this port.)
 
-Two findings drive the implementation (updated 2026-09-27):
+## Reference images / golden screenshots
 
-1. **`visitorData` unlocks art tracks on mobile player clients.** Send it as `X-Goog-Visitor-Id`
-   and in `context.client.visitorData`. `YtMusicAuthStore` caches it for 12 hours.
-2. **Catalog art tracks need a GVS PO token past ~1 MiB on every Innertube client we tried.**
-   Without it, Range requests at byte ≥ ~1.5 MiB return 403 — ExoPlayer stops near **0:48–1:04**
-   depending on bitrate. BotGuard minting (`YtPoTokenSession`) warms with visitorData, prefers a
-   **video-id-bound** `pot=` on googlevideo URLs, and sends the video pot in
-   `serviceIntegrityDimensions.poToken`. Innertube order is IOS → ANDROID_VR → WEB_REMIX.
-   Video-bound pots start play without a mid-file Range probe (session/bare URLs still probe).
-   BotGuard warm is capped at 8s so mint failures cannot block play. Resolved URLs are cached
-   briefly and the next tracks are prefetched into that cache — not into Media3 — so skip stays
-   fast without replaying expired googlevideo items.
-3. **Reads must use the minting User-Agent.** `YtStreamPlayback` + `RequestHeaderDataSource`
-   replay the IOS/ANDROID_VR UA that minted the URL; a Chrome default against those URLs 403s
-   past the preview window. `ChunkedDataSource` reads 512 KiB Ranges. Premature upstream EOS with
-   bytes still remaining soft-EOS (avoids MediaCodec abort).
+`references/images/` is empty and `screenshots/golden/` has no baselines yet. The UI mirrors
+`apps/music/` (which is the accepted visual reference); capture golden screenshots from the
+running app on the lumia-925 profile when convenient.
+
+## Deliberately removed features
+
+Lyrics, Last.fm scrobbling, Spotify/JioSaavn import, animated canvas visualizers, artist
+video, Android Auto / Cast / GMS, TV/leanback, home-screen widgets, Listen Together, GitHub
+OAuth, in-app OTA updater, and Material-You dynamic theming were removed by design (see
+`README.md`). They will not be re-added.
+
+## Minimal feature screens
+
+The Equalizer and Recognition screens are functional but intentionally minimal (profile
+list / single recognize action + history) rather than ports of Vivi's richer M3 screens, to
+match the Metro design language.
+
+## Out of scope for v1
+
+- Per-app theme selection (the suite theme/accent from `MetroPreferences` is used).
+- Lyrics/now-playing metadata broadcast (the launcher reads the Media3 session via its
+  notification listener; `com.metro.music` is in `MetroConnectedApps.DEFAULT_MUSIC_PACKAGES`).

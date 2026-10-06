@@ -45,6 +45,7 @@ fun MetroListItem(
     twoLineMinHeight: Dp = 90.dp,
     singleLine: Boolean = false,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val resolvedTitleColor = titleColor ?: if (enabled) {
         MetroTheme.colors.primaryText
@@ -65,7 +66,11 @@ fun MetroListItem(
             .heightIn(min = if (subtitle == null) oneLineMinHeight else twoLineMinHeight)
             .then(
                 if (onClick != null) {
-                    Modifier.metroClickable(enabled = enabled, onClick = onClick)
+                    Modifier.metroClickable(
+                        enabled = enabled,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
                 } else {
                     Modifier
                 },

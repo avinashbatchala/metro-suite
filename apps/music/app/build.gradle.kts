@@ -1,77 +1,261 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.ksp)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.protobufPlugin)
 }
 
 android {
-    namespace = "com.metro.music"
-    compileSdk = 35
+    namespace = "com.music.vivi"
+    compileSdk = 37
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.metro.music"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.0"
+        targetSdk = 37
+        versionCode = 1
+        versionName = "1.0.0"
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables.useSupportLibrary = true
+
+        val lastFmKey = localProperties.getProperty("LASTFM_API_KEY") ?: System.getenv("LASTFM_API_KEY") ?: ""
+        val lastFmSecret = localProperties.getProperty("LASTFM_SECRET") ?: System.getenv("LASTFM_SECRET") ?: ""
+        buildConfigField("String", "LASTFM_API_KEY", "\"$lastFmKey\"")
+        buildConfigField("String", "LASTFM_SECRET", "\"$lastFmSecret\"")
+
+        buildConfigField("Boolean", "IS_NIGHTLY", "false")
+        // Cast is removed in the MetroSuite port.
+        buildConfigField("Boolean", "CAST_AVAILABLE", "false")
+        buildConfigField("String", "ARCHITECTURE", "\"universal\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("keystore/release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+        getByName("debug") {
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storePassword = "android"
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = if (file("keystore/release.keystore").exists())
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isCrunchPngs = false
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
+                "proguard-rules.pro"
             )
+        }
+        debug {
+            // Kept unminified and debug-signed, but NOT debuggable: on 16 KB-page devices
+            // Android shows the "app isn't 16 KB-compatible" developer dialog only for
+            // debuggable apps. The three prebuilt native libs (quickjs / datastore / graphics)
+            // come from third-party AARs and cannot be realigned here, so we suppress the
+            // dev-only nag. (Verify with `adb`/Play pre-launch if shipping to 16 KB devices.)
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    kotlin {
+        jvmToolchain(21)
+        compilerOptions {
+            freeCompilerArgs.add("-Xannotation-default-target=param-property")
+            freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    lint {
+        lintConfig = file("lint.xml")
+        warningsAsErrors = false
+        abortOnError = false
+        checkDependencies = false
+    }
+
+    androidResources {
+        generateLocaleConfig = true
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+            keepDebugSymbols += listOf(
+                "**/libandroidx.graphics.path.so",
+                "**/libdatastore_shared_counter.so"
+            )
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/NOTICE.md"
+            excludes += "META-INF/CONTRIBUTORS.md"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("java") {
+                    option("lite")
+                }
+                create("kotlin") {
+                    option("lite")
+                }
+            }
+        }
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn"
+        )
+        suppressWarnings.set(false)
     }
 }
 
 dependencies {
+    // MetroSuite Windows design system + system contract (consumed from mavenLocal, AGP 8.x).
     implementation("com.metro.ui:metro-ui-android:1.0.0")
     implementation("com.metro.system:metro-system-sdk:1.0.0")
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
-    implementation(composeBom)
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation(libs.guava)
+    implementation(libs.coroutines.guava)
+    implementation(libs.concurrent.futures)
 
-    val media3 = "1.4.1"
-    implementation("androidx.media3:media3-exoplayer:$media3")
-    implementation("androidx.media3:media3-exoplayer-hls:$media3")
-    implementation("androidx.media3:media3-session:$media3")
-    implementation("androidx.media3:media3-common:$media3")
+    implementation(libs.activity)
+    implementation(libs.hilt.navigation)
+    implementation(libs.datastore)
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.util)
+    implementation(libs.compose.ui.tooling)
+    implementation(libs.compose.animation)
+    implementation(libs.compose.reorderable)
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.14.1")
+    implementation(libs.viewmodel)
+    implementation(libs.viewmodel.compose)
 
-    androidTestImplementation(composeBom)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    implementation(libs.material3)
+    implementation(libs.androidx.adaptive)
+    implementation(libs.androidx.adaptive.layout)
+    implementation(libs.androidx.adaptive.navigation)
+    implementation(libs.material3.adaptive.navigation.suite)
+    implementation(libs.palette)
+    implementation(libs.materialKolor)
+    implementation(libs.vico.compose.m3)
+
+    implementation(libs.appcompat)
+
+    implementation(libs.coil)
+    implementation(libs.coil.network.okhttp)
+
+    implementation(libs.ucrop)
+
+    implementation(libs.shimmer)
+
+    implementation(libs.media3)
+    implementation(libs.media3.session)
+    implementation(libs.media3.hls)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.okhttp)
+
+    implementation(libs.room.runtime)
+    implementation(libs.kuromoji.ipadic)
+    implementation(libs.tinypinyin)
+    ksp(libs.room.compiler)
+    implementation(libs.room.ktx)
+
+    implementation(libs.apache.lang3)
+
+    implementation(libs.hilt)
+    implementation(libs.jsoup)
+    ksp(libs.hilt.compiler)
+
+    implementation(project(":innertube"))
+    implementation(project(":kizzy"))
+    implementation(project(":shazamkit"))
+
+    implementation(libs.innertubex)
+    implementation(libs.expressivelab)
+
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
+
+    implementation(libs.protobuf.javalite)
+    implementation(libs.protobuf.kotlin.lite)
+
+    coreLibraryDesugaring(libs.desugaring)
+    implementation(libs.timber)
+    implementation(libs.smoothCorner)
+    implementation(libs.lottie.compose)
+    implementation(libs.haze)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.androidx.core.splashscreen)
+
+    // Test harness (matches the suite's other apps so connectedDebugAndroidTest has a runner).
+    testImplementation(libs.junit)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

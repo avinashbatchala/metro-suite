@@ -20,7 +20,6 @@ object MetroAppRegistry {
         "com.metro.browser" to Entry("Internet Explorer", "#1BA1E2"),
         "com.metro.notes" to Entry("Notes", "#A200FF"),
         "com.metro.music" to Entry("Music", "#E3008C"),
-        "com.metro.vivimusic" to Entry("ViviMusic", "#B4009E"),
         "com.metro.settings" to Entry("Settings", "#F09609"),
         "com.metro.store" to Entry("Store", "#7CB342"),
         "com.metro.photos" to Entry("Photos", "#EB3C00"),

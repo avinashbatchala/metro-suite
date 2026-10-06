@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Shared suite glyph — source of truth: metro-ui-android/metro_notification_music -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/metro_notification_music" />
-</layer-list>

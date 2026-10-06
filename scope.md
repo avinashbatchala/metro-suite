@@ -41,8 +41,7 @@ These apps form the **Metro Shell** (launcher, status bar, notifications, naviga
 |-----|---------|------|
 | **Browser** | `com.metro.browser` | IE Mobile–style browser: address bar, tabs, favorites, reading view |
 | **Notes** | `com.metro.notes` | OneNote-style hub: notebooks, sections, pages; pivot navigation |
-| **Music** | `com.metro.music` | Xbox Music–style: artists/albums/songs pivots, now playing, playlists |
-| **ViviMusic** | `com.metro.vivimusic` | Xbox Music–style UI over the Vivi engine: anonymous YouTube streaming, offline downloads, local library, equalizer, sound recognition, SponsorBlock |
+| **Music** | `com.metro.music` | Xbox Music–style player over the Vivi engine: anonymous YouTube streaming, offline downloads, local library, EQ, sound recognition, SponsorBlock |
 
 ### Tier 2 — Extended suite (subsequent waves)
 

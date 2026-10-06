@@ -25,7 +25,6 @@ object MetroConnectedApps {
 
     val DEFAULT_MUSIC_PACKAGES: Set<String> = setOf(
         "com.metro.music",
-        "com.metro.vivimusic",
         "com.google.android.apps.youtube.music",
         "com.google.android.music",
         "com.spotify.music",
