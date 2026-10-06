@@ -1,6 +1,16 @@
 package com.metro.system
 
+import org.json.JSONArray
 import org.json.JSONObject
+
+/**
+ * One city row inside a [MetroTileWidgetFaceKind.WORLD_CLOCK] wide face. The launcher renders the
+ * current time locally from [zoneId]; no per-minute provider updates.
+ */
+data class MetroWorldClockFaceEntry(
+    val cityName: String,
+    val zoneId: String,
+)
 
 /**
  * Custom Start widget face — apps export kind + state; the launcher renders without loading
@@ -23,9 +33,18 @@ data class MetroTileWidgetFace(
     val toggleOn: Boolean? = null,
     /** When true, glyph reads unavailable (dimmed). */
     val dimmed: Boolean? = null,
+    /**
+     * Up to [MetroTileWidgetFace.MAX_WORLD_CLOCK_ENTRIES] cities for
+     * [MetroTileWidgetFaceKind.WORLD_CLOCK]; the launcher ticks them locally.
+     */
+    val worldClocks: List<MetroWorldClockFaceEntry>? = null,
 ) {
     val hasContent: Boolean
         get() = kind.isNotBlank()
+
+    companion object {
+        const val MAX_WORLD_CLOCK_ENTRIES = 3
+    }
 }
 
 object MetroTileWidgetFaceKind {
@@ -49,6 +68,12 @@ object MetroTileWidgetFaceKind {
      * (+ optional [MetroTileData.counter] badge).
      */
     const val PEEK_CYCLE = "peek_cycle"
+
+    /**
+     * Wide World Clock face — up to three [MetroWorldClockFaceEntry] rows. The launcher renders
+     * current city times locally.
+     */
+    const val WORLD_CLOCK = "world_clock"
 }
 
 object MetroTileWidgetGlyph {
@@ -66,6 +91,17 @@ internal object MetroTileWidgetFaceCodec {
             face.glyph?.let { put("glyph", it) }
             face.toggleOn?.let { put("toggle_on", it) }
             face.dimmed?.let { put("dimmed", it) }
+            face.worldClocks?.takeIf { it.isNotEmpty() }?.let { clocks ->
+                put("world_clocks", JSONArray().apply {
+                    clocks.take(MetroTileWidgetFace.MAX_WORLD_CLOCK_ENTRIES).forEach { entry ->
+                        if (entry.cityName.isBlank() || entry.zoneId.isBlank()) return@forEach
+                        put(JSONObject().apply {
+                            put("city", entry.cityName)
+                            put("zone", entry.zoneId)
+                        })
+                    }
+                })
+            }
         }.toString()
     }
 
@@ -80,6 +116,16 @@ internal object MetroTileWidgetFaceCodec {
                 glyph = obj.optString("glyph").takeIf { it.isNotBlank() },
                 toggleOn = if (obj.has("toggle_on")) obj.optBoolean("toggle_on") else null,
                 dimmed = if (obj.has("dimmed")) obj.optBoolean("dimmed") else null,
+                worldClocks = obj.optJSONArray("world_clocks")?.let { array ->
+                    buildList {
+                        for (i in 0 until array.length()) {
+                            val entry = array.optJSONObject(i) ?: continue
+                            val cityName = entry.optString("city").takeIf { it.isNotBlank() } ?: continue
+                            val zoneId = entry.optString("zone").takeIf { it.isNotBlank() } ?: continue
+                            add(MetroWorldClockFaceEntry(cityName, zoneId))
+                        }
+                    }.take(MetroTileWidgetFace.MAX_WORLD_CLOCK_ENTRIES).ifEmpty { null }
+                },
             ).takeIf { it.hasContent }
         } catch (_: Exception) {
             null

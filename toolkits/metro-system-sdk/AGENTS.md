@@ -61,8 +61,48 @@ Apps that pin interactive catalog widgets export face state on `MetroTileData.wi
 | `glyph` | `glyph` key (`lock`, …) | `tapAction` → lock / etc. |
 | `glyph_toggle` | `glyph`, `toggleOn`, optional `dimmed` | `tapAction` → toggle |
 | `peek_cycle` | [MetroTileData.peeks] + optional counter | cycle notifications only (no host icon) |
+| `world_clock` | `worldClocks` (1–3 `MetroWorldClockFaceEntry` name+zoneId) | usually none (display; launcher ticks locally) |
 
 Glyph keys: `MetroTileWidgetGlyph` (`torch`, `lock`, `battery_saver`). Drawables live in `metro-ui-android`.
+
+### Temporal peek state (`MetroTilePeek.temporal`)
+
+`MetroTilePeek` may carry an optional `MetroTileTemporalState` so the **launcher renders timers /
+stopwatches / world clocks locally** — the source app must never broadcast a tile update per second.
+Absent → text-only peek (backwards compatible). Values are timestamps/state, never ticking strings:
+
+- `timer`: `running`, `targetElapsedRealtimeMillis` (monotonic, valid within a boot), `targetEpochMillis`
+  (wall-clock recovery aid), `pausedRemainingMillis`, `finished`.
+- `stopwatch`: `running`, `accumulatedElapsedMillis`, `runningSinceElapsedRealtimeMillis`,
+  `runningSinceEpochMillis`.
+- `world_clock`: `zoneId` (IANA); launcher reads wall time itself.
+- `alarm`: `targetEpochMillis` (informational; alarms do not tick).
+
+Rendering math lives in `MetroTileTemporalRender` (pure, tested): timers clamp at zero (never
+`-00:01`), stopwatch/timer display `H:MM:SS` / `MM:SS`, `use24Hour` honored. `MetroClockFace.parts`
+and `MetroClockFace.time` accept a `use24Hour` flag (default false).
+
+`MetroWorldClockCatalog` (`com.metro.system`) is the shared, offline city catalog used by Clock and
+the Widgets World Clock widget. `zoneId` is the source of truth (never fixed offsets).
+
+### Metro sounds (`MetroSoundRole` / `MetroSoundContract`)
+
+Metro Settings owns the bundled sound pack and installs it into MediaStore. Apps refer to **semantic
+roles**, never filenames or asset paths:
+
+`PHONE_RINGTONE`, `MESSAGE`, `MAIL`, `CALENDAR`, `REMINDER`, `SYSTEM_NOTIFICATION`, `ALARM`, `TIMER`.
+
+- `MetroSoundDescriptor(id, title, role?, category)` + `MetroSoundCategory`
+  (`RINGTONE` / `NOTIFICATION` / `ALARM` / `UI`).
+- `MetroSoundContract.resolve(resolver, role)` → descriptor or null; `resolveUri(...)` →
+  installed `content://` URI or null; `installedPackVersion(...)`.
+- Provider (read-only, hosted by Settings): authority `com.metro.settings.sounds`, paths
+  `role/<ROLE>` and `pack`. Consumers must fall back safely when it returns null.
+- `MetroNotificationChannels.openChannelSettings(context, packageName, channelId)` — deep link to a
+  channel's Android settings; `applyInitialSound(context, manager, channel, role)` — adopt the Metro
+  sound **only when the channel is first created** (existing channels are user-owned; never mutate).
+- Consumer apps must not bundle their own copies of the pack, and must not change system defaults
+  (only Settings, with `WRITE_SETTINGS` + user intent).
 
 ### MetroBroadcasts
 

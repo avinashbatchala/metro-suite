@@ -57,4 +57,58 @@ class MetroTileWidgetFaceCodecTest {
         val encoded = MetroTilePeekCodec.encode(peeks)
         assertEquals(peeks, MetroTilePeekCodec.decode(encoded))
     }
+
+    @Test
+    fun peeks_temporalRoundTrip() {
+        val peeks = listOf(
+            MetroTilePeek(
+                title = "Pasta",
+                temporal = MetroTileTemporalState(
+                    kind = MetroTemporalKind.TIMER,
+                    itemId = "42",
+                    label = "Pasta",
+                    running = true,
+                    targetElapsedRealtimeMillis = 123_456L,
+                    targetEpochMillis = 999_999L,
+                ),
+            ),
+            MetroTilePeek(
+                title = "Run",
+                temporal = MetroTileTemporalState(
+                    kind = MetroTemporalKind.STOPWATCH,
+                    itemId = "7",
+                    running = false,
+                    accumulatedElapsedMillis = 5_000L,
+                ),
+            ),
+        )
+        assertEquals(peeks, MetroTilePeekCodec.decode(MetroTilePeekCodec.encode(peeks)))
+    }
+
+    @Test
+    fun worldClockFace_roundTrip_andClampsToThree() {
+        val face = MetroTileWidgetFace(
+            kind = MetroTileWidgetFaceKind.WORLD_CLOCK,
+            worldClocks = listOf(
+                MetroWorldClockFaceEntry("London", "Europe/London"),
+                MetroWorldClockFaceEntry("New York", "America/New_York"),
+                MetroWorldClockFaceEntry("Tokyo", "Asia/Tokyo"),
+                MetroWorldClockFaceEntry("Berlin", "Europe/Berlin"),
+            ),
+        )
+        val decoded = MetroTileWidgetFaceCodec.decode(MetroTileWidgetFaceCodec.encode(face))
+        assertEquals(MetroTileWidgetFaceKind.WORLD_CLOCK, decoded!!.kind)
+        assertEquals(3, decoded.worldClocks!!.size)
+        assertEquals("London", decoded.worldClocks!![0].cityName)
+        assertEquals("Asia/Tokyo", decoded.worldClocks!![2].zoneId)
+    }
+
+    @Test
+    fun clockParts_twentyFourHour() {
+        val afternoon = java.time.LocalDateTime.of(2024, 6, 15, 14, 5)
+        val parts = MetroClockFace.parts(afternoon, use24Hour = true)
+        assertEquals("14", parts.hour)
+        assertEquals("05", parts.minute)
+        assertEquals("", parts.period)
+    }
 }
