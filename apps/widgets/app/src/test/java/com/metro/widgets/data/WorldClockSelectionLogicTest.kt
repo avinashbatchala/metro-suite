@@ -1,6 +1,7 @@
 package com.metro.widgets.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WorldClockSelectionLogicTest {
@@ -32,6 +33,13 @@ class WorldClockSelectionLogicTest {
         val ids = listOf("london", "london", "atlantis", "tokyo")
         assertEquals(listOf("london", "tokyo"), WorldClockSelectionLogic.sanitize(ids))
         assertEquals(listOf("london", "tokyo"), WorldClockSelectionLogic.toggle(ids, "atlantis"))
+    }
+
+    @Test
+    fun cannotRemoveLastCity() {
+        assertEquals(listOf("london"), WorldClockSelectionLogic.toggle(listOf("london"), "london"))
+        assertTrue(WorldClockSelectionLogic.isLastRemaining(listOf("london"), "london"))
+        assertEquals(false, WorldClockSelectionLogic.isLastRemaining(listOf("london", "tokyo"), "london"))
     }
 
     @Test
