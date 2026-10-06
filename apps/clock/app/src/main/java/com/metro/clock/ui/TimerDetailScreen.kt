@@ -1,8 +1,8 @@
 package com.metro.clock.ui
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -11,20 +11,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.metro.clock.R
 import com.metro.clock.timers.TimerLogic
 import com.metro.clock.timers.TimerState
 import com.metro.system.MetroTileTemporalRender
-import com.metro.ui.MetroBorderButton
-import com.metro.ui.MetroCircleIconButton
-import com.metro.ui.MetroPageHeader
+import com.metro.ui.MetroAppBar
+import com.metro.ui.MetroAppBarIcon
+import com.metro.ui.MetroAppBarMenuItem
+import com.metro.ui.MetroDimens
 import com.metro.ui.MetroSystemIconType
 import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 
+/** WP-style timer detail: large countdown, controls in the ApplicationBar. */
 @Composable
 fun TimerDetailScreen(
     state: ClockState,
@@ -34,6 +37,7 @@ fun TimerDetailScreen(
 ) {
     @Suppress("UNUSED_VARIABLE")
     val generation = state.generation
+    val context = LocalContext.current
     val timer = state.timer(timerId)
     if (timer == null) {
         LaunchedEffect(timerId) { onBack() }
@@ -44,56 +48,75 @@ fun TimerDetailScreen(
     val display = MetroTileTemporalRender.formatDuration(remaining, roundUp = true)
     val timerState = TimerState.fromName(timer.state)
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp),
+            .background(MetroTheme.colors.background),
     ) {
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
         ) {
-            MetroCircleIconButton(
-                type = MetroSystemIconType.Back,
-                onClick = onBack,
-                contentDescription = stringResource(R.string.back),
+            MetroText(
+                text = timer.label,
+                style = MetroTextStyle.SectionHeader,
+                color = MetroTheme.colors.secondaryText,
+                modifier = Modifier.padding(top = 8.dp),
             )
-        }
-        MetroPageHeader(title = timer.label)
-        Spacer(modifier = Modifier.height(24.dp))
-        MetroText(text = display, style = MetroTextStyle.PageTitle)
-        MetroText(
-            text = timerState.name.lowercase(),
-            style = MetroTextStyle.ListItemSubtitle,
-            color = MetroTheme.colors.secondaryText,
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            when (timerState) {
-                TimerState.RUNNING -> MetroBorderButton(
-                    text = stringResource(R.string.timer_pause),
-                    onClick = { state.pauseTimer(timer.id) },
-                )
-                TimerState.PAUSED -> MetroBorderButton(
-                    text = stringResource(R.string.timer_resume),
-                    onClick = { state.resumeTimer(timer.id) },
-                )
-                else -> MetroBorderButton(
-                    text = stringResource(R.string.timer_start),
-                    onClick = { state.startTimer(timer.id) },
+            Spacer(modifier = Modifier.height(24.dp))
+            MetroText(text = display, style = MetroTextStyle.PageTitle)
+            if (timerState == TimerState.PAUSED || timerState == TimerState.FINISHED) {
+                MetroText(
+                    text = stringResource(
+                        if (timerState == TimerState.FINISHED) R.string.timer_finished else R.string.timer_paused,
+                    ),
+                    style = MetroTextStyle.ListItemSubtitle,
+                    color = if (timerState == TimerState.FINISHED) {
+                        MetroTheme.colors.accent
+                    } else {
+                        MetroTheme.colors.secondaryText
+                    },
                 )
             }
-            MetroBorderButton(
-                text = stringResource(R.string.timer_reset),
-                onClick = { state.resetTimer(timer.id) },
-            )
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetroBorderButton(
-                text = stringResource(R.string.timer_delete),
-                onClick = { state.deleteTimer(timer.id) },
-            )
-        }
+
+        MetroAppBar(
+            icons = listOf(
+                MetroAppBarIcon(
+                    type = if (timerState == TimerState.RUNNING) {
+                        MetroSystemIconType.Pause
+                    } else {
+                        MetroSystemIconType.Play
+                    },
+                    label = when (timerState) {
+                        TimerState.RUNNING -> stringResource(R.string.timer_pause)
+                        TimerState.PAUSED -> stringResource(R.string.timer_resume)
+                        else -> stringResource(R.string.timer_start)
+                    },
+                    onClick = {
+                        when (timerState) {
+                            TimerState.RUNNING -> state.pauseTimer(timer.id)
+                            TimerState.PAUSED -> state.resumeTimer(timer.id)
+                            else -> state.restartTimer(timer.id)
+                        }
+                    },
+                ),
+                MetroAppBarIcon(
+                    type = MetroSystemIconType.Refresh,
+                    label = stringResource(R.string.timer_reset),
+                    onClick = { state.resetTimer(timer.id) },
+                ),
+            ),
+            menuItems = listOf(
+                MetroAppBarMenuItem(stringResource(R.string.pin_to_start)) {
+                    ClockPin.pin(context, "timer:${timer.id}")
+                },
+                MetroAppBarMenuItem(stringResource(R.string.timer_delete)) {
+                    state.deleteTimer(timer.id)
+                },
+            ),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }

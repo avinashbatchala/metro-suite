@@ -80,7 +80,6 @@ class ClockState(context: Context) {
 
     fun initialize() {
         scope.launch {
-            worldRepo.seedDefaultsIfEmpty()
             refresh()
         }
     }
@@ -223,6 +222,13 @@ class ClockState(context: Context) {
 
     fun isCitySelected(cityId: String): Boolean = worldCities.any { it.id == cityId }
 
+    fun moveCity(cityId: String, delta: Int) {
+        scope.launch {
+            worldRepo.move(cityId, delta)
+            refresh()
+        }
+    }
+
     // ---- Timers ------------------------------------------------------------
 
     fun timer(id: Long): TimerEntity? = timers.firstOrNull { it.id == id }
@@ -230,7 +236,8 @@ class ClockState(context: Context) {
     fun createTimer(label: String, durationMillis: Long) {
         ensureNotifications()
         scope.launch {
-            val id = timerRepo.create(label, durationMillis)
+            val name = label.trim().ifBlank { appContext.getString(R.string.timer_default_label) }
+            val id = timerRepo.create(name, durationMillis)
             timerRepo.start(id)
             route = ClockRoute.TimerDetail(id)
             refresh()
@@ -245,6 +252,8 @@ class ClockState(context: Context) {
 
     fun resetTimer(id: Long) = scope.launch { timerRepo.reset(id); refresh() }
 
+    fun restartTimer(id: Long) = scope.launch { timerRepo.reset(id); timerRepo.start(id); refresh() }
+
     fun deleteTimer(id: Long) {
         scope.launch {
             timerRepo.delete(id)
@@ -257,11 +266,22 @@ class ClockState(context: Context) {
 
     fun stopwatch(id: Long): StopwatchEntity? = stopwatches.firstOrNull { it.id == id }
 
-    fun createStopwatch(name: String) {
-        ensureNotifications()
+    /**
+     * Create a new stopwatch at 00:00, **paused** (the user explicitly presses Start), with a
+     * human-readable name, then open it. No notification permission is required for stopwatches.
+     */
+    fun newStopwatch() {
         scope.launch {
+            val base = appContext.getString(R.string.stopwatch_default_name)
+            val names = stopwatches.map { it.name }
+            val name = if (base !in names) {
+                base
+            } else {
+                var n = 2
+                while ("$base $n" in names) n++
+                "$base $n"
+            }
             val id = stopwatchRepo.create(name)
-            stopwatchRepo.start(id)
             route = ClockRoute.StopwatchDetail(id)
             refresh()
         }

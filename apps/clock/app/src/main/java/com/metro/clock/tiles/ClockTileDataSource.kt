@@ -54,9 +54,12 @@ class ClockTileDataSource(context: Context) {
 
         val ordered = ClockPeekLogic.order(timers, stopwatches, nextAlarm, nowElapsed)
         val peeks = ArrayList<MetroTilePeek>()
-        ordered.take(ClockPeekLogic.MAX_PEEKS).forEach { peeks.add(it.toPeek(use24)) }
-        val overflow = ClockPeekLogic.overflowCount(ordered.size)
-        if (overflow > 0) {
+        // Deterministic cap: 6 visible faces TOTAL. On overflow, show 5 real faces + "+N more".
+        val hasOverflow = ordered.size > ClockPeekLogic.MAX_PEEKS
+        val realFaces = if (hasOverflow) ClockPeekLogic.MAX_PEEKS - 1 else ordered.size
+        ordered.take(realFaces).forEach { peeks.add(it.toPeek(use24)) }
+        if (hasOverflow) {
+            val overflow = ordered.size - realFaces
             peeks.add(
                 MetroTilePeek(
                     title = appContext.getString(R.string.tile_more, overflow),
@@ -140,9 +143,7 @@ class ClockTileDataSource(context: Context) {
     private fun ClockPeekLogic.Source.toPeek(use24: Boolean): MetroTilePeek = when (this) {
         is ClockPeekLogic.FinishedTimer -> timer.toPeek(forcedFinished = true)
         is ClockPeekLogic.RunningTimer -> timer.toPeek()
-        is ClockPeekLogic.PausedTimer -> timer.toPeek()
         is ClockPeekLogic.RunningStopwatch -> stopwatch.toPeek()
-        is ClockPeekLogic.PausedStopwatch -> stopwatch.toPeek()
         is ClockPeekLogic.NextAlarm -> alarm.toPeek(triggerMillis, use24)
     }
 

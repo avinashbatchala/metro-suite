@@ -72,6 +72,9 @@ interface ClockDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertWorldCity(city: WorldClockCityEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertWorldCities(cities: List<WorldClockCityEntity>)
+
     @Query("DELETE FROM world_clock_cities WHERE cityId = :cityId")
     suspend fun deleteWorldCity(cityId: String)
 

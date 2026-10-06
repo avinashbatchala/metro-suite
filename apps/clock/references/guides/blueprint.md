@@ -2,128 +2,126 @@
 
 **Authoritative spec for this app.** Read this before `images/` or `web-resources.md`.
 
-Agents implement pages, layout, and interactions exactly as described here. Screenshots in `images/` are visual aids only — they do not override this file.
+Target: **Windows Phone 8.1 presentation, Android/GrapheneOS engine.** Flat Metro — no cards, chips,
+FAB, bottom sheets, or Material pickers. Not Windows 10 Mobile *Alarms & Clock*.
 
-Target: **Windows Phone 8.1** Clock. Four pivots. Black background, Noto Sans stand-in for Segoe WP,
-flat Metro — no cards, chips, FAB, bottom sheets, or Material pickers.
+## Fidelity boundary
 
-> Historical note: the stock WP8.1 **Alarms** app was much simpler than the later Windows 10 Mobile
-> *Alarms & Clock*. Do not copy the Windows 10 Mobile design. Where WP8.1 has no first-party screen
-> (world clock, timer, stopwatch, pinning), follow the suite Metro conventions.
+```
+A — AUTHENTIC WP8.1 (first-party "Alarms")
+    alarm list, alarm create/edit, alarm ringing, next-alarm Live Tile
+B — PERIOD-CORRECT EXTENSIONS (later/other WP8.x Metro apps)
+    world clock, timer, stopwatch, their secondary Live Tiles
+C — METROSUITE EXTENSIONS
+    multiple concurrent timers, multiple stopwatches, timer/stopwatch peek cycling,
+    3-city Widgets World Clock
+```
+
+Category A matches WP8.1 as closely as Android permits. B/C use WP8.x Metro grammar, **not** Windows
+10 Mobile. World clock / timer / stopwatch were **not** stock WP8.1 and are never described as such.
 
 ## App shell
 
 - `MetroPivot` with four titles: `alarms` · `world clock` · `timer` · `stopwatch` (lowercase, large
-  Light). Horizontal swipe moves pivots; tapping a title selects it.
-- `MetroAppTitle("clock")` at the top; bottom `MetroAppBar` with a context action per pivot
-  (`new` for alarms/timer/stopwatch, `add` for world clock).
-- Subpages use `MetroSubpageHost` (page-pivot load/exit). Back returns to the pivot root.
-- Deep links: `metro://clock/alarms|world|timer|stopwatch`, plus `/alarm/<id>`, `/timer/<id>`,
+  Light). One application identity: the large `clock` title (`MetroAppTitle`); no second "metro clock".
+- Bottom `MetroAppBar` with a single circular **icon** command per pivot: `+` (`new` for
+  alarms/timer/stopwatch, `add` for world clock). Labels appear on bar expansion.
+- Subpages use `MetroSubpageHost` (page-pivot enter/exit). **No redundant top Back circles** — the
+  system Back / navbar returns.
+- `rememberSystem24Hour()` reacts to configuration (12/24h) changes; `rememberMinuteTick()` ticks the
+  world clock on minute boundaries.
+- Deep links: `metro://clock/{alarms|world|timer|stopwatch}` and `/alarm/<id>`, `/timer/<id>`,
   `/stopwatch/<id>`, `/world/<cityId>`.
 
-## Pages
+## Category A — Alarms
 
-### Page 1 — Alarms pivot
+### Alarms list
 
-- **Layout:** list of alarms sorted by time. Row: time in large type (e.g. `7:00 AM`) with
-  `label · repeat` in grey beneath, and a `MetroToggleSwitch` on the right (no On/Off text). Empty
-  state `no alarms` centered.
-- **Navigation:** tap row → Alarm edit. App bar `new` → Alarm edit (new).
-- **Interactions:** toggle enable/disable schedules/cancels immediately.
-- **Background:** Black.
+- Chronological by time of day (repeating and one-time together). Row: large time (`7:00 AM`),
+  optional name, localized repeat summary; `MetroToggleSwitch` on the right (no On/Off text).
+- Toggle enables/disables and reschedules immediately. Tap row → editor. App-bar `+` → new alarm.
+- Empty state `no alarms`. Flat black.
 
-### Page 2 — Alarm edit
+### Alarm editor (authentic field form)
 
-- **Layout:** back circle + `alarm` page header; a WP8.1 **wheel time picker** (hour and minute
-  columns, three rows visible, centre row is the selection, `AM`/`PM` to the right in 12-hour mode; a
-  single 00–23 column in 24-hour mode); `label` text box; **repeat** = seven day checkboxes
-  (M T W T F S S) plus `every day` / `weekdays` / `weekends` presets; `vibrate` toggle; `snooze`
-  picker; `save` and (when editing) `delete`.
-- **Interactions:** save persists to Room and reschedules the next concrete occurrence. Repeat
-  weekdays store a bitmask (Mon = bit0).
-- **Background:** Black.
+```
+ALARMS
+new | edit
 
-### Page 3 — Alarm ringing
+Time        7:00 AM        → time picker
+Repeats     only once      → repeat picker
+Sound       Metro Dawn     → sound picker
+Name        [ Morning    ]
+Snooze time 10 minutes     → snooze picker
+```
 
-- **Layout:** full-screen; `alarm` overline, time in PageTitle, label, and `snooze` / `dismiss`
-  buttons. Shown with `setShowWhenLocked` + `setTurnScreenOn`.
-- **Interactions:** loops the alarm ringtone and vibrates; snooze re-arms after the alarm's snooze
-  interval; dismiss stops and (one-time alarms) disables.
-- **Degradation:** if full-screen intent is blocked, the high-priority notification remains actionable.
+- **No permanently-visible time wheel** and **no large body Save/Delete buttons**; the
+  ApplicationBar owns them: `✓ save`, plus `trash delete` when editing an existing alarm.
+- **Time** opens a WP8.1 scrolling time selector (12/24h per system). **Repeats** opens a picker:
+  `only once`, `every day`, `weekdays`, `weekends`, and **custom days** (locale-aware full day names;
+  bits remain Mon=bit0…Sun=bit6). **Sound** opens a Metro picker (default + system alarm tones) with
+  preview; the selection is stored in `AlarmEntity.soundUri`. **Snooze time** offers the WP8.1 Update
+  values. **Vibrate** is not a primary field (kept in the DB for compatibility; default/system behavior).
+- Save persists to Room, reschedules the next concrete occurrence, and returns to the list without a
+  redundant toast. Blank name falls back to `Alarm`.
 
-### Page 4 — World clock pivot
+### Alarm ringing
 
-- **Layout:** list of selected cities. Row: city name + region (left), current local time (large,
-  right) with a subtle `tomorrow` / `yesterday` when on a different calendar day. Rows tick locally.
-- **Navigation:** app bar `add` → City picker. Tap a row → pin that city to Start. `remove` removes it.
-- **Background:** Black.
+Full-screen (`setShowWhenLocked` + `setTurnScreenOn`): `ALARM` overline, time (`PageTitle`), name,
+the current **snooze interval**, then `snooze` / `dismiss`. Loops the per-alarm sound, else the suite
+`MetroSoundRole.ALARM`, else the system alarm default. If full-screen intent is blocked, the
+high-priority notification remains actionable. Back never dismisses.
 
-### Page 5 — City picker
+## Category B/C — World clock, Timer, Stopwatch
 
-- **Layout:** back circle + `choose a city` header, `search cities` box (matches city, country, zone,
-  alias), alphabetical list; each row shows name + country/region with a `MetroCheckBox`.
-- **Interactions:** tap/checkbox adds or removes; duplicates prevented. No upper limit in Clock
-  (the Widgets widget limits to 3).
-- **Background:** Black.
+### World clock
 
-### Page 6 — Timer pivot
+- List of user-chosen cities. Row: name + region (left), local time (large, right) with subtle
+  `tomorrow`/`yesterday`. Locale-aware and 12/24h-aware; ticks on minute boundaries.
+- **No auto-seeding** of London/New York/Tokyo. Empty state `add a city`.
+- **Tap does nothing destructive** (no pin-on-tap). **Long-press** opens a Metro menu:
+  `pin to start`, `move up`, `move down`, `remove`.
+- Clock add-city flow: `+` → picker → **tap one city adds it and returns**.
 
-- **Layout:** list of timers (multiple concurrent). Row: label; `remaining · state` beneath; a
-  trailing `start`/`pause`/`resume` action. Remaining counts down locally.
-- **Navigation:** app bar `new` → Timer create. Tap row → Timer detail.
-- **Background:** Black.
+### Timer
 
-### Page 7 — Timer create
+- List: name + countdown; visual state only (`paused` / `finished`) — no state-machine strings.
+- `+` → new-timer page (duration wheels + name); **Start is an ApplicationBar command**; navigation
+  is owned by the create action (no Back race). Blank names fall back to `timer`/`timer N`.
+- Detail: large countdown; ApplicationBar `play/pause`, `reset`; `…` → `pin to start`, `delete`.
+- Finished timers are `FINISHED` and count toward tile attention until opened/acknowledged.
 
-- **Layout:** back circle + `timer` header; hours/minutes/seconds wheel picker; `label` box; `start`
-  button (disabled at zero). Uses `MetroDurationPicker`.
-- **Background:** Black.
+### Stopwatch
 
-### Page 8 — Timer detail
+- List: name + `H:MM:SS.hh`; `paused` suffix when not running.
+- `+` creates a stopwatch at `00:00` **paused** (the user presses Start) with a readable name
+  (`stopwatch`, `stopwatch 2`, …). No notification permission is requested for stopwatches.
+- Detail: large elapsed time; ApplicationBar `start/pause`, `lap` (disabled when not running),
+  `reset`; `…` → `pin to start`, `rename`, `delete`. Flat lap list.
 
-- **Layout:** label header; remaining time in PageTitle; state beneath; actions `pause`/`resume`/
-  `start`, `reset`, `delete`.
-- **Background:** Black.
+## Live Tiles
 
-### Page 9 — Stopwatch pivot
+- **Primary (`primary`)** peek-cycle priority: finished timers → running timers (soonest completion)
+  → running stopwatches → next enabled alarm. **Paused/ready items do not cycle.** Cap: **6 visible
+  faces total**; on overflow, **5 real faces + `+N more`**. Counter = finished timers.
+- **Secondary:** `timer:<id>`, `stopwatch:<id>`, `world:<cityId>`, `alarm:<id>` carry structured
+  `MetroTilePeek.temporal`; the launcher ticks locally (no per-second app broadcasts).
+- Authentic (A): next active alarm. Extension (B/C): running timers/stopwatches, finished attention,
+  world clock.
 
-- **Layout:** list of stopwatches (multiple concurrent). Row: name; `elapsed · running|paused`
-  beneath; trailing `start`/`pause`. Elapsed ticks locally.
-- **Navigation:** app bar `new` creates + starts a stopwatch and opens its detail.
-- **Background:** Black.
+## Widgets World Clock (extension)
 
-### Page 10 — Stopwatch detail
-
-- **Layout:** name header; `H:MM:SS.hh` elapsed in PageTitle; state; actions `pause`/`start`, `lap`,
-  `reset`, `rename`, `delete`; a flat `LAPS` list (lap number, lap split, total).
-- **Interactions:** lap records `lapNumber`, `lapDurationMillis`, `totalDurationMillis`.
-- **Background:** Black.
-
-### Page 11 — Live Tiles
-
-- **Primary (`primary`):** peek-cycle. Deterministic order — finished timers → running timers
-  (soonest completion first) → paused timers → running stopwatches → paused stopwatches → next enabled
-  alarm; cap six faces then a `+N more` face. Idle → a single next-alarm face (`next alarm` /
-  `7:00 AM` / `weekdays`). Counter badge = finished timers awaiting attention.
-- **Secondary:** `timer:<id>`, `stopwatch:<id>`, `world:<cityId>` render a locally-ticking temporal
-  peek; `alarm:<id>` shows the time + `label · repeat` and deep-links to the alarm.
-- **Taps:** tapping any Clock tile opens the Clock app (the launcher launches it from the foreground);
-  `alarm:<id>` opens that alarm's edit page.
-- **Contract:** timer/stopwatch/world peeks carry structured `MetroTilePeek.temporal`; the launcher
-  ticks locally. Do not broadcast a tile update every second.
+- 1–3 user-chosen cities; wide tile; shared `MetroWorldClockCatalog`; launcher-local ticking.
+- **Selection enforces minimum 1 / maximum 3** — the last city cannot be removed; the Widgets
+  config screen uses multi-select checkboxes (distinct from Clock's single-add flow).
 
 ## Images
 
-| Image | Page | Notes |
-|-------|------|-------|
-| _(not yet sourced)_ | all | See `known-gaps.md`; WP8.1 Alarms screenshots pending |
-| `alarms_dark_blue.png` | Alarms pivot | expected |
-| `alarm_edit_dark_blue.png` | Alarm edit | expected (wheel picker) |
-| `worldclock_dark_blue.png` | World clock | expected |
-| `timer_dark_blue.png` | Timer | expected |
-| `stopwatch_dark_blue.png` | Stopwatch | expected |
+| Image | Page |
+|-------|------|
+| _(not yet sourced — see known-gaps.md)_ | Alarms list, alarm editor, time picker, repeat picker, sound picker, alarm ringing, world clock, timer, stopwatch, tiles |
 
-## Out of scope (v1)
+## Out of scope
 
-- Sleep tracking / focus sessions, Cortana, cloud clock sync, online city lookup, weather in World
-  Clock, Windows 10 Mobile styling.
+Sleep/focus sessions, Cortana, cloud sync, online city lookup, weather in world clock, Windows 10
+Mobile styling.

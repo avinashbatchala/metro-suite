@@ -8,14 +8,13 @@ import com.metro.clock.timers.TimerLogic
 import com.metro.clock.timers.TimerState
 
 /**
- * Deterministic peek ordering for the primary Clock tile. Stable across recompositions:
+ * Deterministic peek ordering for the primary Clock tile. Only items genuinely awaiting attention
+ * cycle on the primary tile (paused/ready items stay on individually pinned tiles):
  *
- * 1. finished timers awaiting attention
+ * 1. finished timers awaiting acknowledgement
  * 2. running timers, soonest completion first
- * 3. paused timers, soonest remaining first
- * 4. running stopwatches
- * 5. paused stopwatches
- * 6. next enabled alarm (final informational peek)
+ * 3. running stopwatches
+ * 4. next enabled alarm
  */
 object ClockPeekLogic {
 
@@ -33,15 +32,7 @@ object ClockPeekLogic {
         override val stableOrder: Long get() = timer.id
     }
 
-    data class PausedTimer(val timer: TimerEntity, val remaining: Long) : Source {
-        override val stableOrder: Long get() = timer.id
-    }
-
     data class RunningStopwatch(val stopwatch: StopwatchEntity) : Source {
-        override val stableOrder: Long get() = stopwatch.id
-    }
-
-    data class PausedStopwatch(val stopwatch: StopwatchEntity) : Source {
         override val stableOrder: Long get() = stopwatch.id
     }
 
@@ -66,18 +57,9 @@ object ClockPeekLogic {
             .sortedWith(compareBy({ it.remaining }, { it.timer.id }))
             .forEach { result.add(it) }
 
-        timers.filter { TimerState.fromName(it.state) == TimerState.PAUSED }
-            .map { PausedTimer(it, TimerLogic.remainingMillis(it, nowElapsedRealtime)) }
-            .sortedWith(compareBy({ it.remaining }, { it.timer.id }))
-            .forEach { result.add(it) }
-
         stopwatches.filter { it.running }
             .sortedBy { it.createdOrder }
             .forEach { result.add(RunningStopwatch(it)) }
-
-        stopwatches.filter { !it.running && it.accumulatedElapsedMillis > 0L }
-            .sortedBy { it.createdOrder }
-            .forEach { result.add(PausedStopwatch(it)) }
 
         nextAlarm?.let { result.add(NextAlarm(it.first, it.second)) }
         return result

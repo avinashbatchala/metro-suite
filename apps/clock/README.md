@@ -6,9 +6,11 @@
 ## Status
 
 Implemented — buildable Android app with four WP8.1 pivots: **alarms**, **world clock**, **timer**,
-**stopwatch**. Alarms use exact `AlarmManager.setAlarmClock` scheduling; timers/stopwatches are
-multi-instance and derive their time from monotonic timestamps. Live Tiles export structured temporal
-state so the launcher ticks locally (no per-second broadcasts).
+**stopwatch**. **Alarms** targets >95% fidelity to the mature WP8.1 *Alarms* app (field-based editor,
+picker surfaces, ApplicationBar save/delete, next-alarm Live Tile). World clock / timer / stopwatch are
+period-correct extensions. Alarms use exact `AlarmManager.setAlarmClock` scheduling; timers/stopwatches
+are multi-instance and derive their time from monotonic timestamps. Live Tiles export structured
+temporal state so the launcher ticks locally (no per-second broadcasts).
 
 ## App role
 
@@ -56,7 +58,8 @@ apps/clock/app/src/main/java/com/metro/clock/
 - Ringing: high-priority alarm channel (no channel sound — the ringing activity loops the alarm tone via
   `Ringtone` + vibration) with a full-screen intent; dismiss + snooze. `WRITE`-nothing; no permanent
   foreground service.
-- `POST_NOTIFICATIONS` is requested when the user first creates an alarm/timer/stopwatch.
+- `POST_NOTIFICATIONS` is requested only when the user first creates an **alarm** or **timer**
+  (stopwatches need none), never on launch.
 
 ## Reboot semantics
 

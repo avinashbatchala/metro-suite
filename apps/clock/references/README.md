@@ -4,31 +4,38 @@ Visual and behavioral source material for implementing this app to WP8.1 fidelit
 
 Agents must read this folder **before** changing UI in `apps/clock/`.
 
+**Fidelity boundary** (see `guides/blueprint.md`): **A** = authentic WP8.1 *Alarms* (alarm list,
+editor, ringing, next-alarm tile); **B** = period-correct WP8.x extensions (world clock, timer,
+stopwatch); **C** = MetroSuite extensions (multiple timers/stopwatches, peek cycling, 3-city widget).
+Do not copy Windows 10 Mobile *Alarms & Clock*.
+
 ## Folder layout
 
 ```
 references/
 ├── README.md           # This file — screen index and usage rules
 ├── web-resources.md    # Curated web guides, docs, and video links
-├── images/             # WP8.1 screenshots for this app
-│   └── <screen>_<theme>_<accent>.png
+├── images/             # WP8.1 screenshots for this app (currently empty — see known-gaps.md)
 └── guides/             # Offline PDFs, saved articles, measurement notes
 ```
 
 ## Screens
 
-| Screen | Image | Notes |
-|--------|-------|-------|
-| Alarms pivot | `images/alarms_dark_blue.png` _(pending)_ | list of alarms + toggle |
-| Alarm edit | `images/alarm_edit_dark_blue.png` _(pending)_ | wheel time picker + repeat |
-| Alarm ringing | `images/alarm_ringing_dark_blue.png` _(pending)_ | dismiss / snooze |
-| World clock | `images/worldclock_dark_blue.png` _(pending)_ | city list with local times |
-| Timer | `images/timer_dark_blue.png` _(pending)_ | multiple timers |
-| Stopwatch | `images/stopwatch_dark_blue.png` _(pending)_ | elapsed + laps |
-| Start tiles | `images/tiles_dark_blue.png` _(pending)_ | primary peek cycle + secondary |
+| Screen | Category | Notes |
+|--------|----------|-------|
+| Alarms list | A | large time + name + repeat + toggle; chronological |
+| Alarm editor | A | field form: time / repeats / sound / name / snooze time |
+| Time picker | A | WP8.1 scrolling hour/minute selector |
+| Repeat picker | A | only once / every day / weekdays / weekends / custom days |
+| Sound picker | A | default + system alarm tones, with preview |
+| Alarm ringing | A | ALARM / time / name / snooze interval / snooze / dismiss |
+| World clock | B | city list with local times; long-press actions |
+| Timer | B | multiple timers; large countdown |
+| Stopwatch | B | elapsed + laps |
+| Start tiles | A/C | next-alarm primary peek + secondary temporal tiles |
 
 See [`known-gaps.md`](known-gaps.md) — WP8.1 first-party captures for world clock / timer /
-stopwatch do not exist; those pivots follow the repo Metro conventions.
+stopwatch do not exist; those pivots follow period WP8.x Metro conventions.
 
 ## Image naming
 

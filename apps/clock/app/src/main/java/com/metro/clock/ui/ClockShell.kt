@@ -12,16 +12,16 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.metro.clock.R
 import com.metro.ui.LocalMetroSubpageExit
 import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarDefaults
-import com.metro.ui.MetroAppBarTextButton
+import com.metro.ui.MetroAppBarIcon
 import com.metro.ui.MetroAppTitle
 import com.metro.ui.MetroPivot
 import com.metro.ui.MetroSubpageHost
+import com.metro.ui.MetroSystemIconType
 import com.metro.ui.metroNavBarPadding
 
 @Composable
@@ -31,7 +31,6 @@ fun ClockShell(
 ) {
     @Suppress("UNUSED_VARIABLE")
     val generation = state.generation
-    val context = LocalContext.current
     val pivotTitles = ClockPivot.entries.map { stringResource(it.titleRes) }
     val pagerState = rememberPagerState(
         initialPage = state.pivot.ordinal,
@@ -131,20 +130,34 @@ fun ClockShell(
         val showAppBar = state.route == ClockRoute.Root
         MetroAppBar(
             visible = showAppBar,
-            textButtons = when (state.pivot) {
+            icons = when (state.pivot) {
                 ClockPivot.Alarms -> listOf(
-                    MetroAppBarTextButton(stringResource(R.string.new_alarm)) { state.openAlarmEdit(null) },
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = stringResource(R.string.new_alarm),
+                        onClick = { state.openAlarmEdit(null) },
+                    ),
                 )
                 ClockPivot.World -> listOf(
-                    MetroAppBarTextButton(stringResource(R.string.add_city)) { state.openCityPicker() },
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = stringResource(R.string.add_city),
+                        onClick = { state.openCityPicker() },
+                    ),
                 )
                 ClockPivot.Timer -> listOf(
-                    MetroAppBarTextButton(stringResource(R.string.new_timer)) { state.openTimerEdit() },
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = stringResource(R.string.new_timer),
+                        onClick = { state.openTimerEdit() },
+                    ),
                 )
                 ClockPivot.Stopwatch -> listOf(
-                    MetroAppBarTextButton(stringResource(R.string.new_stopwatch)) {
-                        state.createStopwatch(context.getString(R.string.stopwatch_default_name))
-                    },
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = stringResource(R.string.new_stopwatch),
+                        onClick = { state.newStopwatch() },
+                    ),
                 )
             },
             modifier = Modifier.align(Alignment.BottomCenter),

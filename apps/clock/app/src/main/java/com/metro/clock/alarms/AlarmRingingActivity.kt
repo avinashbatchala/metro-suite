@@ -97,6 +97,15 @@ class AlarmRingingActivity : ComponentActivity() {
                         Spacer(modifier = Modifier.height(8.dp))
                         MetroText(text = current!!.label, style = MetroTextStyle.HubTitle)
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MetroText(
+                        text = stringResource(
+                            R.string.alarm_snooze_minutes,
+                            current?.snoozeMinutes ?: 10,
+                        ),
+                        style = MetroTextStyle.ListItemSubtitle,
+                        color = MetroTheme.colors.secondaryText,
+                    )
                     Spacer(modifier = Modifier.height(40.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -147,9 +156,13 @@ class AlarmRingingActivity : ComponentActivity() {
     }
 
     private fun startRinging(alarm: AlarmEntity) {
-        // Per-alarm override, else the user's actual system alarm default (set in Metro Settings
-        // or Android), else the platform default alarm/ringtone.
+        // Per-alarm override, else the suite's Metro ALARM sound, else the user's system alarm
+        // default, else the platform default.
         val uri: Uri = alarm.soundUri?.let { Uri.parse(it) }
+            ?: com.metro.system.MetroSoundContract.resolveUri(
+                contentResolver,
+                com.metro.system.MetroSoundRole.ALARM,
+            )
             ?: RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)

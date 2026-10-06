@@ -11,14 +11,21 @@
     <!-- Alarms -->
     <string name="new_alarm">new</string>
     <string name="alarm">alarm</string>
-    <string name="alarm_label_placeholder">label</string>
+    <string name="alarm_title_new">new</string>
+    <string name="alarm_title_edit">edit</string>
+    <string name="alarm_label_placeholder">alarm</string>
     <string name="alarm_repeat">repeat</string>
+    <string name="alarm_repeats">repeats</string>
+    <string name="alarm_name">name</string>
     <string name="alarm_repeat_once">once</string>
+    <string name="alarm_repeat_only_once">only once</string>
     <string name="alarm_repeat_daily">every day</string>
     <string name="alarm_repeat_weekdays">weekdays</string>
     <string name="alarm_repeat_weekends">weekends</string>
+    <string name="alarm_repeat_custom">custom days</string>
     <string name="alarm_vibrate">vibrate</string>
     <string name="alarm_snooze">snooze</string>
+    <string name="alarm_snooze_time">snooze time</string>
     <string name="alarm_snooze_minutes">%1$d minutes</string>
     <string name="alarm_delete">delete</string>
     <string name="alarm_save">save</string>
@@ -81,6 +88,8 @@
     <string name="city_search_placeholder">search cities</string>
     <string name="world_clock_empty">add a city</string>
     <string name="world_clock_remove">remove</string>
+    <string name="city_move_up">move up</string>
+    <string name="city_move_down">move down</string>
     <string name="select_cities">choose cities</string>
 
     <!-- Pin -->

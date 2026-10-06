@@ -31,7 +31,6 @@ class ClockRestoreReceiver : BroadcastReceiver() {
                 AlarmRepository(appContext).restoreAll()
                 TimerRepository(appContext).restore()
                 StopwatchRepository(appContext).restore()
-                WorldClockRepository(appContext).seedDefaultsIfEmpty()
                 ClockTileRefresh.request(appContext)
             } finally {
                 pending.finish()

@@ -33,11 +33,15 @@ class WorldClockRepository(context: Context) {
         ClockTileRefresh.request(appContext)
     }
 
-    suspend fun seedDefaultsIfEmpty() {
-        if (dao.worldCityCount() > 0) return
-        MetroWorldClockCatalog.DEFAULT_IDS.forEachIndexed { index, id ->
-            dao.upsertWorldCity(WorldClockCityEntity(id, index))
-        }
+    /** Move a city by [delta] positions (−1 = up, +1 = down), persisting the new `sortOrder`. */
+    suspend fun move(cityId: String, delta: Int) {
+        val list = dao.worldCities().sortedBy { it.sortOrder }
+        val index = list.indexOfFirst { it.cityId == cityId }
+        if (index < 0 || delta == 0) return
+        val target = (index + delta).coerceIn(0, list.size - 1)
+        if (target == index) return
+        val reordered = list.toMutableList().apply { add(target, removeAt(index)) }
+        dao.upsertWorldCities(reordered.mapIndexed { i, entity -> entity.copy(sortOrder = i) })
         ClockTileRefresh.request(appContext)
     }
 

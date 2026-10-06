@@ -59,19 +59,19 @@ class ClockPeekLogicTest {
     private fun alarm(id: Long) = AlarmEntity(id = id, hour = 7, minute = 0)
 
     @Test
-    fun deterministicOrder_matchesPriority() {
+    fun deterministicOrder_matchesPriority_excludesPaused() {
         val ordered = ClockPeekLogic.order(
             timers = listOf(finishedTimer(9), runningTimer(1, 120_000L), runningTimer(2, 900_000L), pausedTimer(3, 300_000L)),
             stopwatches = listOf(stopwatch(4, running = true, accumulated = 0L), stopwatch(5, running = false, accumulated = 5_000L)),
             nextAlarm = alarm(7) to 2_000_000L,
             nowElapsedRealtime = now,
         )
-        assertEquals(listOf(9L, 1L, 2L, 3L, 4L, 5L, 7L), ordered.map { it.stableOrder })
+        // Paused timer (3) and paused stopwatch (5) do not cycle on the primary tile.
+        assertEquals(listOf(9L, 1L, 2L, 4L, 7L), ordered.map { it.stableOrder })
         assertTrue(ordered[0] is ClockPeekLogic.FinishedTimer)
         assertTrue(ordered[1] is ClockPeekLogic.RunningTimer)
-        assertTrue(ordered[4] is ClockPeekLogic.RunningStopwatch)
-        assertTrue(ordered[5] is ClockPeekLogic.PausedStopwatch)
-        assertTrue(ordered[6] is ClockPeekLogic.NextAlarm)
+        assertTrue(ordered[3] is ClockPeekLogic.RunningStopwatch)
+        assertTrue(ordered[4] is ClockPeekLogic.NextAlarm)
     }
 
     @Test
