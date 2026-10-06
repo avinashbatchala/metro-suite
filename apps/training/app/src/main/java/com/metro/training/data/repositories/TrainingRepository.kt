@@ -103,6 +103,19 @@ class TrainingRepository(
         dao.archiveRoutine(id, System.currentTimeMillis())
     }
 
+    /** Duplicate a routine (new ids, same prescriptions/superset tags). Returns the new id. */
+    suspend fun duplicateRoutine(id: String): String? = withContext(io) {
+        val source = routine(id) ?: return@withContext null
+        val copy = source.copy(
+            id = UUID.randomUUID().toString(),
+            name = "${source.name} copy".trim(),
+            createdAt = System.currentTimeMillis(),
+            exercises = source.exercises.map { it.copy(prescription = it.prescription.copy(id = UUID.randomUUID().toString())) },
+        )
+        saveRoutine(copy)
+        copy.id
+    }
+
     // ---- workouts --------------------------------------------------------
 
     /** One-shot recovery load of the in-progress workout. Not observed during editing. */

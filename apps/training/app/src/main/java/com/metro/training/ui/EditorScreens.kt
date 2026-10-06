@@ -141,27 +141,33 @@ fun RoutineDetailScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
                 MetroAppBarIcon(MetroSystemIconType.Add, "add", onClick = { viewModel.openExercisePicker(forWorkout = false) }),
             ),
             menuItems = listOf(
+                MetroAppBarMenuItem("duplicate routine", onClick = { viewModel.duplicateRoutine(routine) }),
                 MetroAppBarMenuItem("delete routine", onClick = { viewModel.deleteRoutine(routine) }),
             ),
             modifier = Modifier.align(Alignment.BottomCenter),
         )
 
         menuRecordId?.let { id ->
+            val inSuperset = routine.exercises.firstOrNull { it.prescription.id == id }?.supersetTag != null
             MetroContextMenuPopup(
                 visibleState = menuVisible,
                 anchorBounds = menuTarget ?: Rect.Zero,
                 rootBounds = rootBounds,
-                items = listOf(
-                    MetroContextMenuItem("move up", onClick = {
+                items = buildList {
+                    add(MetroContextMenuItem("move up", onClick = {
                         viewModel.moveRoutineExercise(id, -1); menuVisible.targetState = false
-                    }),
-                    MetroContextMenuItem("move down", onClick = {
+                    }))
+                    add(MetroContextMenuItem("move down", onClick = {
                         viewModel.moveRoutineExercise(id, 1); menuVisible.targetState = false
-                    }),
-                    MetroContextMenuItem("remove", onClick = {
+                    }))
+                    add(MetroContextMenuItem(if (inSuperset) "remove from superset" else "add to superset", onClick = {
+                        viewModel.setRoutineSupersetTag(id, if (inSuperset) null else "A")
+                        menuVisible.targetState = false
+                    }))
+                    add(MetroContextMenuItem("remove", onClick = {
                         viewModel.removeRoutineExercise(id); menuVisible.targetState = false
-                    }),
-                ),
+                    }))
+                },
                 onDismissRequest = { menuVisible.targetState = false },
             )
         }
@@ -663,6 +669,22 @@ fun SettingsScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             ToggleRow("log RIR", viewModel.rirEnabled) { viewModel.toggleRir(it) }
             SectionLabel("workout")
             ToggleRow("smart progression hints", viewModel.smartHints) { viewModel.toggleSmartHints(it) }
+            SectionLabel("equipment")
+            var barText by remember { mutableStateOf(viewModel.barWeightKg.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }) }
+            MetroTextBox(
+                value = barText,
+                onValueChange = { barText = it; it.toDoubleOrNull()?.let { v -> viewModel.setBarWeight(v) } },
+                placeholder = "bar weight (kg)",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            var platesText by remember { mutableStateOf(viewModel.plateWeights.joinToString(", ")) }
+            MetroTextBox(
+                value = platesText,
+                onValueChange = { platesText = it; viewModel.setPlateWeights(it) },
+                placeholder = "plates per side (kg, comma)",
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
             SectionLabel("data")
             SettingRow("export workouts (json)") { exportJson.launch("metro-training-backup.json") }
             SettingRow("export workouts (csv)") { exportCsv.launch("metro-training-backup.csv") }

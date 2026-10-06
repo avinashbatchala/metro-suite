@@ -485,8 +485,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    fun moveRoutineExercise(recordId: String, delta: Int) {
-        val routine = selectedRoutine ?: return
+    fun moveRoutineExercise(recordId: String, delta: Int) {        val routine = selectedRoutine ?: return
         val list = routine.exercises.toMutableList()
         val index = list.indexOfFirst { it.prescription.id == recordId }
         if (index < 0) return
@@ -495,6 +494,21 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val item = list.removeAt(index)
         list.add(target, item)
         selectedRoutine = routine.copy(exercises = list.mapIndexed { i, e -> e.copy(order = i) })
+    }
+
+    fun setRoutineSupersetTag(recordId: String, tag: String?) {
+        val routine = selectedRoutine ?: return
+        selectedRoutine = routine.copy(
+            exercises = routine.exercises.map {
+                if (it.prescription.id == recordId) it.copy(supersetTag = tag) else it
+            },
+        )
+    }
+
+    fun duplicateRoutine(routine: Routine) {
+        viewModelScope.launch {
+            repo.duplicateRoutine(routine.id)
+        }
     }
 
     fun saveRoutine() {
@@ -983,6 +997,12 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         get() = if (weightUnit == com.metro.training.domain.exercises.LoadUnit.KG) "kg" else "lb"
 
     val barWeightKg: Double get() = prefs.barWeightKg
+    val plateWeights: List<Double> get() = prefs.plateWeightsKg
+    fun setBarWeight(kg: Double) { if (kg > 0) prefs.barWeightKg = kg }
+    fun setPlateWeights(text: String) {
+        val list = text.split(',').mapNotNull { it.trim().toDoubleOrNull() }.filter { it > 0.0 }.sortedDescending()
+        if (list.isNotEmpty()) prefs.plateWeightsKg = list
+    }
 
     companion object {
         const val ONBOARDING_STEPS = 4
