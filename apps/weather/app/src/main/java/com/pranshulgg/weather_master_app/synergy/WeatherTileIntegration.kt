@@ -88,6 +88,7 @@ private fun Weather.toTileData(context: Context, units: WeatherUnits): MetroTile
     fun temp(value: Double?): Int? =
         TemperatureUnit.CELSIUS.convert(value, units.tempUnit)?.roundToInt()
 
+    // Face 1 — current conditions.
     val currentFace = MetroTilePeek(
         title = placeLabel,
         subtitle = temp(current.temperature)?.let { "$it°" } ?: "--",
@@ -96,14 +97,18 @@ private fun Weather.toTileData(context: Context, units: WeatherUnits): MetroTile
         packageName = context.packageName,
     )
 
-    val dayFaces = daily.drop(1).take(3).map { day ->
+    // Face 2 — the next 3 days in one glance, as three text lines (one per day).
+    val dayLines = daily.drop(1).take(3).mapNotNull { day ->
+        val hi = temp(day.temperatureMax)
+        val lo = temp(day.temperatureMin)
+        val range = listOfNotNull(hi?.let { "$it°" }, lo?.let { "$it°" }).joinToString("/")
+        "${toWeekdayString(day.time, timezone)} $range".trim().takeIf { it.isNotBlank() }
+    }
+    val forecastFace = dayLines.takeIf { it.isNotEmpty() }?.let { lines ->
         MetroTilePeek(
-            title = toWeekdayString(day.time, timezone),
-            subtitle = listOfNotNull(
-                temp(day.temperatureMax)?.let { "H $it°" },
-                temp(day.temperatureMin)?.let { "L $it°" },
-            ).joinToString("   ").takeIf { it.isNotBlank() },
-            body = day.weatherCondition.toLabel(context).takeIf { it.isNotBlank() },
+            title = lines.getOrNull(0),
+            subtitle = lines.getOrNull(1),
+            body = lines.getOrNull(2),
             footer = placeLabel,
             packageName = context.packageName,
         )
@@ -113,7 +118,7 @@ private fun Weather.toTileData(context: Context, units: WeatherUnits): MetroTile
         title = placeLabel,
         backgroundColorHex = accentHex,
         widgetFace = MetroTileWidgetFace(kind = MetroTileWidgetFaceKind.PEEK_CYCLE),
-        peeks = (listOf(currentFace) + dayFaces).filter { it.hasContent },
+        peeks = listOfNotNull(currentFace, forecastFace).filter { it.hasContent },
     )
 }
 

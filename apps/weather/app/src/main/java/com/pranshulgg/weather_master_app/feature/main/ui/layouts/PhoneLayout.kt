@@ -254,40 +254,33 @@ private fun HourlyPage(weather: Weather, units: WeatherUnits, context: Context, 
 
     val today = weather.daily.getOrNull(0)
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = MetroDimens.ScreenHorizontalMargin, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = MetroDimens.ScreenHorizontalMargin),
     ) {
+        Spacer(modifier = Modifier.height(4.dp))
         hours.forEachIndexed { index, item ->
             val temp = TemperatureUnit.CELSIUS.convert(item.temperature, units.tempUnit)?.roundToInt()
             val kind = item.weatherCondition.toGlyphKind(daily = today, targetTimeMilli = item.time)
-            Column(
-                modifier = Modifier
-                    .width(64.dp)
-                    .background(MetroTheme.colors.secondarySurface, RectangleShape)
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                MetroText(
-                    text = if (index == 0) "now" else hourLabel(item.time, weather.location.timezone, prefs.is24HrTimeFormat),
-                    style = MetroTextStyle.ListItemSubtitle,
-                    color = MetroTheme.colors.secondaryText,
-                    maxLines = 1
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                WeatherGlyph(kind, size = 28.dp, color = MetroTheme.colors.primaryText)
-                Spacer(modifier = Modifier.height(6.dp))
-                MetroText(
-                    text = "${temp ?: "-"}°",
-                    style = MetroTextStyle.ListItemTitle,
-                    color = MetroTheme.colors.primaryText,
-                    maxLines = 1
-                )
+            val timeLabel = if (index == 0) "now" else hourLabel(item.time, weather.location.timezone, prefs.is24HrTimeFormat)
+            val precip = item.precipitationProbability
+            val subtitle = buildString {
+                append(timeLabel)
+                if (precip != null && precip > 0) append(" · $precip%")
             }
+            MetroListItem(
+                title = "${temp ?: "-"}°",
+                subtitle = subtitle,
+                leading = { WeatherGlyph(kind, size = 32.dp, color = MetroTheme.colors.primaryText) },
+                verticalPadding = 4.dp,
+                oneLineMinHeight = 48.dp,
+                twoLineMinHeight = 56.dp,
+                singleLine = false,
+            )
         }
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
