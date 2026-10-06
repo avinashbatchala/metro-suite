@@ -53,6 +53,7 @@ These apps form the **Metro Shell** (launcher, status bar, notifications, naviga
 | **Messaging** | `com.metro.messaging` | SMS/MMS thread list |
 | **People** | `com.metro.people` | Contact hub, social integration surface |
 | **Phone** | `com.metro.dialer` | Call history, speed dial, dial pad, in-call UI |
+| **Training** | `com.metro.training` | Resistance-training tracker: routines, workout logging, evidence-informed RIR double progression, exercise PRs, weekly muscle-set estimates |
 | **Store** | `com.metro.store` | App discovery shell (stub acceptable in v1) |
 | **Settings** | `com.metro.settings` | System settings mirroring WP8.1 settings hierarchy |
 | **Calculator** | `com.metro.calculator` | Portrait scientific calculator |
