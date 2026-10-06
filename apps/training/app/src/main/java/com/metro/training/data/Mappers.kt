@@ -96,7 +96,7 @@ fun RoutineExerciseEntity.toPrescription() = RoutineExercisePrescription(
     note = note,
 )
 
-fun RoutineExercisePrescription.toEntity(routineId: String, order: Int) = RoutineExerciseEntity(
+fun RoutineExercisePrescription.toEntity(routineId: String, order: Int, supersetTag: String? = null) = RoutineExerciseEntity(
     id = id,
     routineId = routineId,
     exerciseId = exerciseId,
@@ -114,13 +114,14 @@ fun RoutineExercisePrescription.toEntity(routineId: String, order: Int) = Routin
     underperformanceBeforeDecrease = progressionPolicy.underperformanceSessionsBeforeDecrease,
     longGapDays = progressionPolicy.longGapDays,
     note = note,
+    supersetTag = supersetTag,
 )
 
 fun RoutineEntity.toDomain(exercises: List<RoutineExerciseEntity>): Routine = Routine(
     id = id,
     name = name,
     exercises = exercises.sortedBy { it.order }
-        .map { RoutineExercise(prescription = it.toPrescription(), order = it.order) },
+        .map { RoutineExercise(prescription = it.toPrescription(), order = it.order, supersetTag = it.supersetTag) },
     archived = archived,
     createdAt = createdAt,
 )
@@ -136,6 +137,10 @@ fun WorkoutSetEntity.toDomain() = WorkoutSet(
     quality = runCatching { SetQuality.valueOf(quality) }.getOrDefault(SetQuality.NORMAL),
     completed = completed,
     prescribed = prescribed,
+    repsLeft = repsLeft,
+    repsRight = repsRight,
+    partialReps = partialReps,
+    note = note,
     timestamp = timestamp,
 )
 
@@ -151,6 +156,10 @@ fun WorkoutSet.toEntity(workoutExerciseId: String) = WorkoutSetEntity(
     completed = completed,
     prescribed = prescribed,
     timestamp = timestamp,
+    repsLeft = repsLeft,
+    repsRight = repsRight,
+    partialReps = partialReps,
+    note = note,
 )
 
 fun WorkoutExerciseEntity.toDomain(sets: List<WorkoutSetEntity>): WorkoutExercise = WorkoutExercise(
@@ -173,6 +182,7 @@ fun WorkoutExerciseEntity.toDomain(sets: List<WorkoutSetEntity>): WorkoutExercis
     restSeconds = restSeconds,
     autoProgressEnabled = autoProgressEnabled,
     note = note,
+    supersetTag = supersetTag,
     sets = sets.sortedBy { it.setIndex }.map { it.toDomain() },
 )
 
@@ -194,6 +204,7 @@ fun WorkoutExercise.toEntity() = WorkoutExerciseEntity(
     restSeconds = restSeconds,
     autoProgressEnabled = autoProgressEnabled,
     note = note,
+    supersetTag = supersetTag,
 )
 
 fun WorkoutEntity.toDomain(exercises: List<WorkoutExerciseEntity>, setsByExercise: Map<String, List<WorkoutSetEntity>>): Workout =

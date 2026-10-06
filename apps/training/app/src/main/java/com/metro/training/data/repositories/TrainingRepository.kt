@@ -94,7 +94,7 @@ class TrainingRepository(
         dao.deleteRoutineExercises(routine.id)
         dao.upsertRoutineExercises(
             routine.exercises.mapIndexed { index, exercise ->
-                exercise.prescription.toEntity(routine.id, index)
+                exercise.prescription.toEntity(routine.id, index, exercise.supersetTag)
             },
         )
     }
@@ -160,6 +160,7 @@ class TrainingRepository(
                 restSeconds = prescription.restSeconds,
                 autoProgressEnabled = prescription.autoProgressEnabled,
                 note = prescription.note,
+                supersetTag = routineExercise.supersetTag,
             )
             val prefillLoad = lastUsedLoad(definition.id, prescription)
             repeat(prescription.workSetCount) { index2 ->
@@ -211,6 +212,7 @@ class TrainingRepository(
             restSeconds = prescription.restSeconds,
             autoProgressEnabled = prescription.autoProgressEnabled,
             note = prescription.note,
+            supersetTag = null,
         )
         dao.upsertWorkoutExercises(listOf(entity))
         val now = System.currentTimeMillis()
@@ -236,15 +238,17 @@ class TrainingRepository(
     suspend fun addExtraSet(workoutExerciseId: String, setType: SetType) = withContext(io) {
         val existing = dao.sets(workoutExerciseId)
         val now = System.currentTimeMillis()
+        val previous = existing.maxByOrNull { it.setIndex }
         dao.upsertSet(
             WorkoutSetEntity(
                 id = UUID.randomUUID().toString(),
                 workoutExerciseId = workoutExerciseId,
                 setIndex = (existing.maxOfOrNull { it.setIndex } ?: 0) + 1,
                 setType = setType.name,
-                load = existing.lastOrNull()?.load,
-                repsCompleted = 0,
-                rir = null,
+                // Copy the previous set's values (Hevy-style "add set").
+                load = previous?.load,
+                repsCompleted = previous?.repsCompleted ?: 0,
+                rir = previous?.rir,
                 quality = com.metro.training.domain.workout.SetQuality.NORMAL.name,
                 completed = false,
                 prescribed = false,
@@ -258,6 +262,124 @@ class TrainingRepository(
     }
 
     suspend fun deleteSet(id: String) = withContext(io) { dao.deleteSet(id) }
+
+    /** Start a workout with no routine ("start empty workout"). */
+    suspend fun startEmptyWorkout(): String = withContext(io) {
+        val workoutId = UUID.randomUUID().toString()
+        dao.upsertWorkout(
+            WorkoutEntity(
+                id = workoutId,
+                routineId = null,
+                routineName = "Workout",
+                startedAt = System.currentTimeMillis(),
+                finishedAt = null,
+                status = WorkoutStatus.IN_PROGRESS.name,
+                restDeadlineMillis = null,
+                note = "",
+            ),
+        )
+        workoutId
+    }
+
+    suspend fun updateWorkoutNote(workoutId: String, note: String) = withContext(io) {
+        val workout = dao.workout(workoutId) ?: return@withContext
+        dao.upsertWorkout(workout.copy(note = note))
+    }
+
+    suspend fun updateWorkoutExerciseNote(workoutExerciseId: String, note: String) = withContext(io) {
+        val entity = dao.workoutExercise(workoutExerciseId) ?: return@withContext
+        dao.upsertWorkoutExercises(listOf(entity.copy(note = note)))
+    }
+
+    suspend fun setSupersetTag(workoutExerciseId: String, tag: String?) = withContext(io) {
+        val entity = dao.workoutExercise(workoutExerciseId) ?: return@withContext
+        dao.upsertWorkoutExercises(listOf(entity.copy(supersetTag = tag)))
+    }
+
+    suspend fun moveWorkoutExercise(workoutExerciseId: String, delta: Int) = withContext(io) {
+        val workoutId = dao.workoutExercise(workoutExerciseId)?.workoutId ?: return@withContext
+        val ordered = dao.workoutExercises(workoutId).sortedBy { it.order }.toMutableList()
+        val index = ordered.indexOfFirst { it.id == workoutExerciseId }
+        if (index < 0) return@withContext
+        val target = (index + delta).coerceIn(0, ordered.lastIndex)
+        if (target == index) return@withContext
+        val item = ordered.removeAt(index)
+        ordered.add(target, item)
+        dao.upsertWorkoutExercises(ordered.mapIndexed { i, e -> e.copy(order = i) })
+    }
+
+    suspend fun removeWorkoutExercise(workoutExerciseId: String) = withContext(io) {
+        val workoutId = dao.workoutExercise(workoutExerciseId)?.workoutId
+        dao.deleteWorkoutExercise(workoutExerciseId)
+        if (workoutId != null) {
+            val ordered = dao.workoutExercises(workoutId).sortedBy { it.order }
+            dao.upsertWorkoutExercises(ordered.mapIndexed { i, e -> e.copy(order = i) })
+        }
+    }
+
+    /** Replace an exercise in a live workout (smart swap), keeping rep range/work-set count. */
+    suspend fun replaceWorkoutExercise(workoutExerciseId: String, newExerciseId: String) = withContext(io) {
+        val existing = dao.workoutExercise(workoutExerciseId) ?: return@withContext
+        val definition = dao.exercise(newExerciseId)?.toDomain() ?: return@withContext
+        dao.sets(workoutExerciseId).forEach { dao.deleteSet(it.id) }
+        val replacement = existing.copy(
+            exerciseId = definition.id,
+            exerciseName = definition.name,
+            loadSemantics = definition.loadSemantics.name,
+            progressionDirection = definition.progressionDirection.name,
+            incrementKg = definition.defaultIncrement,
+        )
+        dao.upsertWorkoutExercises(listOf(replacement))
+        val prescription = com.metro.training.domain.routines.RoutineExercisePrescription(
+            id = existing.prescriptionId,
+            exerciseId = definition.id,
+            workSetCount = existing.workSetCount,
+            repMin = existing.repMin,
+            repMax = existing.repMax,
+            targetRirMin = existing.targetRirMin,
+            targetRirMax = existing.targetRirMax,
+            restSeconds = existing.restSeconds,
+            autoProgressEnabled = existing.autoProgressEnabled,
+            incrementOverrideKg = definition.defaultIncrement,
+        )
+        val prefill = lastUsedLoad(definition.id, prescription)
+        val now = System.currentTimeMillis()
+        repeat(existing.workSetCount) { index ->
+            dao.upsertSet(
+                WorkoutSetEntity(
+                    id = UUID.randomUUID().toString(),
+                    workoutExerciseId = workoutExerciseId,
+                    setIndex = index + 1,
+                    setType = SetType.WORK.name,
+                    load = prefill,
+                    repsCompleted = 0,
+                    rir = null,
+                    quality = com.metro.training.domain.workout.SetQuality.NORMAL.name,
+                    completed = false,
+                    prescribed = true,
+                    timestamp = now,
+                ),
+            )
+        }
+    }
+
+    /** Previous comparable work-set values for prefill/ghost column: (load, reps, rir). */
+    suspend fun previousWorkSets(
+        exerciseId: String,
+        repMin: Int,
+        repMax: Int,
+        workSetCount: Int,
+    ): List<Triple<Double?, Int, Int?>> = withContext(io) {
+        val exposure = recentExposures(exerciseId, limit = 8).firstOrNull {
+            it.snapshot.repMin == repMin &&
+                it.snapshot.repMax == repMax &&
+                it.snapshot.workSetCount == workSetCount
+        } ?: return@withContext emptyList()
+        exposure.sets
+            .filter { it.setType.feedsProgression && it.prescribed && it.completed }
+            .sortedBy { it.setIndex }
+            .map { Triple(it.load, it.repsCompleted, it.rir) }
+    }
 
     suspend fun discardWorkout(workoutId: String) = withContext(io) {
         dao.deleteWorkout(workoutId)

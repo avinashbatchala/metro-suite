@@ -63,6 +63,7 @@ data class RoutineExerciseEntity(
     val underperformanceBeforeDecrease: Int,
     val longGapDays: Int,
     val note: String,
+    val supersetTag: String? = null,
 )
 
 @Entity(
@@ -111,6 +112,7 @@ data class WorkoutExerciseEntity(
     val restSeconds: Int?,
     val autoProgressEnabled: Boolean,
     val note: String,
+    val supersetTag: String?,
 )
 
 @Entity(
@@ -137,6 +139,10 @@ data class WorkoutSetEntity(
     val completed: Boolean,
     val prescribed: Boolean,
     val timestamp: Long,
+    val repsLeft: Int? = null,
+    val repsRight: Int? = null,
+    val partialReps: Int? = null,
+    val note: String = "",
 )
 
 @Entity(

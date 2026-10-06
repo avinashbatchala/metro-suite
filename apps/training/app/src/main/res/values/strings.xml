@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Training</string>
+    <string name="workout_channel_name">Workout</string>
+    <string name="workout_channel_description">Shows the active workout and rest timer</string>
 </resources>

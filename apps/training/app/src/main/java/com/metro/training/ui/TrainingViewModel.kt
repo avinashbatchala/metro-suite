@@ -34,6 +34,7 @@ import com.metro.training.domain.workout.Workout
 import com.metro.training.domain.workout.WorkoutExercise
 import com.metro.training.domain.workout.WorkoutSet
 import com.metro.training.domain.workout.WorkoutSummary
+import com.metro.training.notify.WorkoutNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -141,6 +142,12 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     var prEvent by mutableStateOf<PrEvent?>(null)
         private set
 
+    /** Previous comparable work sets per live workout exercise: (load, reps, rir). */
+    var previousByExercise by mutableStateOf<Map<String, List<Triple<Double?, Int, Int?>>>>(emptyMap())
+        private set
+    var workoutNoteDraft by mutableStateOf<String?>(null)
+        private set
+
     var status by mutableStateOf<String?>(null)
         private set
 
@@ -179,6 +186,11 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 ?.let { it.copy(restDeadlineMillis = prefs.restDeadline(it.id)) }
             activeWorkout = recovered
             recovered?.let { primeForWorkout(it) }
+            recovered?.let {
+                val name = it.routineName.ifBlank { "Workout" }
+                it.restDeadlineMillis?.let { deadline -> WorkoutNotifier.showRest(getApplication(), name, deadline) }
+                    ?: WorkoutNotifier.showWorkout(getApplication(), name, it.startedAt)
+            }
         }
         viewModelScope.launch { refreshHistory() }
         viewModelScope.launch { refreshProgress() }
@@ -493,6 +505,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             val workout = withContext(Dispatchers.IO) { repo.workout(id) }
             activeWorkout = workout
             workout?.let { primeForWorkout(it) }
+            workout?.let { WorkoutNotifier.showWorkout(getApplication(), it.routineName.ifBlank { "Workout" }, it.startedAt) }
             route = TrainingRoute.ActiveWorkout
         }
     }
@@ -556,12 +569,17 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     fun completeSet(setId: String) {
         val workout = activeWorkout ?: return
         val exercise = workout.exercises.firstOrNull { ex -> ex.sets.any { it.id == setId } }
-        updateSet(setId) { set ->
-            if (set.repsCompleted <= 0) set else set.copy(completed = true)
+        val set = exercise?.sets?.firstOrNull { it.id == setId }
+        updateSet(setId) { s ->
+            if (s.repsCompleted <= 0) s else s.copy(completed = true)
         }
         exercise?.let { detectPr(it, setId) }
-        val rest = exercise?.restSeconds ?: defaultRestSeconds.takeIf { it > 0 } ?: 0
-        if (rest > 0) startRest(rest)
+        // Warm-up, drop and myo-rep sets do not trigger a full rest.
+        val skipRest = set == null || set.setType.suppressesRest || set.setType == SetType.WARMUP
+        if (!skipRest) {
+            val rest = exercise?.restSeconds ?: defaultRestSeconds.takeIf { it > 0 } ?: 0
+            if (rest > 0) startRest(rest)
+        }
     }
 
     fun consumePrEvent() { prEvent = null }
@@ -584,12 +602,116 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private suspend fun primeForWorkout(workout: Workout) {
         manuallyEditedSets.clear()
         prCache.clear()
+        val previous = HashMap<String, List<Triple<Double?, Int, Int?>>>()
         workout.exercises.forEach { exercise ->
-            val best = withContext(Dispatchers.IO) { repo.recentExposures(exercise.exerciseId, 200) }
-                .let { ExerciseAnalytics.personalBest(it, ProgressMetric.ESTIMATED_1RM) }
-            if (best != null) prCache[exercise.exerciseId] = best
+            val history = withContext(Dispatchers.IO) { repo.recentExposures(exercise.exerciseId, 200) }
+            ExerciseAnalytics.personalBest(history, ProgressMetric.ESTIMATED_1RM)
+                ?.let { prCache[exercise.exerciseId] = it }
+            val workSets = withContext(Dispatchers.IO) {
+                repo.previousWorkSets(
+                    exerciseId = exercise.exerciseId,
+                    repMin = exercise.snapshot.repMin,
+                    repMax = exercise.snapshot.repMax,
+                    workSetCount = exercise.snapshot.workSetCount,
+                )
+            }
+            if (workSets.isNotEmpty()) previous[exercise.id] = workSets
+        }
+        previousByExercise = previous
+    }
+
+    // ---- Phase 1 logging actions ----------------------------------------
+
+    fun startEmptyWorkout() {
+        if (activeWorkout != null) { route = TrainingRoute.ActiveWorkout; return }
+        viewModelScope.launch {
+            val id = repo.startEmptyWorkout()
+            prefs.clearRest()
+            val workout = withContext(Dispatchers.IO) { repo.workout(id) }
+            activeWorkout = workout
+            workout?.let { primeForWorkout(it) }
+            workout?.let { WorkoutNotifier.showWorkout(getApplication(), it.routineName.ifBlank { "Workout" }, it.startedAt) }
+            route = TrainingRoute.ActiveWorkout
         }
     }
+
+    fun changeSetType(setId: String, type: SetType) {
+        updateSet(setId) { it.copy(setType = type) }
+    }
+
+    fun moveExercise(workoutExerciseId: String, delta: Int) {
+        viewModelScope.launch {
+            repo.moveWorkoutExercise(workoutExerciseId, delta)
+            activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
+        }
+    }
+
+    fun removeExercise(workoutExerciseId: String) {
+        viewModelScope.launch {
+            repo.removeWorkoutExercise(workoutExerciseId)
+            activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
+        }
+    }
+
+    fun replaceExercise(workoutExerciseId: String, newExerciseId: String) {
+        viewModelScope.launch {
+            repo.replaceWorkoutExercise(workoutExerciseId, newExerciseId)
+            activeWorkout?.id?.let {
+                val workout = withContext(Dispatchers.IO) { repo.workout(it) }
+                activeWorkout = workout
+                workout?.let { primeForWorkout(it) }
+            }
+        }
+    }
+
+    fun setSupersetTag(workoutExerciseId: String, tag: String?) {
+        viewModelScope.launch {
+            repo.setSupersetTag(workoutExerciseId, tag)
+            activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
+        }
+    }
+
+    fun setExerciseNote(workoutExerciseId: String, note: String) {
+        viewModelScope.launch {
+            repo.updateWorkoutExerciseNote(workoutExerciseId, note)
+            activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
+        }
+    }
+
+    fun openWorkoutNote() { workoutNoteDraft = activeWorkout?.note.orEmpty() }
+    fun updateWorkoutNoteDraft(text: String) { workoutNoteDraft = text }
+    fun dismissWorkoutNote() { workoutNoteDraft = null }
+    fun saveWorkoutNote() {
+        val workout = activeWorkout ?: return
+        val note = workoutNoteDraft.orEmpty()
+        workoutNoteDraft = null
+        activeWorkout = workout.copy(note = note)
+        viewModelScope.launch { repo.updateWorkoutNote(workout.id, note) }
+    }
+
+    /** Smart swap candidates: same primary muscle, similar equipment, not already in the workout. */
+    fun swapCandidates(exerciseId: String): List<ExerciseDefinition> {
+        val source = exercises.firstOrNull { it.id == exerciseId } ?: return emptyList()
+        val inWorkout = activeWorkout?.exercises?.map { it.exerciseId }?.toSet().orEmpty()
+        return exercises
+            .filter { it.id != exerciseId && it.id !in inWorkout && !it.archived }
+            .filter { it.primaryMuscles.any { muscle -> muscle in source.primaryMuscles } }
+            .sortedWith(
+                compareByDescending<ExerciseDefinition> { it.equipment == source.equipment }
+                    .thenByDescending { it.mechanic == source.mechanic }
+                    .thenBy { it.name },
+            )
+            .take(8)
+    }
+
+    /** Live header stats. */
+    fun workoutVolumeKg(): Double =
+        activeWorkout?.exercises?.flatMap { it.sets }
+            ?.filter { it.completed && it.load != null }
+            ?.sumOf { (it.load ?: 0.0) * it.repsCompleted } ?: 0.0
+
+    fun completedSetCount(): Int =
+        activeWorkout?.exercises?.flatMap { it.sets }?.count { it.completed } ?: 0
 
     fun addSet(workoutExerciseId: String, setType: SetType) {
         viewModelScope.launch {
@@ -624,12 +746,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Persisted in prefs, not the workouts table — no Room invalidation, no reload, no clobber.
         prefs.setRest(workout.id, deadline)
         activeWorkout = workout.copy(restDeadlineMillis = deadline)
+        WorkoutNotifier.showRest(getApplication(), workout.routineName.ifBlank { "Workout" }, deadline)
     }
 
     fun clearRest() {
         val workout = activeWorkout ?: return
         prefs.clearRest()
         activeWorkout = workout.copy(restDeadlineMillis = null)
+        WorkoutNotifier.showWorkout(getApplication(), workout.routineName.ifBlank { "Workout" }, workout.startedAt)
     }
 
     fun finishWorkout() {
@@ -637,6 +761,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repo.finishWorkout(workout.id)
             prefs.clearRest()
+            WorkoutNotifier.stop(getApplication())
             val completed = withContext(Dispatchers.IO) { repo.workout(workout.id) }
             val recs = withContext(Dispatchers.IO) { repo.recommendationsForWorkout(workout.id) }
             summaryWorkout = completed
@@ -652,6 +777,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repo.discardWorkout(workout.id)
             prefs.clearRest()
+            WorkoutNotifier.stop(getApplication())
             activeWorkout = null
             route = TrainingRoute.Main
         }

@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WorkoutSetEntity::class,
         ProgressionRecommendationEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class TrainingDatabase : RoomDatabase() {
@@ -37,6 +37,18 @@ abstract class TrainingDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3: per-side reps, partial reps, set notes and superset tags. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_sets ADD COLUMN repsLeft INTEGER")
+                db.execSQL("ALTER TABLE workout_sets ADD COLUMN repsRight INTEGER")
+                db.execSQL("ALTER TABLE workout_sets ADD COLUMN partialReps INTEGER")
+                db.execSQL("ALTER TABLE workout_sets ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE workout_exercises ADD COLUMN supersetTag TEXT")
+                db.execSQL("ALTER TABLE routine_exercises ADD COLUMN supersetTag TEXT")
+            }
+        }
+
         fun get(context: Context): TrainingDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -45,7 +57,7 @@ abstract class TrainingDatabase : RoomDatabase() {
                     "training.db",
                 )
                     // Training history is valuable; never silently drop it on schema changes.
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }

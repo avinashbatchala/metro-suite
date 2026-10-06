@@ -1,6 +1,20 @@
 package com.metro.training.domain.workout
 
-enum class SetType { WARMUP, WORK, DROP, BACKOFF }
+enum class SetType {
+    WARMUP,
+    WORK,
+    FAILURE,
+    DROP,
+    BACKOFF,
+    MYOREP,
+    ;
+
+    /** Only plain work sets feed Auto Progress. */
+    val feedsProgression: Boolean get() = this == WORK
+
+    /** Drop and myo-rep mini-sets are performed without a full rest. */
+    val suppressesRest: Boolean get() = this == DROP || this == MYOREP
+}
 
 /** Explicit per-set flags. No invented form score. */
 enum class SetQuality {
@@ -15,7 +29,10 @@ enum class SetQuality {
     val isFailedRep: Boolean get() = this == FAILED_REP
 }
 
-/** One logged set. `load` is canonical kg; `repsCompleted` counts only completed reps. */
+/**
+ * One logged set. `load` is canonical kg; `repsCompleted` counts only completed full reps.
+ * Per-side sets record left/right separately; partials are extra partial reps beyond full reps.
+ */
 data class WorkoutSet(
     val id: String,
     val exerciseSessionId: String,
@@ -28,10 +45,18 @@ data class WorkoutSet(
     val completed: Boolean,
     /** False for sets added beyond the prescribed work-set block (extra volume). */
     val prescribed: Boolean = true,
+    /** Unilateral logging; null when the set is logged as a single value. */
+    val repsLeft: Int? = null,
+    val repsRight: Int? = null,
+    /** Extra partial reps performed after the full reps. Never counted for range achievement. */
+    val partialReps: Int? = null,
+    val note: String = "",
     val timestamp: Long = System.currentTimeMillis(),
 ) {
+    val isPerSide: Boolean get() = repsLeft != null || repsRight != null
+
     val countsTowardProgression: Boolean
-        get() = setType == SetType.WORK && prescribed && completed
+        get() = setType.feedsProgression && prescribed && completed
 }
 
 /** Snapshot of prescription parameters captured at workout time (historical integrity). */
@@ -59,5 +84,5 @@ data class CompletedExerciseExposure(
     val sets: List<WorkoutSet>,
 ) {
     val workSets: List<WorkoutSet>
-        get() = sets.filter { it.setType == SetType.WORK && it.prescribed }
+        get() = sets.filter { it.setType.feedsProgression && it.prescribed }
 }

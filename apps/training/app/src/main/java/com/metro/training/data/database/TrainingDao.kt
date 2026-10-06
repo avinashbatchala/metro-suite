@@ -130,6 +130,9 @@ interface TrainingDao {
     @Query("SELECT * FROM workout_exercises WHERE id = :id")
     suspend fun workoutExercise(id: String): WorkoutExerciseEntity?
 
+    @Query("DELETE FROM workout_exercises WHERE id = :id")
+    suspend fun deleteWorkoutExercise(id: String)
+
     @Query("SELECT * FROM workout_sets WHERE workoutExerciseId = :workoutExerciseId ORDER BY setIndex")
     fun observeSets(workoutExerciseId: String): Flow<List<WorkoutSetEntity>>
 

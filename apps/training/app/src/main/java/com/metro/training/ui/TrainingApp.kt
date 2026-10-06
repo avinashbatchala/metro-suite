@@ -191,9 +191,10 @@ private fun BoxScope.RootAppBar(viewModel: TrainingViewModel, page: Int) {
     }
     MetroAppBar(
         icons = icons,
-        menuItems = listOf(
-            MetroAppBarMenuItem("settings", onClick = viewModel::openSettings),
-        ),
+        menuItems = buildList {
+            add(MetroAppBarMenuItem("start empty workout", onClick = viewModel::startEmptyWorkout))
+            add(MetroAppBarMenuItem("settings", onClick = viewModel::openSettings))
+        },
         enterKey = page,
         modifier = Modifier.align(Alignment.BottomCenter),
     )

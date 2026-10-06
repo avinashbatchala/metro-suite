@@ -17,6 +17,8 @@ data class WorkoutExercise(
     val restSeconds: Int?,
     val autoProgressEnabled: Boolean = true,
     val note: String,
+    /** Non-null when this exercise is paired into a superset/tag group. */
+    val supersetTag: String? = null,
     val sets: List<WorkoutSet>,
 ) {
     fun toExposure(performedAt: Long): CompletedExerciseExposure =

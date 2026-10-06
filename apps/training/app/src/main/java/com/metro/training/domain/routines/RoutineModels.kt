@@ -51,6 +51,7 @@ data class RoutineExercisePrescription(
 data class RoutineExercise(
     val prescription: RoutineExercisePrescription,
     val order: Int,
+    val supersetTag: String? = null,
 )
 
 data class Routine(
