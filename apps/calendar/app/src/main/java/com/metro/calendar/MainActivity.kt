@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.metro.calendar.data.subscription.SubscriptionSyncWorker
 import com.metro.calendar.tiles.CalendarTileRefresh
 import com.metro.calendar.ui.CalendarShell
 import com.metro.calendar.ui.CalendarState
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         MetroActivities.applyLaunchTransition(this)
         enableEdgeToEdge()
+        SubscriptionSyncWorker.schedulePeriodic(this)
         setContent {
             val context = LocalContext.current
             val state = remember { CalendarState(context) }
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     requestCalendar.launch(Manifest.permission.READ_CALENDAR)
                                 },
+                                onAddSubscription = state::skipToAddSubscription,
                                 onContinueWithDemo = state::continueWithDemo,
                                 modifier = Modifier.fillMaxSize(),
                             )

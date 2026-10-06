@@ -1,19 +1,66 @@
 package com.metro.calendar.data
 
+import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
 import android.provider.CalendarContract
+import androidx.core.content.ContextCompat
+import com.metro.calendar.data.subscription.CalendarSubscription
+import com.metro.calendar.data.subscription.CalendarSubscriptionStore
+import com.metro.calendar.data.subscription.IcsCalendarSource
 import com.metro.system.MetroPreferences
-import java.time.Instant
 import java.time.ZoneId
-import java.util.concurrent.TimeUnit
 
 class CalendarRepository(context: Context) {
     private val appContext = context.applicationContext
     private val prefs = MetroPreferences(appContext)
     private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val subscriptionStore = CalendarSubscriptionStore(appContext)
+    private val subscriptions = IcsCalendarSource(subscriptionStore)
 
+    fun hasDevicePermission(): Boolean =
+        ContextCompat.checkSelfPermission(appContext, Manifest.permission.READ_CALENDAR) ==
+            PackageManager.PERMISSION_GRANTED
+
+    fun subscriptions(): List<CalendarSubscription> = subscriptions.subscriptions()
+
+    fun addSubscription(name: String, url: String, colorHex: String): CalendarSubscription? =
+        subscriptions.add(name, url, colorHex, System.currentTimeMillis())
+
+    fun removeSubscription(id: String) = subscriptions.remove(id)
+
+    fun setSubscriptionEnabled(id: String, enabled: Boolean) =
+        subscriptions.setEnabled(id, enabled)
+
+    fun syncSubscription(id: String) = subscriptions.sync(id)
+
+    fun syncAllSubscriptions(): Int = subscriptions.syncAll()
+
+    /**
+     * Merged event stream: device provider events (when permitted) plus every enabled ICS
+     * subscription from its last-good cache. Sorted chronologically.
+     */
     fun loadEvents(startMillis: Long, endMillis: Long): List<CalendarEvent> {
+        val merged = ArrayList<CalendarEvent>()
+        if (hasDevicePermission()) {
+            runCatching { loadDeviceEvents(startMillis, endMillis) }.getOrNull()?.let { merged.addAll(it) }
+        }
+        merged.addAll(subscriptions.loadEvents(startMillis, endMillis))
+        return merged
+            .distinctBy { event -> "${event.sourceType}-${event.sourceId}-${event.id}-${event.startMillis}" }
+            .sortedWith(compareBy({ it.startMillis }, { it.endMillis }))
+    }
+
+    fun loadEventsAround(epochDay: Long, dayRadius: Int = 90): List<CalendarEvent> {
+        val start = CalendarLogic.millisFromEpochDay(epochDay - dayRadius, zoneId)
+        val end = CalendarLogic.millisFromEpochDay(epochDay + dayRadius + 1, zoneId)
+        return loadEvents(start, end)
+    }
+
+    fun loadDemoEvents(): List<CalendarEvent> = StubCalendarDataSource.demoEvents(zoneId)
+
+    private fun loadDeviceEvents(startMillis: Long, endMillis: Long): List<CalendarEvent> {
         val projection = arrayOf(
             CalendarContract.Instances.EVENT_ID,
             CalendarContract.Instances.TITLE,
@@ -60,19 +107,12 @@ class CalendarRepository(context: Context) {
                     calendarColorHex = colorIntToHex(colorInt),
                     calendarName = calName,
                     location = location,
+                    sourceType = CalendarSourceType.DEVICE,
                 )
             }
         }
         return events.distinctBy { "${it.id}-${it.startMillis}" }
     }
-
-    fun loadEventsAround(epochDay: Long, dayRadius: Int = 90): List<CalendarEvent> {
-        val start = CalendarLogic.millisFromEpochDay(epochDay - dayRadius, zoneId)
-        val end = CalendarLogic.millisFromEpochDay(epochDay + dayRadius + 1, zoneId)
-        return loadEvents(start, end)
-    }
-
-    fun loadDemoEvents(): List<CalendarEvent> = StubCalendarDataSource.demoEvents(zoneId)
 
     private fun colorIntToHex(color: Int): String {
         if (color == 0) return prefs.accentColorHex

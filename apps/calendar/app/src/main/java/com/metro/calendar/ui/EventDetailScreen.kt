@@ -103,6 +103,16 @@ fun EventDetailScreen(
             DetailField(label = stringResource(R.string.event_calendar_label), value = calendar)
         }
 
+        if (event.readOnly) {
+            Spacer(modifier = Modifier.height(16.dp))
+            MetroText(
+                text = stringResource(R.string.subscription_read_only),
+                style = MetroTextStyle.Body,
+                color = MetroTheme.colors.secondaryText,
+                modifier = Modifier.padding(horizontal = MetroDimens.ScreenHorizontalMargin),
+            )
+        }
+
         Spacer(modifier = Modifier.height(48.dp))
     }
 }

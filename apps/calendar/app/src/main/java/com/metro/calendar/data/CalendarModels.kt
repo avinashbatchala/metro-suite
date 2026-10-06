@@ -1,5 +1,12 @@
 package com.metro.calendar.data
 
+/** Where a merged [CalendarEvent] came from. */
+enum class CalendarSourceType {
+    DEVICE,
+    SUBSCRIPTION,
+    DEMO,
+}
+
 data class CalendarEvent(
     val id: Long,
     val title: String,
@@ -9,7 +16,13 @@ data class CalendarEvent(
     val calendarColorHex: String,
     val calendarName: String?,
     val location: String?,
-)
+    val sourceType: CalendarSourceType = CalendarSourceType.DEVICE,
+    /** Subscription id when [sourceType] is [CalendarSourceType.SUBSCRIPTION]. */
+    val sourceId: String? = null,
+) {
+    /** Subscribed events are read-only (no edit/delete affordances). */
+    val readOnly: Boolean get() = sourceType == CalendarSourceType.SUBSCRIPTION
+}
 
 data class DayBucket(
     val epochDay: Long,

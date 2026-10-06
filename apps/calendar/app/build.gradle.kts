@@ -54,7 +54,17 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
 
+    // Read-only ICS subscription support.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // RFC 5545 parser + recurrence expansion (Apache-2.0). Chosen over ical4j 4.x, whose
+    // transitive Groovy/Caffeine/jparsec dependencies are unsuitable for an Android app.
+    implementation("net.sf.biweekly:biweekly:0.6.8")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
 
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

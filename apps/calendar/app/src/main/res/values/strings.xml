@@ -25,4 +25,37 @@
     <string name="next_day">next day</string>
     <string name="previous_month">previous month</string>
     <string name="next_month">next month</string>
+
+    <string name="calendars">calendars</string>
+    <string name="add_calendar">add calendar</string>
+    <string name="calendars_empty">No calendars added yet.</string>
+    <string name="calendars_section_subscriptions">subscribed calendars</string>
+    <string name="calendars_section_device">device calendar</string>
+    <string name="device_calendar_connected">connected</string>
+    <string name="device_calendar_not_connected">not connected</string>
+    <string name="subscription_name_label">name</string>
+    <string name="subscription_name_placeholder">Team holidays</string>
+    <string name="subscription_url_label">calendar URL</string>
+    <string name="subscription_url_placeholder">https://example.com/calendar.ics</string>
+    <string name="subscription_color_label">color</string>
+    <string name="subscription_add">add</string>
+    <string name="subscription_invalid_url">Enter a valid https:// or webcal:// calendar URL</string>
+    <string name="subscription_show_events">show events</string>
+    <string name="subscription_sync_now">sync now</string>
+    <string name="subscription_remove">remove calendar</string>
+    <string name="subscription_removed">Calendar removed</string>
+    <string name="subscription_last_synced">last synced</string>
+    <string name="subscription_never_synced">not synced yet</string>
+    <string name="subscription_last_error">last error</string>
+    <string name="subscription_pending">not downloaded yet</string>
+    <string name="subscription_read_only">Read-only subscription</string>
+    <string name="subscription_url_hidden">URL hidden for privacy</string>
+    <string name="sync_failed_count">Some calendars couldn\'t sync (%1$d)</string>
+    <string name="remove_calendar_title">remove calendar?</string>
+    <string name="remove_calendar_body">Its downloaded events will be deleted from this device.</string>
+    <string name="cancel">cancel</string>
+    <string name="remove">remove</string>
+    <string name="permission_optional_title">add a calendar</string>
+    <string name="permission_optional_body">Subscribe to any public .ics URL to see events here. Or allow access to your device calendar.</string>
+    <string name="add_subscription_instead">add a calendar URL</string>
 </resources>

@@ -22,6 +22,7 @@ import com.metro.ui.metroNavBarPadding
 @Composable
 fun PermissionScreen(
     onRequestPermission: () -> Unit,
+    onAddSubscription: () -> Unit,
     onContinueWithDemo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -48,6 +49,12 @@ fun PermissionScreen(
         MetroBorderButton(
             text = stringResource(R.string.grant_calendar),
             onClick = onRequestPermission,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        MetroBorderButton(
+            text = stringResource(R.string.add_subscription_instead),
+            onClick = onAddSubscription,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
         Spacer(modifier = Modifier.height(12.dp))

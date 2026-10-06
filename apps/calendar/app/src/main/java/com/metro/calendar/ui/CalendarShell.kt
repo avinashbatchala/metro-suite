@@ -15,12 +15,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.metro.calendar.R
 import com.metro.calendar.data.CalendarPivot
+import com.metro.ui.LocalMetroSubpageExit
 import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarMenuItem
 import com.metro.ui.MetroAppBarTextButton
 import com.metro.ui.MetroAppTitle
 import com.metro.ui.MetroPagePivotLoad
 import com.metro.ui.MetroPivot
+import com.metro.ui.MetroSubpageHost
 import com.metro.ui.metroNavBarPadding
 
 @Composable
@@ -32,6 +34,54 @@ fun CalendarShell(
     @Suppress("UNUSED_VARIABLE")
     val generation = state.generation
 
+    MetroSubpageHost(
+        route = state.route,
+        isRoot = { it is CalendarRoute.Root },
+        parentOf = { route ->
+            when (route) {
+                is CalendarRoute.SubscriptionDetail -> CalendarRoute.Calendars
+                CalendarRoute.AddSubscription -> CalendarRoute.Calendars
+                CalendarRoute.Calendars -> CalendarRoute.Root
+                CalendarRoute.Root -> CalendarRoute.Root
+            }
+        },
+        onGoBack = state::routeBack,
+        modifier = modifier,
+        rootContent = { CalendarRoot(state = state, modifier = Modifier.fillMaxSize()) },
+        subpageContent = { route ->
+            val exit = LocalMetroSubpageExit.current
+            when (route) {
+                CalendarRoute.Calendars -> CalendarsScreen(
+                    state = state,
+                    onBack = { exit?.invoke() ?: state.routeBack() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                CalendarRoute.AddSubscription -> AddSubscriptionScreen(
+                    state = state,
+                    onBack = { exit?.invoke() ?: state.routeBack() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                is CalendarRoute.SubscriptionDetail -> SubscriptionDetailScreen(
+                    state = state,
+                    subscriptionId = route.id,
+                    onBack = { exit?.invoke() ?: state.routeBack() },
+                    onRemoved = { exit?.invoke() ?: state.routeBack() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                CalendarRoute.Root -> Unit
+            }
+        },
+    )
+}
+
+@Composable
+private fun CalendarRoot(
+    state: CalendarState,
+    modifier: Modifier = Modifier,
+) {
     val pivotTitles = CalendarPivot.entries.map { it.title }
     val pagerState = rememberPagerState(
         initialPage = state.pivot.ordinal,
@@ -105,20 +155,15 @@ fun CalendarShell(
                     text = stringResource(R.string.today),
                     onClick = state::goToToday,
                 ),
-                MetroAppBarTextButton(
-                    text = stringResource(R.string.new_event),
-                    onClick = {
-                        state.showStub(state.appContext.getString(R.string.create_event_stub))
-                    },
-                ),
             ),
             menuItems = listOf(
                 MetroAppBarMenuItem(
+                    text = stringResource(R.string.calendars),
+                    onClick = state::openCalendars,
+                ),
+                MetroAppBarMenuItem(
                     text = stringResource(R.string.sync_calendars),
-                    onClick = {
-                        state.syncNow()
-                        state.showStub(state.appContext.getString(R.string.sync_done))
-                    },
+                    onClick = state::syncNow,
                 ),
             ),
             modifier = Modifier.align(Alignment.BottomCenter),

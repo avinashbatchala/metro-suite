@@ -49,9 +49,10 @@ class CalendarTileDataSource(context: Context) {
 
     fun buildTileData(): MetroTileData {
         val accentHex = MetroPreferences(appContext).accentColorHex
-        val events = if (hasCalendarPermission()) {
+        val repo = CalendarRepository(appContext)
+        val hasSubscriptions = repo.subscriptions().any { it.enabled }
+        val events = if (hasCalendarPermission() || hasSubscriptions) {
             runCatching {
-                val repo = CalendarRepository(appContext)
                 val today = CalendarLogic.todayEpochDay()
                 repo.loadEventsAround(today, dayRadius = 30)
             }.getOrDefault(StubCalendarDataSource.demoEvents())

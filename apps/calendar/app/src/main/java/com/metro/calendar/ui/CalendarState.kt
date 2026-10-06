@@ -16,13 +16,29 @@ import com.metro.calendar.data.CalendarRepository
 import com.metro.calendar.data.DayBucket
 import com.metro.calendar.data.HourSlot
 import com.metro.calendar.data.MonthGridCell
+import com.metro.calendar.data.subscription.CalendarSubscription
+import com.metro.calendar.data.subscription.SubscriptionUrl
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
+
+/** In-app page stack (rendered by [com.metro.ui.MetroSubpageHost]). */
+sealed interface CalendarRoute {
+    data object Root : CalendarRoute
+    data object Calendars : CalendarRoute
+    data object AddSubscription : CalendarRoute
+    data class SubscriptionDetail(val id: String) : CalendarRoute
+}
 
 class CalendarState(context: Context) {
     private val repository = CalendarRepository(context)
     internal val appContext = context.applicationContext
     private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     var generation by mutableIntStateOf(0)
         private set
@@ -37,10 +53,14 @@ class CalendarState(context: Context) {
     var usingDemoData: Boolean = false
         private set
 
+    /** User chose to proceed without granting the device calendar permission. */
     var skippedPermissions: Boolean = false
         private set
 
-    /** True when the calendar provider query itself failed (distinct from no permission). */
+    /** User explicitly asked for demo data (as opposed to simply having no source yet). */
+    private var demoExplicit: Boolean = false
+
+    /** True when the latest load failed (distinct from no permission/source). */
     var loadFailed: Boolean = false
         private set
 
@@ -48,8 +68,52 @@ class CalendarState(context: Context) {
     var permissionsChecked: Boolean = false
         private set
 
+    // ---- Subscriptions -----------------------------------------------------
+
+    var subscriptions: List<CalendarSubscription> = emptyList()
+        private set
+
+    var syncing: Boolean = false
+        private set
+
+    val hasSubscriptionSource: Boolean get() = subscriptions.any { it.enabled }
+
+    /** True when at least one event source (device provider or ICS subscription) is available. */
+    val hasAnySource: Boolean get() = hasCalendarPermission || hasSubscriptionSource
+
     val needsPermissionGate: Boolean
-        get() = !hasCalendarPermission && !skippedPermissions
+        get() = !hasCalendarPermission && subscriptions.isEmpty() && !skippedPermissions
+
+    // ---- Navigation --------------------------------------------------------
+
+    var route: CalendarRoute = CalendarRoute.Root
+        private set
+
+    fun openCalendars() {
+        route = CalendarRoute.Calendars
+        notifyChanged()
+    }
+
+    fun openAddSubscription() {
+        route = CalendarRoute.AddSubscription
+        notifyChanged()
+    }
+
+    fun openSubscriptionDetail(id: String) {
+        route = CalendarRoute.SubscriptionDetail(id)
+        notifyChanged()
+    }
+
+    /** Route-aware Back for [CalendarRoute]s outside the subpage host's own Back handling. */
+    fun routeBack() {
+        route = when (val current = route) {
+            is CalendarRoute.SubscriptionDetail -> CalendarRoute.Calendars
+            CalendarRoute.AddSubscription -> CalendarRoute.Calendars
+            CalendarRoute.Calendars -> CalendarRoute.Root
+            CalendarRoute.Root -> CalendarRoute.Root
+        }
+        notifyChanged()
+    }
 
     var selectedEpochDay: Long = CalendarLogic.todayEpochDay(zoneId)
         private set
@@ -108,6 +172,7 @@ class CalendarState(context: Context) {
             context,
             Manifest.permission.READ_CALENDAR,
         ) == PackageManager.PERMISSION_GRANTED
+        subscriptions = repository.subscriptions()
         permissionsChecked = true
         notifyChanged()
     }
@@ -115,30 +180,31 @@ class CalendarState(context: Context) {
     fun onPermissionResult(granted: Boolean) {
         hasCalendarPermission = granted
         skippedPermissions = false
-        if (granted) {
-            reloadEvents()
-        } else {
-            usingDemoData = true
-            loadFailed = false
-            events = repository.loadDemoEvents()
-        }
-        notifyChanged()
+        demoExplicit = false
+        reloadEvents()
     }
 
     fun continueWithDemo() {
         skippedPermissions = true
-        usingDemoData = true
-        loadFailed = false
-        events = repository.loadDemoEvents()
-        notifyChanged()
+        demoExplicit = true
+        reloadEvents()
+    }
+
+    /** Proceed without the device permission and jump straight to the add-a-calendar form. */
+    fun skipToAddSubscription() {
+        skippedPermissions = true
+        demoExplicit = false
+        route = CalendarRoute.AddSubscription
+        reloadEvents()
     }
 
     /**
-     * Loads real provider events. Demo data is only used when the user skipped the permission
-     * gate — a provider query failure shows the empty/error state instead of fake events.
+     * Loads the merged event stream (device provider + ICS subscriptions). Demo data is only used
+     * when the user skipped the permission gate and has no subscriptions.
      */
     fun reloadEvents() {
-        if (hasCalendarPermission) {
+        subscriptions = repository.subscriptions()
+        if (hasAnySource) {
             usingDemoData = false
             val loaded = runCatching {
                 repository.loadEventsAround(selectedEpochDay, LOAD_RADIUS_DAYS)
@@ -154,7 +220,7 @@ class CalendarState(context: Context) {
                 loadFailed = true
                 rangeLoaded = false
             }
-        } else if (skippedPermissions) {
+        } else if (demoExplicit) {
             usingDemoData = true
             loadFailed = false
             events = repository.loadDemoEvents()
@@ -168,11 +234,11 @@ class CalendarState(context: Context) {
     }
 
     /**
-     * Pulls fresh provider events whenever the selected date drifts near the edge of the loaded
-     * window, so paging days/months always reflects the real calendar.
+     * Pulls fresh events whenever the selected date drifts near the edge of the loaded window, so
+     * paging days/months always reflects the real calendar.
      */
     private fun ensureRangeLoaded(epochDay: Long) {
-        if (!hasCalendarPermission || usingDemoData) return
+        if (!hasAnySource || usingDemoData) return
         if (rangeLoaded &&
             epochDay in (loadedStartEpochDay + RELOAD_MARGIN_DAYS)..(loadedEndEpochDay - RELOAD_MARGIN_DAYS)
         ) {
@@ -249,14 +315,75 @@ class CalendarState(context: Context) {
         notifyChanged()
     }
 
-    /** Force a fresh pull from the device calendar provider (Google/Exchange/local accounts). */
-    fun syncNow() {
-        if (hasCalendarPermission) {
+    // ---- Subscription actions ---------------------------------------------
+
+    /** Validates and stores a subscription, then fetches it once. Returns false on invalid URL. */
+    fun addSubscription(name: String, url: String, colorHex: String): Boolean {
+        if (!SubscriptionUrl.isValid(url)) return false
+        val subscription = repository.addSubscription(name, url, colorHex) ?: return false
+        subscriptions = repository.subscriptions()
+        notifyChanged()
+        syncSubscription(subscription.id)
+        return true
+    }
+
+    fun removeSubscription(id: String) {
+        repository.removeSubscription(id)
+        subscriptions = repository.subscriptions()
+        reloadEvents()
+    }
+
+    fun setSubscriptionEnabled(id: String, enabled: Boolean) {
+        repository.setSubscriptionEnabled(id, enabled)
+        subscriptions = repository.subscriptions()
+        reloadEvents()
+    }
+
+    /** Fetches a single subscription, reloads the stream, and surfaces the outcome. */
+    fun syncSubscription(id: String) {
+        if (syncing) return
+        syncing = true
+        notifyChanged()
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) { repository.syncSubscription(id) }
+            syncing = false
+            subscriptions = repository.subscriptions()
             reloadEvents()
-        } else {
-            refreshPermission(appContext)
-            if (hasCalendarPermission) reloadEvents() else notifyChanged()
+            showStub(syncMessage(outcome))
         }
+    }
+
+    /** Fetches every enabled subscription (manual "sync calendars"). */
+    fun syncNow() {
+        refreshPermission(appContext)
+        if (!hasSubscriptionSource) {
+            reloadEvents()
+            showStub(appContext.getString(com.metro.calendar.R.string.sync_done))
+            return
+        }
+        if (syncing) return
+        syncing = true
+        notifyChanged()
+        scope.launch {
+            val failures = withContext(Dispatchers.IO) { repository.syncAllSubscriptions() }
+            syncing = false
+            subscriptions = repository.subscriptions()
+            reloadEvents()
+            showStub(
+                if (failures == 0) {
+                    appContext.getString(com.metro.calendar.R.string.sync_done)
+                } else {
+                    appContext.getString(com.metro.calendar.R.string.sync_failed_count, failures)
+                },
+            )
+        }
+    }
+
+    private fun syncMessage(
+        outcome: com.metro.calendar.data.subscription.IcsCalendarSource.SyncOutcome,
+    ): String = when (outcome) {
+        is com.metro.calendar.data.subscription.IcsCalendarSource.SyncOutcome.Failure -> outcome.message
+        else -> appContext.getString(com.metro.calendar.R.string.sync_done)
     }
 
     fun showStub(message: String) {
