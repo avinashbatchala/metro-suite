@@ -68,25 +68,29 @@ Progression logic is pure Kotlin with **no Android dependencies** and is extensi
 
 ## Visuals & logging (v1.1)
 
-- **Inline set logging** — every set row is an editable `SET | LOAD | REPS | RIR | ✓` grid (no
-  per-set dialog). LOAD/REPS use the system numeric keyboard with `−`/`+` steppers; RIR is an inline
-  segmented row (`– 0 1 2 3 4 5+`); long-press/flag quality from the set number.
-- **Copy-from-first-set** — set 1's load and reps propagate live to the remaining sets until you
-  edit a set by hand.
+- **Inline set logging** — each row is `SET | PREVIOUS | KG | REPS | RIR | ✓`; cells are edited in
+  place via a **MacroFactor-style bottom numeric keypad** (no system keyboard), so the table stays
+  visible. The focused cell shows an accent underline.
+- **Copy-first-set / prefill** — KG and REPS prefill from last time; set 1 live-copies to later
+  sets until edited; "+ set" copies the previous set.
+- **Set number menu** — set type (normal/warm-up/failure/drop/backoff/myorep), per-side L/R,
+  partial reps, set note, remove.
+- **Auto-advance** — `next` moves KG → REPS → RIR → next set; completing a set jumps to the next
+  incomplete set.
 - **Charts** — custom Metro Canvas line/bar charts. Exercise detail shows estimated 1RM (Epley,
   1–12 reps), top-set load, total reps and volume load over week/month/3m/6m/year/all; Progress
   shows estimated weekly sets per muscle (vs last week) and a weekly-volume trend.
-- **Illustrations** — bundled free-exercise-db images (two-frame flip) in Exercise detail and the
-  active workout; see `THIRD_PARTY_NOTICES.md`.
-- **Animations** — set-complete accent flash, PR celebration, timestamp-based rest bar, staggered
-  list entry.
+- **Illustrations** — bundled free-exercise-db images (two-frame flip) + instructions. See
+  `THIRD_PARTY_NOTICES.md`.
+- **Animations** — set-complete accent flash, PR celebration, timestamp-based rest bar (plus an
+  ongoing notification), staggered list entry.
 
 ## Revamp status (Hevy/MacroFactor-inspired)
 
-- **Phase 1 — logging** ✅ set types (normal/warm-up/failure/drop/backoff/myorep), previous-values
-  column, focused inline set editor, per-side/partials/myoreps, set + exercise + workout notes,
-  exercise menu (note/replace/reorder/superset/history/remove), start-empty-workout, header stats,
-  ongoing rest notification.
+- **Phase 1 — logging** ✅ inline cells + bottom numeric keypad, set types (normal/warm-up/failure/
+  drop/backoff/myorep), previous-values column, per-side/partials/myoreps, set + exercise + workout
+  notes, exercise menu (note/replace/reorder/superset/history/remove), start-empty-workout, header
+  stats, ongoing rest notification.
 - **Phase 2 — library** ✅ bundled instructions/cues + muscle/equipment filters.
 - **Phase 3 — routines** 🔶 pending (folders, inline editor polish).
 - **Phase 4 — history/PRs** ✅ personal records on exercise detail, richer workout summary; 🔶
