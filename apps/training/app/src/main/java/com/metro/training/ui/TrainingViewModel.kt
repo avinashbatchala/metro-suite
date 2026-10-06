@@ -228,6 +228,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     fun dismissStatus() { status = null }
 
+    fun showStatus(message: String) { status = message }
+
     // ---- settings --------------------------------------------------------
 
     fun chooseWeightUnit(unit: com.metro.training.domain.exercises.LoadUnit) {
@@ -251,6 +253,29 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openSettings() { route = TrainingRoute.Settings }
+
+    // ---- backup / restore ------------------------------------------------
+
+    suspend fun exportJsonBackup(): String = withContext(Dispatchers.IO) {
+        com.metro.training.data.backup.TrainingBackup.exportJson(repo.allCompletedWorkouts())
+    }
+
+    suspend fun exportCsvBackup(): String = withContext(Dispatchers.IO) {
+        com.metro.training.data.backup.TrainingBackup.exportCsv(repo.allCompletedWorkouts())
+    }
+
+    /** Import a JSON backup or a Hevy-style CSV; returns the number of workouts imported. */
+    suspend fun importBackup(text: String): Int = withContext(Dispatchers.IO) {
+        val trimmed = text.trimStart()
+        val workouts = if (trimmed.startsWith("[")) {
+            com.metro.training.data.backup.TrainingBackup.parseJson(text)
+        } else {
+            com.metro.training.data.backup.HevyCsvImport.parse(text, exercises)
+        }
+        if (workouts.isNotEmpty()) repo.importWorkouts(workouts)
+        refreshHistory()
+        workouts.size
+    }
 
     // ---- onboarding / plan builder --------------------------------------
 

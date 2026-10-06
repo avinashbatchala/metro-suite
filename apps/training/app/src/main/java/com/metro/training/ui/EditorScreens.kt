@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ import com.metro.ui.metroNavBarPadding
 import com.metro.training.ui.components.MetroLineChart
 import com.metro.training.ui.components.MetroSegmentedRow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ---- routine detail ------------------------------------------------------
 
@@ -607,6 +609,39 @@ private fun MetadataBlock(exercise: ExerciseDefinition) {
 fun SettingsScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val units = listOf("kg", "lb")
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val exportJson = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(viewModel.exportJsonBackup().toByteArray()) }
+            }
+        }
+    }
+    val exportCsv = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(viewModel.exportCsvBackup().toByteArray()) }
+            }
+        }
+    }
+    val importFile = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val text = runCatching { context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() }.getOrNull()
+            if (text != null) {
+                val count = runCatching { viewModel.importBackup(text) }.getOrDefault(0)
+                viewModel.showStatus("imported $count workouts")
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -614,7 +649,7 @@ fun SettingsScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             .statusBarsPadding()
             .metroNavBarPadding(),
     ) {
-        Column(modifier = Modifier.fillMaxSize().padding(bottom = 72.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(bottom = 72.dp).verticalScroll(rememberScrollState())) {
             MetroAppTitle(title = "settings")
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
             SectionLabel("units")
@@ -628,6 +663,12 @@ fun SettingsScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             ToggleRow("log RIR", viewModel.rirEnabled) { viewModel.toggleRir(it) }
             SectionLabel("workout")
             ToggleRow("smart progression hints", viewModel.smartHints) { viewModel.toggleSmartHints(it) }
+            SectionLabel("data")
+            SettingRow("export workouts (json)") { exportJson.launch("metro-training-backup.json") }
+            SettingRow("export workouts (csv)") { exportCsv.launch("metro-training-backup.csv") }
+            SettingRow("import workouts (json / hevy csv)") {
+                importFile.launch(arrayOf("application/json", "text/csv", "text/comma-separated-values", "text/plain", "*/*"))
+            }
             MetroText(
                 text = "Theme and accent follow the MetroOS system settings.",
                 style = MetroTextStyle.ListItemSubtitle,
@@ -642,6 +683,18 @@ fun SettingsScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+@Composable
+private fun SettingRow(label: String, onClick: () -> Unit) {
+    MetroText(
+        text = label,
+        style = MetroTextStyle.ListItemTitle,
+        modifier = Modifier
+            .fillMaxWidth()
+            .metroClickable { onClick() }
+            .padding(vertical = 12.dp),
+    )
 }
 
 @Composable

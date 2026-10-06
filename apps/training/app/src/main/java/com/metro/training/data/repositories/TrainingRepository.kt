@@ -117,6 +117,32 @@ class TrainingRepository(
     suspend fun completedWorkoutSummaries(limit: Int = HISTORY_LIMIT): List<WorkoutSummary> =
         withContext(io) { dao.completedWorkoutSummaries(limit).map { it.toSummary() } }
 
+    suspend fun allCompletedWorkouts(): List<Workout> = withContext(io) {
+        dao.completedWorkoutSummaries(100_000).mapNotNull { loadWorkout(it.id) }
+    }
+
+    /** Insert imported workouts (JSON backup). Ids are expected to be pre-assigned unique ids. */
+    suspend fun importWorkouts(workouts: List<Workout>) = withContext(io) {
+        workouts.forEach { workout ->
+            dao.upsertWorkout(
+                WorkoutEntity(
+                    id = workout.id,
+                    routineId = null,
+                    routineName = workout.routineName,
+                    startedAt = workout.startedAt,
+                    finishedAt = workout.finishedAt,
+                    status = WorkoutStatus.COMPLETED.name,
+                    restDeadlineMillis = null,
+                    note = workout.note,
+                ),
+            )
+            dao.upsertWorkoutExercises(workout.exercises.map { it.toEntity() })
+            workout.exercises.forEach { exercise ->
+                exercise.sets.forEach { dao.upsertSet(it.toEntity(exercise.id)) }
+            }
+        }
+    }
+
     suspend fun workout(id: String): Workout? = withContext(io) { loadWorkout(id) }
 
     suspend fun startWorkout(routine: Routine): String = withContext(io) {
