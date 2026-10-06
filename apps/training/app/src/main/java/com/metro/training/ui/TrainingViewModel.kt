@@ -668,6 +668,38 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             if (workSets.isNotEmpty()) previous[exercise.id] = workSets
         }
         previousByExercise = previous
+        prefillFromPrevious(workout, previous)
+    }
+
+    /**
+     * Prefill the prescribed work sets of a freshly started workout with last time's load/reps/rir
+     * (editable). Sets the user already touched are left alone.
+     */
+    private suspend fun prefillFromPrevious(
+        workout: Workout,
+        previous: Map<String, List<Triple<Double?, Int, Int?>>>,
+    ) {
+        withContext(Dispatchers.IO) {
+            workout.exercises.forEach { exercise ->
+                val previousSets = previous[exercise.id] ?: return@forEach
+                var index = 0
+                exercise.sets
+                    .filter { it.setType.feedsProgression && it.prescribed }
+                    .forEach { set ->
+                        val values = previousSets.getOrNull(index++)
+                        if (values != null && !set.completed && !manuallyEditedSets.contains(set.id)) {
+                            repo.saveSet(
+                                set.copy(
+                                    load = values.first ?: set.load,
+                                    repsCompleted = values.second,
+                                    rir = values.third ?: set.rir,
+                                ),
+                            )
+                        }
+                    }
+            }
+        }
+        activeWorkout?.id?.let { activeWorkout = withContext(Dispatchers.IO) { repo.workout(it) } }
     }
 
     // ---- Phase 1 logging actions ----------------------------------------

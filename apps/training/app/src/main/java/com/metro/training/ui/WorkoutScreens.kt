@@ -11,7 +11,6 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,9 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,25 +35,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.metro.training.domain.progression.WeightMath
 import com.metro.training.domain.workout.SetQuality
 import com.metro.training.domain.workout.SetType
 import com.metro.training.domain.workout.Workout
@@ -80,16 +67,104 @@ import com.metro.ui.metroClickable
 import com.metro.ui.metroNavBarPadding
 import kotlinx.coroutines.delay
 
+private enum class EditField { LOAD, REPS, RIR, PARTIALS }
+
+private enum class EditSide { LEFT, RIGHT }
+
+/** Which cell the bottom keypad is driving. */
+private data class ActiveEdit(
+    val setId: String,
+    val field: EditField,
+    val side: EditSide = EditSide.LEFT,
+)
+
 @Composable
 fun ActiveWorkoutScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val workout = viewModel.activeWorkout ?: return
-    var expandedSetId by remember(workout.id) { mutableStateOf<String?>(null) }
+
+    var activeEdit by remember(workout.id) { mutableStateOf<ActiveEdit?>(null) }
+    var buffer by remember(workout.id) { mutableStateOf("") }
+    var replacing by remember(workout.id) { mutableStateOf(false) }
+
     var menuExerciseId by remember { mutableStateOf<String?>(null) }
     var menuAnchor by remember { mutableStateOf(Rect.Zero) }
     var rootBounds by remember { mutableStateOf(Rect.Zero) }
     val menuVisible = remember { MutableTransitionState(false) }
     MetroContextMenuClearOnDismiss(menuVisible) { menuExerciseId = null }
+
+    var setOptionsFor by remember { mutableStateOf<String?>(null) }
+    var setNoteFor by remember { mutableStateOf<String?>(null) }
+
+    fun applyBuffer() {
+        val edit = activeEdit ?: return
+        when (edit.field) {
+            EditField.LOAD -> viewModel.updateSet(edit.setId) {
+                it.copy(load = viewModel.parseWeight(buffer) ?: it.load)
+            }
+            EditField.REPS -> viewModel.updateSet(edit.setId) { set ->
+                val value = buffer.toIntOrNull()
+                when {
+                    set.isPerSide -> {
+                        val left = if (edit.side == EditSide.LEFT) value ?: set.repsLeft else set.repsLeft
+                        val right = if (edit.side == EditSide.RIGHT) value ?: set.repsRight else set.repsRight
+                        set.copy(
+                            repsLeft = left,
+                            repsRight = right,
+                            repsCompleted = listOfNotNull(left, right).minOrNull() ?: set.repsCompleted,
+                        )
+                    }
+                    else -> set.copy(repsCompleted = value ?: set.repsCompleted)
+                }
+            }
+            EditField.RIR -> viewModel.updateSet(edit.setId) {
+                it.copy(rir = buffer.toIntOrNull()?.coerceIn(0, 5))
+            }
+            EditField.PARTIALS -> viewModel.updateSet(edit.setId) {
+                it.copy(partialReps = buffer.toIntOrNull())
+            }
+        }
+    }
+
+    fun initialBuffer(edit: ActiveEdit, set: WorkoutSet): String = when (edit.field) {
+        EditField.LOAD -> viewModel.weightNumber(set.load)
+        EditField.REPS -> if (set.isPerSide) {
+            ((if (edit.side == EditSide.LEFT) set.repsLeft else set.repsRight) ?: 0).toString()
+        } else {
+            set.repsCompleted.takeIf { it > 0 }?.toString() ?: ""
+        }
+        EditField.RIR -> set.rir?.toString() ?: ""
+        EditField.PARTIALS -> (set.partialReps ?: 0).toString()
+    }
+
+    fun beginEdit(edit: ActiveEdit) {
+        val set = workout.exercises.flatMap { it.sets }.firstOrNull { it.id == edit.setId } ?: return
+        activeEdit = edit
+        buffer = initialBuffer(edit, set)
+        replacing = true
+    }
+
+    fun advance() {
+        val edit = activeEdit ?: return
+        val rirOn = viewModel.rirEnabled
+        val order = buildList {
+            add(EditField.LOAD); add(EditField.REPS); if (rirOn) add(EditField.RIR)
+        }
+        val flat = workout.exercises.flatMap { ex -> ex.sets.map { ex.id to it } }
+        val currentIndex = flat.indexOfFirst { it.second.id == edit.setId }
+        if (currentIndex < 0) { activeEdit = null; return }
+        val nextInRow = order.getOrNull(order.indexOf(edit.field) + 1)
+        if (nextInRow != null) {
+            beginEdit(edit.copy(field = nextInRow, side = EditSide.LEFT))
+            return
+        }
+        val nextSet = flat.getOrNull(currentIndex + 1)?.second
+        if (nextSet != null) {
+            beginEdit(ActiveEdit(nextSet.id, EditField.LOAD))
+        } else {
+            activeEdit = null
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -99,48 +174,84 @@ fun ActiveWorkoutScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
             .metroNavBarPadding()
             .onGloballyPositioned { rootBounds = it.boundsInWindow() },
     ) {
+        val keypadOpen = activeEdit != null
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 72.dp)
+                .padding(bottom = if (keypadOpen) 300.dp else 72.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             MetroAppTitle(title = workout.routineName.ifBlank { "workout" })
             WorkoutHeader(viewModel = viewModel, workout = workout)
             RestBanner(viewModel = viewModel, workout = workout)
+            val activeSetId = activeEdit?.setId
             workout.exercises.forEach { exercise ->
                 WorkoutExerciseBlock(
                     viewModel = viewModel,
                     exercise = exercise,
-                    expandedSetId = expandedSetId,
-                    onToggleSet = { setId -> expandedSetId = if (expandedSetId == setId) null else setId },
+                    activeEdit = activeEdit,
+                    onCellTap = { edit, _ -> beginEdit(edit) },
+                    onOpenSetOptions = { setOptionsFor = it },
+                    onComplete = { setId ->
+                        viewModel.completeSet(setId)
+                        advanceToNextIncomplete(workout, setId) { beginEdit(it) }
+                    },
+                    onUncomplete = { setId -> viewModel.updateSet(setId) { it.copy(completed = false) } },
                     onOpenMenu = { rect ->
                         menuExerciseId = exercise.id
                         menuAnchor = rect
                         menuVisible.targetState = true
                     },
+                    isActive = activeSetId?.let { id -> exercise.sets.any { it.id == id } } == true,
                 )
             }
         }
-        MetroAppBar(
-            icons = listOf(
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Add,
-                    label = "add",
-                    onClick = { viewModel.openExercisePicker(forWorkout = true) },
+
+        if (!keypadOpen) {
+            MetroAppBar(
+                icons = listOf(
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Add,
+                        label = "add",
+                        onClick = { viewModel.openExercisePicker(forWorkout = true) },
+                    ),
+                    MetroAppBarIcon(
+                        type = MetroSystemIconType.Check,
+                        label = "finish",
+                        onClick = viewModel::finishWorkout,
+                    ),
                 ),
-                MetroAppBarIcon(
-                    type = MetroSystemIconType.Check,
-                    label = "finish",
-                    onClick = viewModel::finishWorkout,
+                menuItems = listOf(
+                    MetroAppBarMenuItem("workout note", onClick = viewModel::openWorkoutNote),
+                    MetroAppBarMenuItem("discard workout", onClick = viewModel::discardWorkout),
                 ),
-            ),
-            menuItems = listOf(
-                MetroAppBarMenuItem("workout note", onClick = viewModel::openWorkoutNote),
-                MetroAppBarMenuItem("discard workout", onClick = viewModel::discardWorkout),
-            ),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        activeEdit?.let { edit ->
+            val set = workout.exercises.flatMap { it.sets }.firstOrNull { it.id == edit.setId }
+            WorkoutKeypad(
+                label = keypadLabel(edit, set),
+                onDigit = { digit ->
+                    if (replacing) { buffer = digit.toString(); replacing = false } else { buffer += digit }
+                    applyBuffer()
+                },
+                onDecimal = {
+                    if (replacing) { buffer = "0."; replacing = false }
+                    else if (!buffer.contains('.')) buffer += "."
+                    applyBuffer()
+                },
+                onBackspace = {
+                    if (buffer.isNotEmpty()) buffer = buffer.dropLast(1)
+                    replacing = false
+                    applyBuffer()
+                },
+                onNext = { advance() },
+                onDone = { activeEdit = null },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
 
         val menuId = menuExerciseId
         if (menuId != null) {
@@ -159,6 +270,37 @@ fun ActiveWorkoutScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
         }
     }
 
+    setOptionsFor?.let { setId ->
+        val set = workout.exercises.flatMap { it.sets }.firstOrNull { it.id == setId }
+        if (set != null) {
+            SetOptionsDialog(
+                viewModel = viewModel,
+                set = set,
+                onClose = { setOptionsFor = null },
+                onEditNote = { setNoteFor = setId; setOptionsFor = null },
+                onEditPartials = {
+                    setOptionsFor = null
+                    beginEdit(ActiveEdit(setId, EditField.PARTIALS))
+                },
+            )
+        } else {
+            setOptionsFor = null
+        }
+    }
+
+    setNoteFor?.let { setId ->
+        val set = workout.exercises.flatMap { it.sets }.firstOrNull { it.id == setId }
+        if (set != null) {
+            SetNoteDialog(
+                initial = set.note,
+                onSave = { text -> viewModel.updateSet(setId) { it.copy(note = text) }; setNoteFor = null },
+                onDismiss = { setNoteFor = null },
+            )
+        } else {
+            setNoteFor = null
+        }
+    }
+
     viewModel.workoutNoteDraft?.let { draft ->
         WorkoutNoteDialog(
             value = draft,
@@ -171,6 +313,30 @@ fun ActiveWorkoutScreen(viewModel: TrainingViewModel, onBack: () -> Unit) {
     viewModel.prEvent?.let { event ->
         PrCelebration(event = event, onDismiss = viewModel::consumePrEvent)
     }
+}
+
+private fun keypadLabel(edit: ActiveEdit, set: WorkoutSet?): String {
+    val prefix = set?.let { "set ${it.setIndex}" } ?: ""
+    val field = when (edit.field) {
+        EditField.LOAD -> "kg"
+        EditField.REPS -> if (set?.isPerSide == true) "reps (${edit.side.name.lowercase()})" else "reps"
+        EditField.RIR -> "rir"
+        EditField.PARTIALS -> "partial reps"
+    }
+    return listOf(prefix, field).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+private fun advanceToNextIncomplete(
+    workout: Workout,
+    completedSetId: String,
+    beginEdit: (ActiveEdit) -> Unit,
+) {
+    val flat = workout.exercises.flatMap { ex -> ex.sets.map { ex.id to it } }
+    val index = flat.indexOfFirst { it.second.id == completedSetId }
+    if (index < 0) return
+    val next = flat.drop(index + 1).firstOrNull { !it.second.completed && it.second.setType.feedsProgression }
+        ?: flat.drop(index + 1).firstOrNull { !it.second.completed }
+    if (next != null) beginEdit(ActiveEdit(next.second.id, EditField.LOAD))
 }
 
 @Composable
@@ -188,10 +354,7 @@ private fun WorkoutHeader(viewModel: TrainingViewModel, workout: Workout) {
             .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MetroText(
-            text = "%d:%02d".format(elapsed / 60, elapsed % 60),
-            style = MetroTextStyle.ListItemTitle,
-        )
+        MetroText(text = "%d:%02d".format(elapsed / 60, elapsed % 60), style = MetroTextStyle.ListItemTitle)
         Spacer(modifier = Modifier.width(16.dp))
         MetroText(
             text = "${viewModel.formatWeight(viewModel.workoutVolumeKg())} volume · ${viewModel.completedSetCount()} sets",
@@ -248,6 +411,407 @@ private fun RestBanner(viewModel: TrainingViewModel, workout: Workout) {
                     .background(MetroTheme.colors.accent),
             )
         }
+    }
+}
+
+@Composable
+private fun WorkoutExerciseBlock(
+    viewModel: TrainingViewModel,
+    exercise: WorkoutExercise,
+    activeEdit: ActiveEdit?,
+    onCellTap: (ActiveEdit, WorkoutSet) -> Unit,
+    onOpenSetOptions: (String) -> Unit,
+    onComplete: (String) -> Unit,
+    onUncomplete: (String) -> Unit,
+    onOpenMenu: (Rect) -> Unit,
+    isActive: Boolean,
+) {
+    val snapshot = exercise.snapshot
+    val imageRes = exerciseImageRes(exercise.exerciseId, 0)
+    var headerBounds by remember { mutableStateOf(Rect.Zero) }
+    val previous = viewModel.previousByExercise[exercise.id].orEmpty()
+    val rirOn = viewModel.rirEnabled
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.onGloballyPositioned { headerBounds = it.boundsInWindow() },
+        ) {
+            if (imageRes != null) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(imageRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    exercise.supersetTag?.let {
+                        MetroText(
+                            text = "superset $it",
+                            style = MetroTextStyle.ListItemSubtitle,
+                            color = MetroTheme.colors.accent,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
+                    MetroText(
+                        text = exercise.exerciseName,
+                        style = MetroTextStyle.ListItemTitle,
+                        color = if (isActive) MetroTheme.colors.accent else MetroTheme.colors.primaryText,
+                    )
+                }
+                val rir = if (snapshot.targetRirMin != null && snapshot.targetRirMax != null) {
+                    " · ${snapshot.targetRirMin}–${snapshot.targetRirMax} RIR"
+                } else {
+                    ""
+                }
+                MetroText(
+                    text = "target ${snapshot.repMin}–${snapshot.repMax}$rir",
+                    style = MetroTextStyle.ListItemSubtitle,
+                    color = MetroTheme.colors.secondaryText,
+                )
+            }
+            MetroText(
+                text = "⋯",
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.primaryText,
+                modifier = Modifier.metroClickable { onOpenMenu(headerBounds) }.padding(horizontal = 8.dp),
+            )
+        }
+        if (exercise.note.isNotBlank()) {
+            MetroText(
+                text = exercise.note,
+                style = MetroTextStyle.ListItemSubtitle,
+                color = MetroTheme.colors.secondaryText,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            HeaderCell("SET", 0.6f)
+            HeaderCell("PREVIOUS", 1.1f)
+            HeaderCell(viewModel.weightSuffix.uppercase(), 0.9f)
+            HeaderCell("REPS", 0.9f)
+            if (rirOn) HeaderCell("RIR", 0.6f)
+            HeaderCell("", 0.5f)
+        }
+
+        var prescribedSeen = 0
+        exercise.sets.forEach { set ->
+            val previousValues = if (set.setType.feedsProgression && set.prescribed) {
+                previous.getOrNull(prescribedSeen++)
+            } else {
+                null
+            }
+            SetRow(
+                viewModel = viewModel,
+                set = set,
+                previous = previousValues,
+                rirOn = rirOn,
+                activeEdit = activeEdit,
+                onCellTap = onCellTap,
+                onOpenSetOptions = { onOpenSetOptions(set.id) },
+                onComplete = { onComplete(set.id) },
+                onUncomplete = { onUncomplete(set.id) },
+            )
+        }
+
+        Row(modifier = Modifier.padding(top = 6.dp)) {
+            MetroText(
+                text = "+ set",
+                style = MetroTextStyle.ListItemSubtitle,
+                color = MetroTheme.colors.accent,
+                modifier = Modifier.metroClickable { viewModel.addSet(exercise.id, SetType.WORK) }.padding(end = 16.dp).padding(vertical = 4.dp),
+            )
+            MetroText(
+                text = "+ warm-up",
+                style = MetroTextStyle.ListItemSubtitle,
+                color = MetroTheme.colors.accent,
+                modifier = Modifier.metroClickable { viewModel.addSet(exercise.id, SetType.WARMUP) }.padding(vertical = 4.dp),
+            )
+        }
+        Divider()
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.HeaderCell(text: String, weight: Float) {
+    MetroText(
+        text = text,
+        style = MetroTextStyle.ListItemSubtitle,
+        color = MetroTheme.colors.secondaryText,
+        modifier = Modifier.weight(weight),
+    )
+}
+
+private fun setLabel(set: WorkoutSet): String = when (set.setType) {
+    SetType.WARMUP -> "W"
+    SetType.FAILURE -> "F"
+    SetType.DROP -> "D"
+    SetType.BACKOFF -> "B"
+    SetType.MYOREP -> "M"
+    SetType.WORK -> set.setIndex.toString()
+}
+
+@Composable
+private fun setLabelColor(set: WorkoutSet): Color =
+    if (set.setType == SetType.WORK) MetroTheme.colors.primaryText else MetroTheme.colors.accent
+
+@Composable
+private fun SetRow(
+    viewModel: TrainingViewModel,
+    set: WorkoutSet,
+    previous: Triple<Double?, Int, Int?>?,
+    rirOn: Boolean,
+    activeEdit: ActiveEdit?,
+    onCellTap: (ActiveEdit, WorkoutSet) -> Unit,
+    onOpenSetOptions: () -> Unit,
+    onComplete: () -> Unit,
+    onUncomplete: () -> Unit,
+) {
+    val flash = remember { Animatable(0f) }
+    LaunchedEffect(set.completed) {
+        if (set.completed) { flash.snapTo(1f); flash.animateTo(0f, tween(450)) }
+    }
+    val background = lerp(MetroTheme.colors.background, MetroTheme.colors.accent, flash.value * 0.22f)
+    val previousText = previous?.let { (load, reps, rir) ->
+        val loadText = load?.let { viewModel.weightNumber(it) } ?: "–"
+        "$loadText×$reps" + (rir?.let { " @$it" } ?: "")
+    } ?: "–"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(background)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MetroText(
+            text = setLabel(set),
+            style = MetroTextStyle.ListItemTitle,
+            color = setLabelColor(set),
+            modifier = Modifier.weight(0.6f).metroClickable { onOpenSetOptions() }.padding(vertical = 6.dp),
+        )
+        MetroText(
+            text = previousText,
+            style = MetroTextStyle.ListItemSubtitle,
+            color = MetroTheme.colors.secondaryText,
+            modifier = Modifier.weight(1.1f),
+        )
+        EditableCell(
+            text = viewModel.weightNumber(set.load),
+            active = activeEdit?.setId == set.id && activeEdit.field == EditField.LOAD,
+            weight = 0.9f,
+            onTap = { onCellTap(ActiveEdit(set.id, EditField.LOAD), set) },
+        )
+        EditableCell(
+            text = repsText(set),
+            active = activeEdit?.setId == set.id && activeEdit.field == EditField.REPS,
+            weight = 0.9f,
+            onTap = { onCellTap(ActiveEdit(set.id, EditField.REPS), set) },
+        )
+        if (rirOn) {
+            EditableCell(
+                text = set.rir?.toString() ?: "–",
+                active = activeEdit?.setId == set.id && activeEdit.field == EditField.RIR,
+                weight = 0.6f,
+                onTap = { onCellTap(ActiveEdit(set.id, EditField.RIR), set) },
+            )
+        }
+        Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.Center) {
+            com.metro.ui.MetroCheckBox(
+                checked = set.completed,
+                onCheckedChange = { checked -> if (checked) onComplete() else onUncomplete() },
+            )
+        }
+    }
+}
+
+private fun repsText(set: WorkoutSet): String {
+    val base = if (set.isPerSide) {
+        "${set.repsLeft ?: 0}/${set.repsRight ?: 0}"
+    } else if (set.repsCompleted > 0) {
+        set.repsCompleted.toString()
+    } else {
+        "–"
+    }
+    val partials = set.partialReps ?: 0
+    return if (partials > 0) "$base +$partials" else base
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.EditableCell(
+    text: String,
+    active: Boolean,
+    weight: Float,
+    onTap: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.weight(weight).metroClickable { onTap() }.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        MetroText(
+            text = text.ifBlank { "–" },
+            style = MetroTextStyle.ListItemTitle,
+            color = if (active) MetroTheme.colors.accent else MetroTheme.colors.primaryText,
+            textAlign = TextAlign.Start,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(if (active) MetroTheme.colors.accent else Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun WorkoutKeypad(
+    label: String,
+    onDigit: (Char) -> Unit,
+    onDecimal: () -> Unit,
+    onBackspace: () -> Unit,
+    onNext: () -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MetroTheme.colors.secondarySurface)
+            .metroNavBarPadding()
+            .padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MetroText(text = label, style = MetroTextStyle.ListItemSubtitle, color = MetroTheme.colors.secondaryText)
+            Spacer(modifier = Modifier.weight(1f))
+            MetroText(
+                text = "done",
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.accent,
+                modifier = Modifier.metroClickable { onDone() }.padding(horizontal = 8.dp),
+            )
+        }
+        val rows = listOf(
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
+        )
+        rows.forEachIndexed { index, row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { key ->
+                    KeypadKey(key, Modifier.weight(1f)) { onDigit(key.first()) }
+                }
+                when (index) {
+                    0 -> ActionKey("◀", Modifier.weight(1f)) { onBackspace() }
+                    1 -> ActionKey("next", Modifier.weight(1f)) { onNext() }
+                    else -> ActionKey("done", Modifier.weight(1f)) { onDone() }
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            KeypadKey(".", Modifier.weight(1f)) { onDecimal() }
+            KeypadKey("0", Modifier.weight(3f)) { onDigit('0') }
+        }
+    }
+}
+
+@Composable
+private fun KeypadKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(MetroTheme.colors.background)
+            .metroClickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(text = label, style = MetroTextStyle.ListItemTitle)
+    }
+}
+
+@Composable
+private fun ActionKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(MetroTheme.colors.accent)
+            .metroClickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(text = label, style = MetroTextStyle.ListItemTitle, color = Color.White)
+    }
+}
+
+@Composable
+private fun SetOptionsDialog(
+    viewModel: TrainingViewModel,
+    set: WorkoutSet,
+    onClose: () -> Unit,
+    onEditNote: () -> Unit,
+    onEditPartials: () -> Unit,
+) {
+    MetroMessageDialog(title = "set ${set.setIndex}", onDismissRequest = onClose) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            MetroText(text = "type", style = MetroTextStyle.ListItemSubtitle, color = MetroTheme.colors.secondaryText)
+            listOf(SetType.WORK, SetType.WARMUP, SetType.FAILURE, SetType.DROP, SetType.BACKOFF, SetType.MYOREP).forEach { type ->
+                MetroText(
+                    text = type.name.lowercase().replace('_', ' '),
+                    style = MetroTextStyle.ListItemTitle,
+                    color = if (type == set.setType) MetroTheme.colors.accent else MetroTheme.colors.primaryText,
+                    modifier = Modifier.metroClickable {
+                        viewModel.changeSetType(set.id, type)
+                        onClose()
+                    }.padding(vertical = 8.dp),
+                )
+            }
+            Divider()
+            MetroText(
+                text = if (set.isPerSide) "per side: on" else "per side: off",
+                style = MetroTextStyle.ListItemTitle,
+                modifier = Modifier.metroClickable {
+                    viewModel.updateSet(set.id) {
+                        if (it.isPerSide) it.copy(repsLeft = null, repsRight = null)
+                        else it.copy(repsLeft = it.repsCompleted, repsRight = it.repsCompleted)
+                    }
+                    onClose()
+                }.padding(vertical = 10.dp),
+            )
+            MetroText(
+                text = "partial reps",
+                style = MetroTextStyle.ListItemTitle,
+                modifier = Modifier.metroClickable { onEditPartials() }.padding(vertical = 10.dp),
+            )
+            MetroText(
+                text = "set note",
+                style = MetroTextStyle.ListItemTitle,
+                modifier = Modifier.metroClickable { onEditNote() }.padding(vertical = 10.dp),
+            )
+            MetroText(
+                text = "remove set",
+                style = MetroTextStyle.ListItemTitle,
+                color = MetroTheme.colors.accent,
+                modifier = Modifier.metroClickable { viewModel.removeSet(set.id); onClose() }.padding(vertical = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SetNoteDialog(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    MetroMessageDialog(
+        title = "set note",
+        onDismissRequest = onDismiss,
+        confirmLabel = "save",
+        onConfirm = { onSave(text) },
+    ) {
+        MetroTextBox(value = text, onValueChange = { text = it }, placeholder = "note", modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -327,11 +891,7 @@ private fun ExerciseMenu(
 }
 
 @Composable
-private fun PlateCalculatorDialog(
-    viewModel: TrainingViewModel,
-    initial: Double,
-    onDismiss: () -> Unit,
-) {
+private fun PlateCalculatorDialog(viewModel: TrainingViewModel, initial: Double, onDismiss: () -> Unit) {
     var target by remember { mutableStateOf(viewModel.weightNumber(initial)) }
     val targetKg = viewModel.parseWeight(target)
     val plates = targetKg?.let { viewModel.plateBreakdown(it) }
@@ -358,418 +918,6 @@ private fun PlateCalculatorDialog(
                 },
                 style = MetroTextStyle.ListItemTitle,
                 modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorkoutExerciseBlock(
-    viewModel: TrainingViewModel,
-    exercise: WorkoutExercise,
-    expandedSetId: String?,
-    onToggleSet: (String) -> Unit,
-    onOpenMenu: (Rect) -> Unit,
-) {
-    val snapshot = exercise.snapshot
-    val imageRes = exerciseImageRes(exercise.exerciseId, 0)
-    var headerBounds by remember { mutableStateOf(Rect.Zero) }
-    val previous = viewModel.previousByExercise[exercise.id].orEmpty()
-
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.onGloballyPositioned { headerBounds = it.boundsInWindow() },
-        ) {
-            if (imageRes != null) {
-                androidx.compose.foundation.Image(
-                    painter = painterResource(imageRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    contentScale = ContentScale.Crop,
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    exercise.supersetTag?.let {
-                        MetroText(
-                            text = "superset $it",
-                            style = MetroTextStyle.ListItemSubtitle,
-                            color = MetroTheme.colors.accent,
-                            modifier = Modifier.padding(end = 8.dp),
-                        )
-                    }
-                    MetroText(text = exercise.exerciseName, style = MetroTextStyle.ListItemTitle)
-                }
-                val rir = if (snapshot.targetRirMin != null && snapshot.targetRirMax != null) {
-                    " · ${snapshot.targetRirMin}–${snapshot.targetRirMax} RIR"
-                } else {
-                    ""
-                }
-                MetroText(
-                    text = "target ${snapshot.repMin}–${snapshot.repMax}$rir",
-                    style = MetroTextStyle.ListItemSubtitle,
-                    color = MetroTheme.colors.secondaryText,
-                )
-            }
-            MetroText(
-                text = "⋯",
-                style = MetroTextStyle.ListItemTitle,
-                color = MetroTheme.colors.primaryText,
-                modifier = Modifier
-                    .metroClickable { onOpenMenu(headerBounds) }
-                    .padding(horizontal = 8.dp),
-            )
-        }
-        if (exercise.note.isNotBlank()) {
-            MetroText(
-                text = exercise.note,
-                style = MetroTextStyle.ListItemSubtitle,
-                color = MetroTheme.colors.secondaryText,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-
-        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            HeaderCell("SET", 0.6f)
-            HeaderCell("PREVIOUS", 1.1f)
-            HeaderCell(viewModel.weightSuffix.uppercase(), 1f)
-            HeaderCell("REPS", 0.8f)
-            HeaderCell("RIR", 0.6f)
-            HeaderCell("", 0.5f)
-        }
-
-        var prescribedSeen = 0
-        exercise.sets.forEach { set ->
-            val previousValues = if (set.setType.feedsProgression && set.prescribed) {
-                previous.getOrNull(prescribedSeen++)
-            } else {
-                null
-            }
-            SetRow(
-                viewModel = viewModel,
-                set = set,
-                previous = previousValues,
-                expanded = expandedSetId == set.id,
-                onClick = { onToggleSet(set.id) },
-            )
-            if (expandedSetId == set.id) {
-                SetEditorPanel(viewModel = viewModel, exercise = exercise, set = set)
-            }
-        }
-
-        Row(modifier = Modifier.padding(top = 6.dp)) {
-            MetroText(
-                text = "+ set",
-                style = MetroTextStyle.ListItemSubtitle,
-                color = MetroTheme.colors.accent,
-                modifier = Modifier
-                    .metroClickable { viewModel.addSet(exercise.id, SetType.WORK) }
-                    .padding(end = 16.dp)
-                    .padding(vertical = 4.dp),
-            )
-            MetroText(
-                text = "+ warm-up",
-                style = MetroTextStyle.ListItemSubtitle,
-                color = MetroTheme.colors.accent,
-                modifier = Modifier
-                    .metroClickable { viewModel.addSet(exercise.id, SetType.WARMUP) }
-                    .padding(vertical = 4.dp),
-            )
-        }
-        Divider()
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.RowScope.HeaderCell(text: String, weight: Float) {
-    MetroText(
-        text = text,
-        style = MetroTextStyle.ListItemSubtitle,
-        color = MetroTheme.colors.secondaryText,
-        modifier = Modifier.weight(weight),
-    )
-}
-
-private fun setLabel(set: WorkoutSet): String = when (set.setType) {
-    SetType.WARMUP -> "W"
-    SetType.FAILURE -> "F"
-    SetType.DROP -> "D"
-    SetType.BACKOFF -> "B"
-    SetType.MYOREP -> "M"
-    SetType.WORK -> set.setIndex.toString()
-}
-
-@Composable
-private fun setLabelColor(set: WorkoutSet): Color =
-    if (set.setType == SetType.WORK) MetroTheme.colors.primaryText else MetroTheme.colors.accent
-
-@Composable
-private fun SetRow(
-    viewModel: TrainingViewModel,
-    set: WorkoutSet,
-    previous: Triple<Double?, Int, Int?>?,
-    expanded: Boolean,
-    onClick: () -> Unit,
-) {
-    val flash = remember { Animatable(0f) }
-    LaunchedEffect(set.completed) {
-        if (set.completed) { flash.snapTo(1f); flash.animateTo(0f, tween(450)) }
-    }
-    val background = lerp(MetroTheme.colors.background, MetroTheme.colors.accent, flash.value * 0.22f)
-    val previousText = previous?.let { (load, reps, rir) ->
-        val loadText = load?.let { viewModel.weightNumber(it) } ?: "–"
-        "$loadText×$reps" + (rir?.let { " @$it" } ?: "")
-    } ?: "–"
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (expanded) MetroTheme.colors.secondarySurface else background)
-            .metroClickable { onClick() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MetroText(
-            text = setLabel(set),
-            style = MetroTextStyle.ListItemTitle,
-            color = setLabelColor(set),
-            modifier = Modifier.weight(0.6f),
-        )
-        MetroText(
-            text = previousText,
-            style = MetroTextStyle.ListItemSubtitle,
-            color = MetroTheme.colors.secondaryText,
-            modifier = Modifier.weight(1.1f),
-        )
-        MetroText(
-            text = viewModel.weightNumber(set.load).ifBlank { "–" },
-            style = MetroTextStyle.ListItemTitle,
-            modifier = Modifier.weight(1f),
-        )
-        MetroText(
-            text = if (set.isPerSide) {
-                "${set.repsLeft ?: 0}/${set.repsRight ?: 0}"
-            } else if (set.repsCompleted > 0) {
-                set.repsCompleted.toString()
-            } else {
-                "–"
-            },
-            style = MetroTextStyle.ListItemTitle,
-            modifier = Modifier.weight(0.8f),
-        )
-        MetroText(
-            text = set.rir?.toString() ?: "–",
-            style = MetroTextStyle.ListItemTitle,
-            modifier = Modifier.weight(0.6f),
-        )
-        Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.Center) {
-            com.metro.ui.MetroCheckBox(
-                checked = set.completed,
-                onCheckedChange = { checked ->
-                    if (checked) viewModel.completeSet(set.id) else viewModel.updateSet(set.id) { it.copy(completed = false) }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SetEditorPanel(
-    viewModel: TrainingViewModel,
-    exercise: WorkoutExercise,
-    set: WorkoutSet,
-) {
-    val increment = exercise.snapshot.incrementKg
-    var perSide by remember(set.id) { mutableStateOf(set.isPerSide) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MetroTheme.colors.secondarySurface)
-            .padding(12.dp),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            NumberField(
-                label = "load (${viewModel.weightSuffix})",
-                value = viewModel.weightNumber(set.load),
-                decimal = true,
-                modifier = Modifier.weight(1f),
-                onCommit = { text -> viewModel.updateSet(set.id) { it.copy(load = viewModel.parseWeight(text) ?: it.load) } },
-                onStep = { dir ->
-                    val current = set.load
-                    if (current != null && increment != null) {
-                        val next = if (dir > 0) current + increment else (current - increment).coerceAtLeast(0.0)
-                        viewModel.updateSet(set.id) { it.copy(load = WeightMath.clean(next)) }
-                    }
-                },
-            )
-            NumberField(
-                label = "reps",
-                value = if (set.repsCompleted > 0) set.repsCompleted.toString() else "",
-                decimal = false,
-                modifier = Modifier.weight(1f),
-                onCommit = { text -> viewModel.updateSet(set.id) { it.copy(repsCompleted = text.toIntOrNull() ?: it.repsCompleted) } },
-                onStep = { dir -> viewModel.updateSet(set.id) { it.copy(repsCompleted = (it.repsCompleted + dir).coerceAtLeast(0)) } },
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        MetroText(text = "RIR", style = MetroTextStyle.ListItemSubtitle, color = MetroTheme.colors.secondaryText)
-        RirSegmented(selected = set.rir) { rir -> viewModel.updateSet(set.id) { it.copy(rir = rir) } }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        MetroText(text = "set type", style = MetroTextStyle.ListItemSubtitle, color = MetroTheme.colors.secondaryText)
-        TypeSegmented(selected = set.setType) { type -> viewModel.changeSetType(set.id, type) }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetroText(
-                text = "per side",
-                style = MetroTextStyle.ListItemSubtitle,
-                color = MetroTheme.colors.secondaryText,
-                modifier = Modifier.weight(1f),
-            )
-            com.metro.ui.MetroCheckBox(checked = perSide, onCheckedChange = { checked ->
-                perSide = checked
-                viewModel.updateSet(set.id) {
-                    if (checked) it.copy(repsLeft = it.repsLeft ?: it.repsCompleted, repsRight = it.repsRight ?: it.repsCompleted)
-                    else it.copy(repsLeft = null, repsRight = null)
-                }
-            })
-        }
-        if (perSide) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                NumberField(
-                    label = "left reps",
-                    value = (set.repsLeft ?: 0).toString(),
-                    decimal = false,
-                    modifier = Modifier.weight(1f),
-                    onCommit = { text -> viewModel.updateSet(set.id) { it.copy(repsLeft = text.toIntOrNull() ?: it.repsLeft) } },
-                    onStep = { dir -> viewModel.updateSet(set.id) { it.copy(repsLeft = ((it.repsLeft ?: 0) + dir).coerceAtLeast(0)) } },
-                )
-                NumberField(
-                    label = "right reps",
-                    value = (set.repsRight ?: 0).toString(),
-                    decimal = false,
-                    modifier = Modifier.weight(1f),
-                    onCommit = { text -> viewModel.updateSet(set.id) { it.copy(repsRight = text.toIntOrNull() ?: it.repsRight) } },
-                    onStep = { dir -> viewModel.updateSet(set.id) { it.copy(repsRight = ((it.repsRight ?: 0) + dir).coerceAtLeast(0)) } },
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        NumberField(
-            label = "partial reps",
-            value = (set.partialReps ?: 0).toString(),
-            decimal = false,
-            modifier = Modifier.fillMaxWidth(),
-            onCommit = { text -> viewModel.updateSet(set.id) { it.copy(partialReps = text.toIntOrNull()) } },
-            onStep = { dir -> viewModel.updateSet(set.id) { it.copy(partialReps = ((it.partialReps ?: 0) + dir).coerceAtLeast(0)) } },
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        var note by remember(set.id, set.note) { mutableStateOf(set.note) }
-        MetroTextBox(
-            value = note,
-            onValueChange = { note = it; viewModel.updateSet(set.id) { s -> s.copy(note = it) } },
-            placeholder = "set note",
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        MetroText(
-            text = "delete set",
-            style = MetroTextStyle.ListItemSubtitle,
-            color = MetroTheme.colors.accent,
-            modifier = Modifier.metroClickable { viewModel.removeSet(set.id) }.padding(vertical = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun NumberField(
-    label: String,
-    value: String,
-    decimal: Boolean,
-    onCommit: (String) -> Unit,
-    onStep: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val focusManager = LocalFocusManager.current
-    var focused by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf(value) }
-    LaunchedEffect(value, focused) { if (!focused) text = value }
-    Column(modifier = modifier) {
-        MetroText(text = label, style = MetroTextStyle.ListItemSubtitle, color = MetroTheme.colors.secondaryText)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetroText(
-                text = "−",
-                style = MetroTextStyle.ListItemTitle,
-                color = MetroTheme.colors.primaryText,
-                modifier = Modifier.metroClickable { onStep(-1) }.padding(horizontal = 6.dp),
-            )
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it; onCommit(it) },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = MetroTheme.colors.primaryText,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 24.sp,
-                ),
-                cursorBrush = SolidColor(MetroTheme.colors.accent),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number,
-                    imeAction = ImeAction.Next,
-                ),
-                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }),
-                modifier = Modifier
-                    .weight(1f)
-                    .onFocusChanged { focused = it.isFocused },
-            )
-            MetroText(
-                text = "+",
-                style = MetroTextStyle.ListItemTitle,
-                color = MetroTheme.colors.primaryText,
-                modifier = Modifier.metroClickable { onStep(1) }.padding(horizontal = 6.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun RirSegmented(selected: Int?, onSelect: (Int?) -> Unit) {
-    val options: List<Int?> = listOf(null, 0, 1, 2, 3, 4, 5)
-    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        options.forEach { option ->
-            val active = option == selected
-            Box(modifier = Modifier.metroClickable { onSelect(option) }.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                MetroText(
-                    text = option?.let { if (it == 5) "5+" else it.toString() } ?: "–",
-                    style = MetroTextStyle.ListItemTitle,
-                    color = if (active) MetroTheme.colors.accent else MetroTheme.colors.secondaryText,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TypeSegmented(selected: SetType, onSelect: (SetType) -> Unit) {
-    Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        listOf(SetType.WORK, SetType.WARMUP, SetType.FAILURE, SetType.DROP, SetType.BACKOFF, SetType.MYOREP).forEach { type ->
-            val active = type == selected
-            MetroText(
-                text = type.name.lowercase().replace('_', ' '),
-                style = MetroTextStyle.ListItemSubtitle,
-                color = if (active) MetroTheme.colors.accent else MetroTheme.colors.secondaryText,
-                modifier = Modifier.metroClickable { onSelect(type) }.padding(vertical = 4.dp),
             )
         }
     }
