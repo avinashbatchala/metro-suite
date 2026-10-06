@@ -5,8 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class CalendarLogicTest {
@@ -97,6 +99,80 @@ class CalendarLogicTest {
         assertEquals(5, slots.size)
         assertEquals("8 AM", slots.first().label)
         assertFalse(slots.any { it.events.isNotEmpty() })
+    }
+
+    @Test
+    fun buildHourSlots_defaultsToFull24Hours() {
+        val day = LocalDate.of(2026, 6, 26).toEpochDay()
+        val slots = CalendarLogic.buildHourSlots(emptyList(), day, zoneId = zoneId)
+        assertEquals(24, slots.size)
+        assertEquals(0, slots.first().hour)
+        assertEquals(23, slots.last().hour)
+    }
+
+    @Test
+    fun formatHourLabel_24Hour() {
+        assertEquals("0:00", CalendarLogic.formatHourLabel(0, use24Hour = true))
+        assertEquals("13:00", CalendarLogic.formatHourLabel(13, use24Hour = true))
+        assertEquals("12 AM", CalendarLogic.formatHourLabel(0, use24Hour = false))
+        assertEquals("1 PM", CalendarLogic.formatHourLabel(13, use24Hour = false))
+    }
+
+    @Test
+    fun buildWeek_startsOnRegionFirstDay() {
+        val friday = LocalDate.of(2026, 6, 26).toEpochDay()
+        val weekUs = CalendarLogic.buildWeek(friday, emptyList(), zoneId, Locale.US)
+        assertEquals(7, weekUs.days.size)
+        assertEquals(DayOfWeek.SUNDAY, LocalDate.ofEpochDay(weekUs.startEpochDay).dayOfWeek)
+
+        val weekUk = CalendarLogic.buildWeek(friday, emptyList(), zoneId, Locale.UK)
+        assertEquals(DayOfWeek.MONDAY, LocalDate.ofEpochDay(weekUk.startEpochDay).dayOfWeek)
+    }
+
+    @Test
+    fun buildMonthGrid_regionFirstSundayOffset() {
+        // 1 June 2026 is a Monday; a Sunday-first grid starts on 31 May.
+        val day = LocalDate.of(2026, 6, 15).toEpochDay()
+        val grid = CalendarLogic.buildMonthGrid(
+            2026, 6, emptyList(), day, zoneId, firstDayOfWeek = DayOfWeek.SUNDAY,
+        )
+        assertEquals(42, grid.size)
+        assertEquals(31, grid.first().dayOfMonth)
+        assertFalse(grid.first().inCurrentMonth)
+    }
+
+    @Test
+    fun buildMiniMonth_has42Cells() {
+        val mini = CalendarLogic.buildMiniMonth(2026, 6, emptyList(), zoneId, Locale.US, DayOfWeek.SUNDAY)
+        assertEquals(42, mini.days.size)
+    }
+
+    @Test
+    fun buildYear_hasTwelveMiniMonths() {
+        val months = CalendarLogic.buildYear(2026, emptyList(), zoneId, Locale.US, DayOfWeek.SUNDAY)
+        assertEquals(12, months.size)
+        assertEquals(1, months.first().monthValue)
+        assertEquals(12, months.last().monthValue)
+    }
+
+    @Test
+    fun dayEventColors_dedupesAndCaps() {
+        val day = LocalDate.of(2026, 6, 26).toEpochDay()
+        val start = LocalDate.ofEpochDay(day).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val events = listOf(
+            sampleEvent(id = 1, startMillis = start, endMillis = start + 3_600_000),
+            sampleEvent(id = 2, startMillis = start + 7_200_000, endMillis = start + 10_800_000),
+        )
+        // Both sample events share the same colour → deduped to one bar.
+        assertEquals(1, CalendarLogic.dayEventColors(events, day, zoneId).size)
+    }
+
+    @Test
+    fun monthStartOffset_matchesFirstDay() {
+        // June 2026 starts Monday (dayOfWeek value 1).
+        val first = LocalDate.of(2026, 6, 1)
+        assertEquals(1, CalendarLogic.monthStartOffset(first, DayOfWeek.SUNDAY))
+        assertEquals(0, CalendarLogic.monthStartOffset(first, DayOfWeek.MONDAY))
     }
 
     // --- Timezone / all-day / recurrence-instance edge cases -------------------------------

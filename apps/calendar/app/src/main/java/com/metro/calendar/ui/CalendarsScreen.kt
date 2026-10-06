@@ -1,6 +1,7 @@
 package com.metro.calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,9 +14,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.metro.calendar.R
@@ -24,7 +30,6 @@ import com.metro.ui.MetroAppBar
 import com.metro.ui.MetroAppBarTextButton
 import com.metro.ui.MetroCircleIconButton
 import com.metro.ui.MetroDimens
-import com.metro.ui.MetroEmptyState
 import com.metro.ui.MetroListItem
 import com.metro.ui.MetroPageHeader
 import com.metro.ui.MetroSystemIconType
@@ -32,9 +37,10 @@ import com.metro.ui.MetroText
 import com.metro.ui.MetroTextStyle
 import com.metro.ui.MetroTheme
 import com.metro.ui.MetroToggleSwitch
+import com.metro.ui.metroClickable
 import com.metro.ui.metroNavBarPadding
 
-/** Subscription management root: device calendar status + subscribed calendars list. */
+/** Subscription + device calendar management root. */
 @Composable
 fun CalendarsScreen(
     state: CalendarState,
@@ -43,6 +49,8 @@ fun CalendarsScreen(
 ) {
     @Suppress("UNUSED_VARIABLE")
     val generation = state.generation
+
+    var colorEditingId by remember { mutableStateOf<Long?>(null) }
 
     Box(
         modifier = modifier
@@ -67,29 +75,90 @@ fun CalendarsScreen(
             }
             MetroPageHeader(title = stringResource(R.string.calendars))
 
-            if (state.subscriptions.isEmpty()) {
-                MetroEmptyState(
-                    message = stringResource(R.string.calendars_empty),
-                    modifier = Modifier.padding(top = 24.dp),
-                )
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    item {
-                        SectionHeader(stringResource(R.string.calendars_section_device))
-                    }
-                    item {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                item { SectionHeader(stringResource(R.string.calendars_section_device)) }
+                item {
+                    MetroListItem(
+                        title = stringResource(R.string.calendars_section_device),
+                        subtitle = if (state.hasCalendarPermission) {
+                            stringResource(R.string.device_calendar_connected)
+                        } else {
+                            stringResource(R.string.device_calendar_not_connected)
+                        },
+                    )
+                }
+                items(state.writableCalendars, key = { "cal-${it.id}" }) { calendar ->
+                    Column {
                         MetroListItem(
-                            title = stringResource(R.string.calendars_section_device),
-                            subtitle = if (state.hasCalendarPermission) {
-                                stringResource(R.string.device_calendar_connected)
-                            } else {
-                                stringResource(R.string.device_calendar_not_connected)
+                            title = calendar.displayName,
+                            leading = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            runCatching {
+                                                Color(android.graphics.Color.parseColor(calendar.colorHex))
+                                            }.getOrDefault(MetroTheme.colors.accent),
+                                        )
+                                        .metroClickable {
+                                            colorEditingId = if (colorEditingId == calendar.id) null else calendar.id
+                                        },
+                                )
+                            },
+                            trailing = {
+                                MetroToggleSwitch(
+                                    checked = calendar.isVisible,
+                                    onCheckedChange = { visible ->
+                                        state.setCalendarVisible(calendar.id, visible)
+                                    },
+                                    showStatus = false,
+                                )
                             },
                         )
+                        if (colorEditingId == calendar.id) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = MetroDimens.ScreenHorizontalMargin,
+                                        end = MetroDimens.ScreenHorizontalMargin,
+                                        bottom = 8.dp,
+                                    ),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                CalendarColorPresets.forEach { hex ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(android.graphics.Color.parseColor(hex)))
+                                            .metroClickable {
+                                                state.setCalendarColor(calendar.id, hex)
+                                                colorEditingId = null
+                                            },
+                                    )
+                                }
+                            }
+                        }
                     }
+                }
+
+                item { SectionHeader(stringResource(R.string.calendars_section_subscriptions)) }
+                if (state.subscriptions.isEmpty()) {
                     item {
-                        SectionHeader(stringResource(R.string.calendars_section_subscriptions))
+                        MetroText(
+                            text = stringResource(R.string.calendars_empty),
+                            style = MetroTextStyle.Body,
+                            color = MetroTheme.colors.secondaryText,
+                            modifier = Modifier.padding(
+                                start = MetroDimens.ScreenHorizontalMargin,
+                                end = MetroDimens.ScreenHorizontalMargin,
+                                top = 8.dp,
+                            ),
+                        )
                     }
+                } else {
                     items(state.subscriptions, key = { it.id }) { subscription ->
                         MetroListItem(
                             title = subscription.name,
@@ -129,6 +198,12 @@ fun CalendarsScreen(
         )
     }
 }
+
+/** WP8.1 calendar accent palette for per-calendar colour. */
+private val CalendarColorPresets = listOf(
+    "#1BA1E2", "#E51400", "#339933", "#F09609", "#8CBF26", "#A05000",
+    "#E671B8", "#A200FF", "#0050EF", "#76608A", "#647687", "#60A917",
+)
 
 @Composable
 private fun SectionHeader(text: String) {

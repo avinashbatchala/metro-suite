@@ -29,9 +29,9 @@ import com.metro.ui.MetroSystemTheme
 
 class MainActivity : ComponentActivity() {
     private val requestCalendar = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        permissionResult?.invoke(granted)
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        permissionResult?.invoke(result[Manifest.permission.READ_CALENDAR] == true)
     }
 
     private var permissionResult: ((Boolean) -> Unit)? = null
@@ -84,7 +84,12 @@ class MainActivity : ComponentActivity() {
                                     permissionResult = { granted ->
                                         state.onPermissionResult(granted)
                                     }
-                                    requestCalendar.launch(Manifest.permission.READ_CALENDAR)
+                                    requestCalendar.launch(
+                                        arrayOf(
+                                            Manifest.permission.READ_CALENDAR,
+                                            Manifest.permission.WRITE_CALENDAR,
+                                        ),
+                                    )
                                 },
                                 onAddSubscription = state::skipToAddSubscription,
                                 onContinueWithDemo = state::continueWithDemo,
