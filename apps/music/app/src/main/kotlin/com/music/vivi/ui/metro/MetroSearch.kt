@@ -81,7 +81,12 @@ private const val SearchDebounceMs = 400L
  * songs / albums / artists / playlists / videos.
  */
 @Composable
-internal fun SearchScreen(playerConnection: PlayerConnection?) {
+internal fun SearchScreen(
+    playerConnection: PlayerConnection?,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
+    onOpenPlaylist: (String) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     var debounced by remember { mutableStateOf("") }
     val pagerState = rememberPagerState(pageCount = { SearchTabs.size })
@@ -180,6 +185,9 @@ internal fun SearchScreen(playerConnection: PlayerConnection?) {
                             onLoadMore = { scope.launch { loadMore(page) } },
                             playerConnection = playerConnection,
                             onLongPressSong = { item, bounds -> menu.open(item, bounds) },
+                            onOpenAlbum = onOpenAlbum,
+                            onOpenArtist = onOpenArtist,
+                            onOpenPlaylist = onOpenPlaylist,
                         )
                     },
                 )
@@ -196,6 +204,9 @@ private fun SearchResultsPane(
     onLoadMore: () -> Unit,
     playerConnection: PlayerConnection?,
     onLongPressSong: (SongItem, Rect) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
+    onOpenPlaylist: (String) -> Unit,
 ) {
     when {
         items.isEmpty() && isLoading -> {
@@ -213,6 +224,9 @@ private fun SearchResultsPane(
                         item = item,
                         playerConnection = playerConnection,
                         onLongPressSong = onLongPressSong,
+                        onOpenAlbum = onOpenAlbum,
+                        onOpenArtist = onOpenArtist,
+                        onOpenPlaylist = onOpenPlaylist,
                     )
                 }
                 if (hasMore) {
@@ -238,6 +252,9 @@ private fun SearchRow(
     item: YTItem,
     playerConnection: PlayerConnection?,
     onLongPressSong: (SongItem, Rect) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
+    onOpenPlaylist: (String) -> Unit,
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
@@ -266,15 +283,11 @@ private fun SearchRow(
                 YouTubeQueue(WatchEndpoint(videoId = item.id), item.toMediaMetadata()),
             )
 
-            is AlbumItem -> playerConnection?.playQueue(YouTubeAlbumRadio(item.playlistId))
+            is AlbumItem -> onOpenAlbum(item.browseId)
 
-            is PlaylistItem -> playerConnection?.playQueue(
-                YouTubePlaylistQueue(item.id, item.title),
-            )
+            is ArtistItem -> onOpenArtist(item.id)
 
-            is ArtistItem -> (item.playEndpoint ?: item.radioEndpoint)?.let { endpoint ->
-                playerConnection?.playQueue(YouTubeQueue(endpoint))
-            }
+            is PlaylistItem -> onOpenPlaylist(item.id)
         }
     }
 
@@ -321,7 +334,7 @@ internal class OnlineMenuState {
 }
 
 @Composable
-private fun OnlineMenuHost(
+internal fun OnlineMenuHost(
     state: OnlineMenuState,
     playerConnection: PlayerConnection?,
     modifier: Modifier = Modifier,

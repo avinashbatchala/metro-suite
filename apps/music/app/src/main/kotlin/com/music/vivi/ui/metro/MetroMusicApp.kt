@@ -145,7 +145,12 @@ fun MetroMusicApp(onExit: () -> Unit = {}) {
                         onOpenArtist = { route = MetroRoute.ArtistDetail(it) },
                         onOpenPlaylist = { route = MetroRoute.PlaylistDetail(it) },
                     )
-                    MetroRoute.Search -> SearchScreen(playerConnection = playerConnection)
+                    MetroRoute.Search -> SearchScreen(
+                        playerConnection = playerConnection,
+                        onOpenAlbum = { route = MetroRoute.OnlineAlbumDetail(it) },
+                        onOpenArtist = { route = MetroRoute.OnlineArtistDetail(it) },
+                        onOpenPlaylist = { route = MetroRoute.OnlinePlaylistDetail(it) },
+                    )
                     MetroRoute.Queue -> QueueScreen(playerConnection = playerConnection)
                     MetroRoute.Downloads -> DownloadsScreen(database = database, downloaded = downloadUtil)
                     MetroRoute.Settings -> SettingsScreen(
@@ -169,6 +174,27 @@ fun MetroMusicApp(onExit: () -> Unit = {}) {
                         database = database,
                         playerConnection = playerConnection,
                         playlistId = current.id,
+                    )
+                    is MetroRoute.OnlineAlbumDetail -> OnlineAlbumDetailScreen(
+                        playerConnection = playerConnection,
+                        database = database,
+                        browseId = current.id,
+                        onOpenArtist = { route = MetroRoute.OnlineArtistDetail(it) },
+                    )
+                    is MetroRoute.OnlineArtistDetail -> OnlineArtistDetailScreen(
+                        playerConnection = playerConnection,
+                        database = database,
+                        artistId = current.id,
+                        onOpenAlbum = { route = MetroRoute.OnlineAlbumDetail(it) },
+                        onOpenArtist = { route = MetroRoute.OnlineArtistDetail(it) },
+                        onOpenPlaylist = { route = MetroRoute.OnlinePlaylistDetail(it) },
+                    )
+                    is MetroRoute.OnlinePlaylistDetail -> OnlinePlaylistDetailScreen(
+                        playerConnection = playerConnection,
+                        database = database,
+                        playlistId = current.id,
+                        onOpenAlbum = { route = MetroRoute.OnlineAlbumDetail(it) },
+                        onOpenArtist = { route = MetroRoute.OnlineArtistDetail(it) },
                     )
                     MetroRoute.Hub -> Unit
                 }
@@ -230,6 +256,9 @@ sealed interface MetroRoute {
     data class AlbumDetail(val id: String) : MetroRoute
     data class ArtistDetail(val id: String) : MetroRoute
     data class PlaylistDetail(val id: String) : MetroRoute
+    data class OnlineAlbumDetail(val id: String) : MetroRoute
+    data class OnlineArtistDetail(val id: String) : MetroRoute
+    data class OnlinePlaylistDetail(val id: String) : MetroRoute
 }
 
 private fun MetroRoute.parentRoute(): MetroRoute = when (this) {
@@ -237,6 +266,12 @@ private fun MetroRoute.parentRoute(): MetroRoute = when (this) {
     is MetroRoute.ArtistDetail,
     is MetroRoute.PlaylistDetail,
     -> MetroRoute.Collection
+
+    is MetroRoute.OnlineAlbumDetail,
+    is MetroRoute.OnlineArtistDetail,
+    is MetroRoute.OnlinePlaylistDetail,
+    -> MetroRoute.Search
+
     else -> MetroRoute.Hub
 }
 
@@ -252,6 +287,9 @@ private fun MetroRoute.loadKey(): Any = when (this) {
     is MetroRoute.AlbumDetail -> "Album:$id"
     is MetroRoute.ArtistDetail -> "Artist:$id"
     is MetroRoute.PlaylistDetail -> "Playlist:$id"
+    is MetroRoute.OnlineAlbumDetail -> "OnlineAlbum:$id"
+    is MetroRoute.OnlineArtistDetail -> "OnlineArtist:$id"
+    is MetroRoute.OnlinePlaylistDetail -> "OnlinePlaylist:$id"
 }
 
 // ---------------------------------------------------------------------------------------------
