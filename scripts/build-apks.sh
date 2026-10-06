@@ -140,6 +140,25 @@ apk_suite_name() {
   fi
 }
 
+# AGP leaves the release APK unsigned. Sign it (env keystore, else the local debug keystore)
+# so it installs and — importantly — gets AOT-compiled (debuggable debug builds run interpreted
+# and jank). Returns non-zero if signing is not possible.
+sign_release_apk() {
+  local in_apk="$1" out_apk="$2"
+  local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+  local apksigner
+  apksigner="$(ls "$sdk"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+  local ks="${KEYSTORE_PATH:-$HOME/.android/debug.keystore}"
+  [[ -f "$ks" ]] || return 1
+  [[ -n "$apksigner" ]] || return 1
+  "$apksigner" sign \
+    --ks "$ks" \
+    --ks-pass "pass:${STORE_PASSWORD:-android}" \
+    --key-pass "pass:${KEY_PASSWORD:-android}" \
+    --ks-key-alias "${KEY_ALIAS:-androiddebugkey}" \
+    --out "$out_apk" "$in_apk" >/dev/null 2>&1
+}
+
 APPS=()
 while IFS= read -r _app; do
   [[ -n "$_app" ]] && APPS+=("$_app")
@@ -198,6 +217,16 @@ for app in "${APPS[@]}"; do
         build_apk="$app_dir/app/build/outputs/apk/release/app-release.apk"
       else
         build_apk=""
+      fi
+    fi
+
+    # Release APKs are unsigned by AGP; sign so they install and run AOT (non-janky).
+    if [[ "$BUILD_VARIANT" == "release" && -n "${build_apk:-}" && "$build_apk" == *"-unsigned.apk" ]]; then
+      signed_apk="$app_dir/app/build/outputs/apk/release/app-release-signed.apk"
+      if sign_release_apk "$build_apk" "$signed_apk"; then
+        build_apk="$signed_apk"
+      else
+        echo "WARN: could not sign release APK for $app (install will fail)" >&2
       fi
     fi
 
